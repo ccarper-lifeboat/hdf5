@@ -201,6 +201,33 @@ static const H5E_msg_t H5E_CANTUNLOCK_msg_s = {false, "Unable to unlock object",
 static const H5E_msg_t H5E_NOSPACE_msg_s = {false, "No space available for allocation", H5E_MINOR, &H5E_err_cls_s};
 static const H5E_msg_t H5E_OBJOPEN_msg_s = {false, "Object is already open", H5E_MINOR, &H5E_err_cls_s};
 
+/* SCC: Shared Chunk Cache errors */
+static const H5E_msg_t H5E_ALREADY_LINKED_msg_s = {false, "Element is already present on an LRU list", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_BADOPCODE_msg_s = {false, "Incompatible I/O operation code provided", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_CANNOTALLOC_msg_s = {false, "Failed to allocate a value", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_CANNOTDESTROY_msg_s = {false, "Failed to destroy internal structure", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_CANNOTEVICT_msg_s = {false, "Failed to evict chunk", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_CANNOTFLUSH_msg_s = {false, "Failed to flush dataset properly", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_CANNOTFREE_msg_s = {false, "Failed to free structure", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_CANNOTGET_msg_s = {false, "Failed to fetch queried element", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_CANNOTINSERT_msg_s = {false, "Failed to insert element", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_CANNOTPREPEND_msg_s = {false, "Failed to prepend element to DLL", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_CANNOTREMOVE_msg_s = {false, "Failed to remove element", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_CHUNK_KEY_msg_s = {false, "Failed to compute the chunk key", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_DLL_msg_s = {false, "Failed to use the DLL properly", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_DLL_INVARIANT_msg_s = {false, "Global header LRU invariant failed", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_DSETNOTFOUND_msg_s = {false, "Dataset not found when it should exist", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_HT_INTERNAL_msg_s = {false, "Failed to internally operate properly", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_HT_NOTFOUND_msg_s = {false, "Element not found in a hash table (unexpected)", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_INIT_CHUNK_SELECTION_msg_s = {false, "Initial structured chunk selection failed", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_INVALIDLIMIT_msg_s = {false, "Quiescent/Active limit must be non-zero", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_IOFAIL_msg_s = {false, "I/O request with the shared chunk cache failed", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_NOT_A_MEMBER_msg_s = {false, "Element is not on the specified LRU list", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_NOT_IMPLEMTED_msg_s = {false, "Function is not yet implemented", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_NOT_TAILMOST_msg_s = {false, "Chunk is not tailmost when it should have been", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_SIZE_MISMATCH_msg_s = {false, "Issue with LRU-related size operation", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_SPLICE_FAILED_msg_s = {false, "Failed to properly interact with the LRU list head", H5E_MINOR, &H5E_err_cls_s};
+
 /* SYSTEM: System level errors */
 static const H5E_msg_t H5E_SYSERRSTR_msg_s = {false, "System error message", H5E_MINOR, &H5E_err_cls_s};
 

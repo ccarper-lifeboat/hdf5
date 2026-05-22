@@ -49,8 +49,10 @@ hid_t H5E_PLUGIN_g         = H5I_INVALID_HID;      /* Plugin for dynamically loa
 hid_t H5E_REFERENCE_g      = H5I_INVALID_HID;      /* References */
 hid_t H5E_RESOURCE_g       = H5I_INVALID_HID;      /* Resource unavailable */
 hid_t H5E_RS_g             = H5I_INVALID_HID;      /* Reference Counted Strings */
+hid_t H5E_SCC_g            = H5I_INVALID_HID;      /* Shared Chunk Cache */
 hid_t H5E_SLIST_g          = H5I_INVALID_HID;      /* Skip Lists */
 hid_t H5E_SOHM_g           = H5I_INVALID_HID;      /* Shared Object Header Messages */
+hid_t H5E_STC_PLINE_g      = H5I_INVALID_HID;      /* Data filters for structured chunk */
 hid_t H5E_STORAGE_g        = H5I_INVALID_HID;      /* Data storage */
 hid_t H5E_SYM_g            = H5I_INVALID_HID;      /* Symbol table */
 hid_t H5E_THREADSAFE_g     = H5I_INVALID_HID;      /* Threadsafety */
@@ -59,7 +61,7 @@ hid_t H5E_VFL_g            = H5I_INVALID_HID;      /* Virtual File Layer */
 hid_t H5E_VOL_g            = H5I_INVALID_HID;      /* Virtual Object Layer */
 
 /* Number of major error messages */
-#define H5E_NUM_MAJ_ERRORS 40
+#define H5E_NUM_MAJ_ERRORS 42
 
 /* Minor error IDs */
 
@@ -242,6 +244,33 @@ hid_t H5E_CANTUNLOCK_g     = H5I_INVALID_HID;      /* Unable to unlock object */
 hid_t H5E_NOSPACE_g        = H5I_INVALID_HID;      /* No space available for allocation */
 hid_t H5E_OBJOPEN_g        = H5I_INVALID_HID;      /* Object is already open */
 
+/* SCC: Shared Chunk Cache errors */
+hid_t H5E_ALREADY_LINKED_g = H5I_INVALID_HID;      /* Element is already present on an LRU list */
+hid_t H5E_BADOPCODE_g      = H5I_INVALID_HID;      /* Incompatible I/O operation code provided */
+hid_t H5E_CANNOTALLOC_g    = H5I_INVALID_HID;      /* Failed to allocate a value */
+hid_t H5E_CANNOTDESTROY_g  = H5I_INVALID_HID;      /* Failed to destroy internal structure */
+hid_t H5E_CANNOTEVICT_g    = H5I_INVALID_HID;      /* Failed to evict chunk */
+hid_t H5E_CANNOTFLUSH_g    = H5I_INVALID_HID;      /* Failed to flush dataset properly */
+hid_t H5E_CANNOTFREE_g     = H5I_INVALID_HID;      /* Failed to free structure */
+hid_t H5E_CANNOTGET_g      = H5I_INVALID_HID;      /* Failed to fetch queried element */
+hid_t H5E_CANNOTINSERT_g   = H5I_INVALID_HID;      /* Failed to insert element */
+hid_t H5E_CANNOTPREPEND_g  = H5I_INVALID_HID;      /* Failed to prepend element to DLL */
+hid_t H5E_CANNOTREMOVE_g   = H5I_INVALID_HID;      /* Failed to remove element */
+hid_t H5E_CHUNK_KEY_g      = H5I_INVALID_HID;      /* Failed to compute the chunk key */
+hid_t H5E_DLL_g            = H5I_INVALID_HID;      /* Failed to use the DLL properly */
+hid_t H5E_DLL_INVARIANT_g  = H5I_INVALID_HID;      /* Global header LRU invariant failed */
+hid_t H5E_DSETNOTFOUND_g   = H5I_INVALID_HID;      /* Dataset not found when it should exist */
+hid_t H5E_HT_INTERNAL_g    = H5I_INVALID_HID;      /* Failed to internally operate properly */
+hid_t H5E_HT_NOTFOUND_g    = H5I_INVALID_HID;      /* Element not found in a hash table (unexpected) */
+hid_t H5E_INIT_CHUNK_SELECTION_g = H5I_INVALID_HID;      /* Initial structured chunk selection failed */
+hid_t H5E_INVALIDLIMIT_g   = H5I_INVALID_HID;      /* Quiescent/Active limit must be non-zero */
+hid_t H5E_IOFAIL_g         = H5I_INVALID_HID;      /* I/O request with the shared chunk cache failed */
+hid_t H5E_NOT_A_MEMBER_g   = H5I_INVALID_HID;      /* Element is not on the specified LRU list */
+hid_t H5E_NOT_IMPLEMTED_g  = H5I_INVALID_HID;      /* Function is not yet implemented */
+hid_t H5E_NOT_TAILMOST_g   = H5I_INVALID_HID;      /* Chunk is not tailmost when it should have been */
+hid_t H5E_SIZE_MISMATCH_g  = H5I_INVALID_HID;      /* Issue with LRU-related size operation */
+hid_t H5E_SPLICE_FAILED_g  = H5I_INVALID_HID;      /* Failed to properly interact with the LRU list head */
+
 /* SYSTEM: System level errors */
 hid_t H5E_SYSERRSTR_g      = H5I_INVALID_HID;      /* System error message */
 
@@ -250,6 +279,6 @@ hid_t H5E_BADSIZE_g        = H5I_INVALID_HID;      /* Bad size for object */
 hid_t H5E_CANTCONVERT_g    = H5I_INVALID_HID;      /* Can't convert datatypes */
 
 /* Number of minor error messages */
-#define H5E_NUM_MIN_ERRORS 140
+#define H5E_NUM_MIN_ERRORS 165
 
 #endif /* H5Edefin_H */

@@ -49,8 +49,10 @@
     H5E_REFERENCE_g =
     H5E_RESOURCE_g =
     H5E_RS_g =
+    H5E_SCC_g =
     H5E_SLIST_g =
     H5E_SOHM_g =
+    H5E_STC_PLINE_g =
     H5E_STORAGE_g =
     H5E_SYM_g =
     H5E_THREADSAFE_g =
@@ -243,6 +245,33 @@ H5E_last_maj_id_g = H5I_INVALID_HID;
     H5E_CANTUNLOCK_g =
     H5E_NOSPACE_g =
     H5E_OBJOPEN_g =
+
+/* SCC: Shared Chunk Cache errors */
+    H5E_ALREADY_LINKED_g =
+    H5E_BADOPCODE_g =
+    H5E_CANNOTALLOC_g =
+    H5E_CANNOTDESTROY_g =
+    H5E_CANNOTEVICT_g =
+    H5E_CANNOTFLUSH_g =
+    H5E_CANNOTFREE_g =
+    H5E_CANNOTGET_g =
+    H5E_CANNOTINSERT_g =
+    H5E_CANNOTPREPEND_g =
+    H5E_CANNOTREMOVE_g =
+    H5E_CHUNK_KEY_g =
+    H5E_DLL_g =
+    H5E_DLL_INVARIANT_g =
+    H5E_DSETNOTFOUND_g =
+    H5E_HT_INTERNAL_g =
+    H5E_HT_NOTFOUND_g =
+    H5E_INIT_CHUNK_SELECTION_g =
+    H5E_INVALIDLIMIT_g =
+    H5E_IOFAIL_g =
+    H5E_NOT_A_MEMBER_g =
+    H5E_NOT_IMPLEMTED_g =
+    H5E_NOT_TAILMOST_g =
+    H5E_SIZE_MISMATCH_g =
+    H5E_SPLICE_FAILED_g =
 
 /* SYSTEM: System level errors */
     H5E_SYSERRSTR_g =

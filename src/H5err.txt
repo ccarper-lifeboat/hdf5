@@ -49,6 +49,7 @@ MAJOR, H5E_IO, Low-level I/O
 MAJOR, H5E_FUNC, Function entry/exit
 MAJOR, H5E_ID, Object ID
 MAJOR, H5E_CACHE, Object cache
+MAJOR, H5E_SCC, Shared Chunk Cache
 MAJOR, H5E_LINK, Links
 MAJOR, H5E_BTREE, B-Tree node
 MAJOR, H5E_SYM, Symbol table
@@ -105,6 +106,7 @@ SECTION, SYSTEM, System level errors
 SECTION, PLUGIN, Plugin errors
 SECTION, MAP, Map related errors
 SECTION, ASYNC, Asynchronous operation errors
+SECTION, SCC, Shared Chunk Cache errors
 SECTION, NONE, No error
 
 # Minor errors
@@ -291,6 +293,34 @@ MINOR, MAP, H5E_CANTPUT, Can't put value
 # Asynchronous operation errors
 MINOR, ASYNC, H5E_CANTWAIT, Can't wait on operation
 MINOR, ASYNC, H5E_CANTCANCEL, Can't cancel operation
+
+# Shared Chunk Cache errors
+
+MINOR, SCC, H5E_ALREADY_LINKED, Element is already present on an LRU list
+MINOR, SCC, H5E_BADOPCODE, Incompatible I/O operation code provided
+MINOR, SCC, H5E_CANNOTALLOC, Failed to allocate a value
+MINOR, SCC, H5E_CANNOTDESTROY, Failed to destroy internal structure
+MINOR, SCC, H5E_CANNOTEVICT, Failed to evict chunk
+MINOR, SCC, H5E_CANNOTFLUSH, Failed to flush dataset properly
+MINOR, SCC, H5E_CANNOTGET, Failed to fetch queried element
+MINOR, SCC, H5E_CANNOTFREE, Failed to free structure
+MINOR, SCC, H5E_CANNOTINSERT, Failed to insert element
+MINOR, SCC, H5E_CANNOTPREPEND, Failed to prepend element to DLL
+MINOR, SCC, H5E_CANNOTREMOVE, Failed to remove element
+MINOR, SCC, H5E_CHUNK_KEY, Failed to compute the chunk key
+MINOR, SCC, H5E_DSETNOTFOUND, Dataset not found when it should exist
+MINOR, SCC, H5E_DLL, Failed to use the DLL properly
+MINOR, SCC, H5E_DLL_INVARIANT, Global header LRU invariant failed
+MINOR, SCC, H5E_HT_NOTFOUND, Element not found in a hash table (unexpected)
+MINOR, SCC, H5E_HT_INTERNAL, Failed to internally operate properly
+MINOR, SCC, H5E_INIT_CHUNK_SELECTION, Initial structured chunk selection failed
+MINOR, SCC, H5E_INVALIDLIMIT, Quiescent/Active limit must be non-zero
+MINOR, SCC, H5E_IOFAIL, I/O request with the shared chunk cache failed
+MINOR, SCC, H5E_NOT_A_MEMBER, Element is not on the specified LRU list
+MINOR, SCC, H5E_NOT_IMPLEMTED, Function is not yet implemented
+MINOR, SCC, H5E_NOT_TAILMOST, Chunk is not tailmost when it should have been
+MINOR, SCC, H5E_SIZE_MISMATCH, Issue with LRU-related size operation
+MINOR, SCC, H5E_SPLICE_FAILED, Failed to properly interact with the LRU list head
 
 # No error, for backward compatibility */
 MINOR, NONE, H5E_NONE_MINOR, No error

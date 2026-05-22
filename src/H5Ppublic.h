@@ -19,10 +19,11 @@
 
 #include "H5public.h"   /* Generic Functions                        */
 #include "H5ACpublic.h" /* Metadata Cache                           */
+#include "H5SCpublic.h" /* Shared Chunk Cache                       */
 #include "H5Dpublic.h"  /* Datasets                                 */
 #include "H5Fpublic.h"  /* Files                                    */
 #include "H5FDpublic.h" /* (Virtual) File Drivers                   */
-#include "H5Ipublic.h"  /* Identifiers                              */
+#include "H5Ipublic.h"  /* Identifiers                               */
 #include "H5Lpublic.h"  /* Links                                    */
 #include "H5MMpublic.h" /* Memory Management                        */
 #include "H5Opublic.h"  /* Object Headers                           */
@@ -4709,6 +4710,40 @@ H5_DLL herr_t H5Pget_page_buffer_size(hid_t plist_id, size_t *buf_size, unsigned
 /**
  * \ingroup FAPL
  *
+ * \brief Get the current initial shared chunk cache configuration from the
+ *        provided file access property list
+ *
+ * \fapl_id{plist_id}
+ * \param[in,out] config_ptr Pointer to the instance of #H5SC__cache_config_t
+ *                in which the current shared chunk cache configuration is to be
+ *                reported
+ * \return \herr_t
+ *
+ * \note The \c in direction applies only to the \ref H5SC__cache_config_t.version
+ *       field. All other fields are \c out parameters.
+ *
+ * \details The fields of the #H5AC_cache_config_t structure are shown
+ *           below:
+ *           \snippet H5SCpublic.h H5SC__cache_config_t_snip
+ *           \click4more
+ *
+ *          H5Pget_scc_config() gets the initial shared chunk cache configuration
+ *          contained in a file access property list and loads it into the
+ *          instance of #H5Pget_scc_config pointed to by the \p config_ptr
+ *          parameter. This configuration is used when the file is opened.
+ *
+ *          Note that the version field of \TText{*config_ptr} must be
+ *          initialized; this allows the library to support earlier versions of
+ *          the #H5AC_cache_config_t structure.
+ *
+ * \since 1.8.0
+ *
+ */
+H5_DLL herr_t H5Pget_scc_config(hid_t plist_id, H5SC__cache_config_t *config /*out*/);
+
+/**
+ * \ingroup FAPL
+ *
  * \brief Returns maximum data sieve buffer size
  *
  * \fapl_id{fapl_id}
@@ -6010,6 +6045,31 @@ H5_DLL herr_t H5Pset_object_flush_cb(hid_t plist_id, H5F_flush_cb_t func, void *
  * \since 1.4.0
  */
 H5_DLL herr_t H5Pset_sieve_buf_size(hid_t fapl_id, size_t size);
+/**
+ * \ingroup FAPL
+ *
+ * \brief Set the initial shared chunk cache configuration in the indicated File
+ *        Access Property List to the supplied value
+ *
+ * \fapl_id{plist_id}
+ * \param[in] config_ptr  Pointer to the instance of \p H5SC__cache_config_t
+ *            containing the desired configuration
+ * \return \herr_t
+ *
+ *  \details The fields of the #H5SC__cache_config_t structure are shown
+ *           below:
+ *           \snippet H5SCpublic.h H5SC__cache_config_t_snip
+ *           \click4more
+ *
+ * \details H5Pset_scc_config() attempts to set the initial shared chunk cache
+ *          configuration to the supplied value.  It will fail if an invalid
+ *          configuration is detected.  This configuration is used when the file
+ *          is opened.
+ *
+ * \since 1.8.0
+ *
+ */
+H5_DLL herr_t H5Pset_scc_config(hid_t plist_id, H5SC__cache_config_t *config_ptr);
 /**
  * \ingroup FAPL
  *

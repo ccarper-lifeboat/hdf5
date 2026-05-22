@@ -56,8 +56,10 @@ extern "C" {
 #define H5E_REFERENCE        (H5OPEN H5E_REFERENCE_g)
 #define H5E_RESOURCE         (H5OPEN H5E_RESOURCE_g)
 #define H5E_RS               (H5OPEN H5E_RS_g)
+#define H5E_SCC              (H5OPEN H5E_SCC_g)
 #define H5E_SLIST            (H5OPEN H5E_SLIST_g)
 #define H5E_SOHM             (H5OPEN H5E_SOHM_g)
+#define H5E_STC_PLINE        (H5OPEN H5E_STC_PLINE_g)
 #define H5E_STORAGE          (H5OPEN H5E_STORAGE_g)
 #define H5E_SYM              (H5OPEN H5E_SYM_g)
 #define H5E_THREADSAFE       (H5OPEN H5E_THREADSAFE_g)
@@ -96,8 +98,10 @@ H5_DLLVAR hid_t H5E_PLUGIN_g;        /* Plugin for dynamically loaded library */
 H5_DLLVAR hid_t H5E_REFERENCE_g;     /* References */
 H5_DLLVAR hid_t H5E_RESOURCE_g;      /* Resource unavailable */
 H5_DLLVAR hid_t H5E_RS_g;            /* Reference Counted Strings */
+H5_DLLVAR hid_t H5E_SCC_g;           /* Shared Chunk Cache */
 H5_DLLVAR hid_t H5E_SLIST_g;         /* Skip Lists */
 H5_DLLVAR hid_t H5E_SOHM_g;          /* Shared Object Header Messages */
+H5_DLLVAR hid_t H5E_STC_PLINE_g;     /* Data filters for structured chunk */
 H5_DLLVAR hid_t H5E_STORAGE_g;       /* Data storage */
 H5_DLLVAR hid_t H5E_SYM_g;           /* Symbol table */
 H5_DLLVAR hid_t H5E_THREADSAFE_g;    /* Threadsafety */
@@ -424,6 +428,58 @@ H5_DLLVAR hid_t H5E_CANTLOCK_g;      /* Unable to lock object */
 H5_DLLVAR hid_t H5E_CANTUNLOCK_g;    /* Unable to unlock object */
 H5_DLLVAR hid_t H5E_NOSPACE_g;       /* No space available for allocation */
 H5_DLLVAR hid_t H5E_OBJOPEN_g;       /* Object is already open */
+
+/* Shared Chunk Cache errors */
+#define H5E_ALREADY_LINKED   (H5OPEN H5E_ALREADY_LINKED_g)
+#define H5E_BADOPCODE        (H5OPEN H5E_BADOPCODE_g)
+#define H5E_CANNOTALLOC      (H5OPEN H5E_CANNOTALLOC_g)
+#define H5E_CANNOTDESTROY    (H5OPEN H5E_CANNOTDESTROY_g)
+#define H5E_CANNOTEVICT      (H5OPEN H5E_CANNOTEVICT_g)
+#define H5E_CANNOTFLUSH      (H5OPEN H5E_CANNOTFLUSH_g)
+#define H5E_CANNOTFREE       (H5OPEN H5E_CANNOTFREE_g)
+#define H5E_CANNOTGET        (H5OPEN H5E_CANNOTGET_g)
+#define H5E_CANNOTINSERT     (H5OPEN H5E_CANNOTINSERT_g)
+#define H5E_CANNOTPREPEND    (H5OPEN H5E_CANNOTPREPEND_g)
+#define H5E_CANNOTREMOVE     (H5OPEN H5E_CANNOTREMOVE_g)
+#define H5E_CHUNK_KEY        (H5OPEN H5E_CHUNK_KEY_g)
+#define H5E_DLL              (H5OPEN H5E_DLL_g)
+#define H5E_DLL_INVARIANT    (H5OPEN H5E_DLL_INVARIANT_g)
+#define H5E_DSETNOTFOUND     (H5OPEN H5E_DSETNOTFOUND_g)
+#define H5E_HT_INTERNAL      (H5OPEN H5E_HT_INTERNAL_g)
+#define H5E_HT_NOTFOUND      (H5OPEN H5E_HT_NOTFOUND_g)
+#define H5E_INIT_CHUNK_SELECTION (H5OPEN H5E_INIT_CHUNK_SELECTION_g)
+#define H5E_INVALIDLIMIT     (H5OPEN H5E_INVALIDLIMIT_g)
+#define H5E_IOFAIL           (H5OPEN H5E_IOFAIL_g)
+#define H5E_NOT_A_MEMBER     (H5OPEN H5E_NOT_A_MEMBER_g)
+#define H5E_NOT_IMPLEMTED    (H5OPEN H5E_NOT_IMPLEMTED_g)
+#define H5E_NOT_TAILMOST     (H5OPEN H5E_NOT_TAILMOST_g)
+#define H5E_SIZE_MISMATCH    (H5OPEN H5E_SIZE_MISMATCH_g)
+#define H5E_SPLICE_FAILED    (H5OPEN H5E_SPLICE_FAILED_g)
+H5_DLLVAR hid_t H5E_ALREADY_LINKED_g; /* Element is already present on an LRU list */
+H5_DLLVAR hid_t H5E_BADOPCODE_g;     /* Incompatible I/O operation code provided */
+H5_DLLVAR hid_t H5E_CANNOTALLOC_g;   /* Failed to allocate a value */
+H5_DLLVAR hid_t H5E_CANNOTDESTROY_g; /* Failed to destroy internal structure */
+H5_DLLVAR hid_t H5E_CANNOTEVICT_g;   /* Failed to evict chunk */
+H5_DLLVAR hid_t H5E_CANNOTFLUSH_g;   /* Failed to flush dataset properly */
+H5_DLLVAR hid_t H5E_CANNOTFREE_g;    /* Failed to free structure */
+H5_DLLVAR hid_t H5E_CANNOTGET_g;     /* Failed to fetch queried element */
+H5_DLLVAR hid_t H5E_CANNOTINSERT_g;  /* Failed to insert element */
+H5_DLLVAR hid_t H5E_CANNOTPREPEND_g; /* Failed to prepend element to DLL */
+H5_DLLVAR hid_t H5E_CANNOTREMOVE_g;  /* Failed to remove element */
+H5_DLLVAR hid_t H5E_CHUNK_KEY_g;     /* Failed to compute the chunk key */
+H5_DLLVAR hid_t H5E_DLL_g;           /* Failed to use the DLL properly */
+H5_DLLVAR hid_t H5E_DLL_INVARIANT_g; /* Global header LRU invariant failed */
+H5_DLLVAR hid_t H5E_DSETNOTFOUND_g;  /* Dataset not found when it should exist */
+H5_DLLVAR hid_t H5E_HT_INTERNAL_g;   /* Failed to internally operate properly */
+H5_DLLVAR hid_t H5E_HT_NOTFOUND_g;   /* Element not found in a hash table (unexpected) */
+H5_DLLVAR hid_t H5E_INIT_CHUNK_SELECTION_g; /* Initial structured chunk selection failed */
+H5_DLLVAR hid_t H5E_INVALIDLIMIT_g;  /* Quiescent/Active limit must be non-zero */
+H5_DLLVAR hid_t H5E_IOFAIL_g;        /* I/O request with the shared chunk cache failed */
+H5_DLLVAR hid_t H5E_NOT_A_MEMBER_g;  /* Element is not on the specified LRU list */
+H5_DLLVAR hid_t H5E_NOT_IMPLEMTED_g; /* Function is not yet implemented */
+H5_DLLVAR hid_t H5E_NOT_TAILMOST_g;  /* Chunk is not tailmost when it should have been */
+H5_DLLVAR hid_t H5E_SIZE_MISMATCH_g; /* Issue with LRU-related size operation */
+H5_DLLVAR hid_t H5E_SPLICE_FAILED_g; /* Failed to properly interact with the LRU list head */
 
 /* System level errors */
 #define H5E_SYSERRSTR        (H5OPEN H5E_SYSERRSTR_g)

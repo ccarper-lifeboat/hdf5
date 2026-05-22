@@ -319,4 +319,8 @@ H5_DLL herr_t H5VL_token_from_str(const H5VL_object_t *vol_obj, H5I_type_t obj_t
 H5_DLL herr_t H5VL_optional(const H5VL_object_t *vol_obj, H5VL_optional_args_t *args, hid_t dxpl_id,
                             void **req);
 
+/* Shared Chunk Cache functions */
+
+H5_DLL herr_t H5VL__get_file_shared_cache(const H5VL_object_t *file_vol_obj, void **cache);
+
 #endif /* H5VLprivate_H */

@@ -28,29 +28,96 @@ typedef struct H5SC_layout_ops_t H5SC_layout_ops_t;
 /* Private headers needed by this file */
 #include "H5private.h"  /* Generic Functions                   */
 #include "H5Dprivate.h" /* Datasets                            */
+#include "H5SCpublic.h" /* Public prototypes                   */
 
 /**************************/
 /* Library Private Macros */
 /**************************/
+/* clang-format off */
+#define H5SC__DEFAULT_SCC_CONFIG                  \
+{                                                 \
+    /* version    = */ H5SC__CURR_SCC_VERSION,    \
+    /* max_q_size = */ ((size_t)(1000ULL * 1024ULL * 1024ULL)),   \
+    /* max_a_size = */ ((size_t)(2ULL *1000ULL * 1024ULL * 1024ULL))  \
+}
+/* clang-format on */
+
+#define H5SC_CHUNK_ADD(head_, item_)                                                                         \
+    HASH_ADD_KEYPTR(hval_chunk, (head_), &(item_)->data_key, sizeof((item_)->data_key), (item_))
+#define H5SC_CHUNK_FIND(head_, keyptr_, out_)                                                                \
+    HASH_FIND(hval_chunk, (head_), (keyptr_), sizeof(*(keyptr_)), (out_))
+#define H5SC_CHUNK_DEL(head_, item_)      HASH_DELETE(hval_chunk, (head_), (item_))
+#define H5SC_CHUNK_ITER(head_, el_, tmp_) HASH_ITER(hval_chunk, (head_), (el_), (tmp_))
+
+#define H5SC_DSET_ADD(head_, item_)                                                                          \
+    HASH_ADD_KEYPTR(dset_hval, (head_), &(item_)->dset_addr, sizeof((item_)->dset_addr), (item_))
+#define H5SC_DSET_FIND(head_, addrptr_, out_)                                                                \
+    HASH_FIND(dset_hval, (head_), (addrptr_), sizeof(*(addrptr_)), (out_))
+#define H5SC_DSET_DEL(head_, item_)      HASH_DELETE(dset_hval, (head_), (item_))
+#define H5SC_DSET_ITER(head_, el_, tmp_) HASH_ITER(dset_hval, (head_), (el_), (tmp_))
 
 /****************************/
 /* Library Private Typedefs */
 /****************************/
 
-/* Forward declaration for shared chunk cache struct (defined in H5SCpkg.h) */
-typedef struct H5SC_t H5SC_t;
+/* Forward declaration for shared chunk cache structs (defined in H5SCpkg.h) */
+
+typedef enum H5SC_tag_t {
+    H5SC_TAG_NONE = 0,
+    H5SC_TAG_CREATE,
+    H5SC_TAG_HT_INSERT,
+    H5SC_TAG_HT_DELETE,
+    H5SC_TAG_LRU_INSERT,
+    H5SC_TAG_LRU_REMOVE,
+    H5SC_TAG_LRU_PROMOTE,
+    H5SC_TAG_LRU_TOUCH,
+    H5SC_TAG_FLUSH_DIRTY,
+    H5SC_TAG_FLUSH,
+    H5SC_TAG_EVICT,
+    H5SC_TAG_LOOKUP,
+    H5SC_TAG_PIN_IOINIT,
+    H5SC_TAG_PIN_IOINIT_CACHED,
+    H5SC_TAG_UNPIN_WRITE_DONE,
+    H5SC_TAG_UNPIN_WRITE_DONE_ERROR,
+    H5SC_TAG_UNPIN_READ_DONE,
+    H5SC_TAG_UNPIN_READ_DONE_ERROR,
+    H5SC_TAG_UNPIN_ERASE_DONE,
+    H5SC_TAG_UNPIN_ERASE_DONE_ERROR,
+    H5SC_TAG_TEST /* catch-all for testing */
+} H5SC_tag_t;
+
+typedef enum H5SC_io_op_code_t {
+    H5SC_WRITE_OP = 0,
+    H5SC_READ_OP,
+    H5SC_NOOP, /*catch-all for testing */
+} H5SC_io_op_code_t;
+
+typedef enum H5SC_evict_mode_t {
+    H5SC_EVICT_CLEAN_ONLY = 0 /* Evict only clean chunks */,
+    H5SC_EVICT_DIRTY_ONLY = 1 /*Evict only dirty chunks */
+} H5SC_evict_mode_t;
+
+typedef struct H5SC_stats_t          H5SC_stats_t;
+typedef struct H5SC_t                H5SC_t;
+typedef struct H5SC_dset_header_t    H5SC_dset_header_t;
+typedef struct H5SC_chunk_t          H5SC_chunk_t;
+typedef struct H5SC_chunk_key_t      H5SC_chunk_key_t;
+typedef struct H5SC_exhausted_list_t H5SC_exhausted_list_t;
+typedef struct H5SC_io_sel_chunk_t   H5SC_io_sel_chunk_t;
+typedef struct H5SC_io_info_t        H5SC_io_info_t;
 
 /*
  * Layout callbacks
  */
-/* Looks up count chunk address and size on disk. defined_values_size is the number of bytes to read if only
- * the list of defined values is needed. size_hint is the suggested allocation size for the chunk (could be
- * larger if the chunk might expand when decoded). defined_values_size_hint is the suggested allocation size
- * if only the list of defined values is needed. If *defined_values_size is returned as 0, then all values are
- * defined for the chunk. In this case, the chunk may still be decoded without reading from disk, by
- * allocating a buffer of size defined_valued_size_hint and passing it to H5SC_chunk_decode_t with *nbytes set
- * to 0. *udata can be set to anything and will be passed through to H5SC_chunk_decode_t and/or the selection
- * or vector I/O routines, then freed with free() (we will create an H5SC_free_udata_t callback if necessary).
+/* Looks up count chunk address and size on disk. defined_values_size is the number of bytes to read if
+ * only the list of defined values is needed. size_hint is the suggested allocation size for the chunk
+ * (could be larger if the chunk might expand when decoded). defined_values_size_hint is the suggested
+ * allocation size if only the list of defined values is needed. If *defined_values_size is returned as 0,
+ * then all values are defined for the chunk. In this case, the chunk may still be decoded without reading
+ * from disk, by allocating a buffer of size defined_valued_size_hint and passing it to
+ * H5SC_chunk_decode_t with *nbytes set to 0. *udata can be set to anything and will be passed through to
+ * H5SC_chunk_decode_t and/or the selection or vector I/O routines, then freed with free() (we will create
+ * an H5SC_free_udata_t callback if necessary).
  */
 typedef herr_t (*H5SC_chunk_lookup_t)(struct H5D_t *dset, size_t count, const hsize_t *scaled[] /*in*/,
                                       haddr_t *addr[] /*out*/, hsize_t *size[] /*out*/,
@@ -276,24 +343,73 @@ struct H5SC_layout_ops_t {
 /***************************************/
 
 /* Functions that operate on a shared chunk cache */
-H5_DLL H5SC_t *H5SC_create(H5F_t *file, H5P_genplist_t *fa_plist);
-H5_DLL herr_t  H5SC_destroy(H5SC_t *cache);
+H5_DLL H5SC_t *H5SC_create(H5F_t *file, H5P_genplist_t *fa_plist,
+                           H5SC__cache_config_t *config_ptr); /* in docs */
+H5_DLL herr_t  H5SC_destroy(H5SC_t *cache);                   /* in docs */
 
 /* Flush functions */
-H5_DLL herr_t H5SC_flush(H5SC_t *cache);
-H5_DLL herr_t H5SC_flush_dset(H5SC_t *cache, H5D_t *dset, bool evict);
+H5_DLL herr_t H5SC_flush(H5SC_t *cache);                               /* in docs */
+H5_DLL herr_t H5SC_flush_dset(H5SC_t *cache, H5D_t *dset, bool evict); /* in docs */
 
 /* I/O functions */
-H5_DLL herr_t H5SC_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info);
-H5_DLL herr_t H5SC_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info);
+H5_DLL herr_t H5SC_invoke_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info);
+H5_DLL herr_t H5SC_invoke_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info);
+H5_DLL herr_t H5SC_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info);  /* in docs */
+H5_DLL herr_t H5SC_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info); /* in docs */
 H5_DLL herr_t H5SC_direct_chunk_read(H5SC_t *cache, H5D_t *dset, const hsize_t *offset, void *udata,
-                                     void *buf, size_t *buf_size);
+                                     void *buf, size_t *buf_size); /* in docs*/
 H5_DLL herr_t H5SC_direct_chunk_write(H5SC_t *cache, H5D_t *dset, const hsize_t *offset, void *udata,
-                                      const void *buf);
-H5_DLL H5S_t *H5SC_get_defined(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space);
-H5_DLL herr_t H5SC_erase(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space);
+                                      const void *buf);                              /* in docs */
+H5_DLL H5S_t *H5SC_get_defined(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space); /* in docs */
+H5_DLL herr_t H5SC_erase(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space);       /* in docs*/
 
 /* Other functions */
-H5_DLL herr_t H5SC_set_extent_notify(H5SC_t *cache, H5D_t *dset, const hsize_t *old_dims);
+H5_DLL herr_t H5SC_set_extent_notify(H5SC_t *cache, H5D_t *dset, const hsize_t *old_dims); /* in docs*/
+H5_DLL herr_t H5SC_validate_config(const H5SC__cache_config_t *config_ptr);                /* in docs */
+
+/* Dataset specific helper functions */
+
+H5_DLL H5SC_dset_header_t *H5SC_dset_create_header(H5SC_t *cache, haddr_t addr, size_t max_chunk_size);
+H5_DLL herr_t              H5SC_dset_destroy_header(H5SC_t *cache, H5D_t *dset, H5SC_dset_header_t *dset_hdr);
+
+H5_DLL herr_t  H5SC_dset_is_empty(H5SC_dset_header_t *dset_hdr, bool *is_empty);
+H5_DLL haddr_t H5SC_dset_get_addr(H5SC_dset_header_t *dset_hdr);
+
+/* Hash Table Functions
+ * Heads are stored on H5SC_t; these helpers only link/unlink.
+ * They never free or mutate payload fields.
+ */
+
+/* Hash table specific functions */
+void H5SC__hash_init(H5SC_t *cache);
+void H5SC__reset_hash_tables(H5SC_t *cache); /* unlink-all (no free), set heads NULL */
+
+H5SC_chunk_t *H5SC__ht_chunk_find(H5SC_t *cache, const H5SC_chunk_key_t *chk_key);
+herr_t        H5SC__ht_chunk_insert(H5SC_t *cache, H5SC_chunk_t *chk);
+herr_t        H5SC__ht_chunk_delete(H5SC_t *cache, const H5SC_chunk_key_t *chk_key);
+
+H5SC_dset_header_t *H5SC__ht_dset_find(H5SC_t *cache, haddr_t addr);
+herr_t              H5SC__ht_dset_insert(H5SC_t *cache, H5SC_dset_header_t *dset_hdr);
+herr_t              H5SC__ht_dset_delete(H5SC_t *cache, haddr_t addr);
+
+herr_t H5SC__drop_dset_chunks_for_test(H5SC_t *cache, H5D_t *dset);
+
+/* Dataset specific DLL functions */
+herr_t H5SC__dset_lru_append(H5SC_t *cache, H5SC_dset_header_t *dset_hdr);
+herr_t H5SC__dset_lru_prepend(H5SC_t *cache, struct H5SC_dset_header_t *dset_hdr);
+herr_t H5SC__dset_lru_promote(H5SC_t *cache, H5SC_dset_header_t *dset_hdr);
+herr_t H5SC__dset_lru_remove(H5SC_t *cache, struct H5SC_dset_header_t *dset_hdr);
+
+/* Chunk specific DLL functions */
+herr_t H5SC__chunk_lru_prepend(struct H5SC_dset_header_t *dset_hdr, struct H5SC_chunk_t *chunk);
+herr_t H5SC__chunk_lru_remove(struct H5SC_dset_header_t *dset_hdr, struct H5SC_chunk_t *chunk);
+
+/* Internal size operations */
+herr_t H5SC__chunk_update_cached_size(H5SC_dset_header_t *dset_hdr, struct H5SC_chunk_t *chunk,
+                                      size_t new_size);
+
+H5SC_chunk_t *H5SC__make_chunk(H5SC_chunk_key_t key, size_t cached_sz, size_t counter, bool pio);
+
+herr_t H5SC__get_cache_from_file_id(hid_t file_id, H5SC_t **cache);
 
 #endif /* H5SCprivate_H */

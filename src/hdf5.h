@@ -36,6 +36,7 @@
 #include "H5PLpublic.h" /* Plugins                                  */
 #include "H5Rpublic.h"  /* References                               */
 #include "H5Spublic.h"  /* Dataspaces                               */
+#include "H5SCpublic.h" /* Shared Chunk Cache                       */
 #include "H5Tpublic.h"  /* Datatypes                                */
 #include "H5VLpublic.h" /* Virtual Object Layer                     */
 #include "H5Zpublic.h"  /* Data filters                             */

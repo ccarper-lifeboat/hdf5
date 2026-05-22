@@ -70,8 +70,9 @@ TEST_PROG= testhdf5 \
            enc_dec_plist_cross_platform getname vfd ros3 s3comms hdfs ntypes \
            dangle dtransform reserved cross_read freespace mf vds file_image \
            unregister cache_logging cork swmr vol timer event_set \
-		   onion struct_chunk_storage
+           onion struct_chunk_storage shared_chunk_cache
 
+# struct_chunk_cache_dll
 # List programs to be built when testing here
 #
 # error_test and err_compat are built at the same time as the other tests, but executed by test_error.sh

@@ -153,6 +153,10 @@ if((H5E_RESOURCE_g = H5I_register(H5I_ERROR_MSG, &H5E_RESOURCE_msg_s, false)) < 
 assert(H5I_INVALID_HID == H5E_RS_g);
 if((H5E_RS_g = H5I_register(H5I_ERROR_MSG, &H5E_RS_msg_s, false)) < 0)
     HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_SCC */
+assert(H5I_INVALID_HID == H5E_SCC_g);
+if((H5E_SCC_g = H5I_register(H5I_ERROR_MSG, &H5E_SCC_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
 /* H5E_SLIST */
 assert(H5I_INVALID_HID == H5E_SLIST_g);
 if((H5E_SLIST_g = H5I_register(H5I_ERROR_MSG, &H5E_SLIST_msg_s, false)) < 0)
@@ -160,6 +164,10 @@ if((H5E_SLIST_g = H5I_register(H5I_ERROR_MSG, &H5E_SLIST_msg_s, false)) < 0)
 /* H5E_SOHM */
 assert(H5I_INVALID_HID == H5E_SOHM_g);
 if((H5E_SOHM_g = H5I_register(H5I_ERROR_MSG, &H5E_SOHM_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_STC_PLINE */
+assert(H5I_INVALID_HID == H5E_STC_PLINE_g);
+if((H5E_STC_PLINE_g = H5I_register(H5I_ERROR_MSG, &H5E_STC_PLINE_msg_s, false)) < 0)
     HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
 /* H5E_STORAGE */
 assert(H5I_INVALID_HID == H5E_STORAGE_g);
@@ -789,6 +797,108 @@ if((H5E_NOSPACE_g = H5I_register(H5I_ERROR_MSG, &H5E_NOSPACE_msg_s, false)) < 0)
 /* H5E_OBJOPEN */
 assert(H5I_INVALID_HID == H5E_OBJOPEN_g);
 if((H5E_OBJOPEN_g = H5I_register(H5I_ERROR_MSG, &H5E_OBJOPEN_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+
+/* Shared Chunk Cache errors */
+/* H5E_ALREADY_LINKED */
+assert(H5I_INVALID_HID == H5E_ALREADY_LINKED_g);
+if((H5E_ALREADY_LINKED_g = H5I_register(H5I_ERROR_MSG, &H5E_ALREADY_LINKED_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_BADOPCODE */
+assert(H5I_INVALID_HID == H5E_BADOPCODE_g);
+if((H5E_BADOPCODE_g = H5I_register(H5I_ERROR_MSG, &H5E_BADOPCODE_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_CANNOTALLOC */
+assert(H5I_INVALID_HID == H5E_CANNOTALLOC_g);
+if((H5E_CANNOTALLOC_g = H5I_register(H5I_ERROR_MSG, &H5E_CANNOTALLOC_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_CANNOTDESTROY */
+assert(H5I_INVALID_HID == H5E_CANNOTDESTROY_g);
+if((H5E_CANNOTDESTROY_g = H5I_register(H5I_ERROR_MSG, &H5E_CANNOTDESTROY_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_CANNOTEVICT */
+assert(H5I_INVALID_HID == H5E_CANNOTEVICT_g);
+if((H5E_CANNOTEVICT_g = H5I_register(H5I_ERROR_MSG, &H5E_CANNOTEVICT_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_CANNOTFLUSH */
+assert(H5I_INVALID_HID == H5E_CANNOTFLUSH_g);
+if((H5E_CANNOTFLUSH_g = H5I_register(H5I_ERROR_MSG, &H5E_CANNOTFLUSH_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_CANNOTFREE */
+assert(H5I_INVALID_HID == H5E_CANNOTFREE_g);
+if((H5E_CANNOTFREE_g = H5I_register(H5I_ERROR_MSG, &H5E_CANNOTFREE_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_CANNOTGET */
+assert(H5I_INVALID_HID == H5E_CANNOTGET_g);
+if((H5E_CANNOTGET_g = H5I_register(H5I_ERROR_MSG, &H5E_CANNOTGET_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_CANNOTINSERT */
+assert(H5I_INVALID_HID == H5E_CANNOTINSERT_g);
+if((H5E_CANNOTINSERT_g = H5I_register(H5I_ERROR_MSG, &H5E_CANNOTINSERT_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_CANNOTPREPEND */
+assert(H5I_INVALID_HID == H5E_CANNOTPREPEND_g);
+if((H5E_CANNOTPREPEND_g = H5I_register(H5I_ERROR_MSG, &H5E_CANNOTPREPEND_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_CANNOTREMOVE */
+assert(H5I_INVALID_HID == H5E_CANNOTREMOVE_g);
+if((H5E_CANNOTREMOVE_g = H5I_register(H5I_ERROR_MSG, &H5E_CANNOTREMOVE_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_CHUNK_KEY */
+assert(H5I_INVALID_HID == H5E_CHUNK_KEY_g);
+if((H5E_CHUNK_KEY_g = H5I_register(H5I_ERROR_MSG, &H5E_CHUNK_KEY_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_DLL */
+assert(H5I_INVALID_HID == H5E_DLL_g);
+if((H5E_DLL_g = H5I_register(H5I_ERROR_MSG, &H5E_DLL_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_DLL_INVARIANT */
+assert(H5I_INVALID_HID == H5E_DLL_INVARIANT_g);
+if((H5E_DLL_INVARIANT_g = H5I_register(H5I_ERROR_MSG, &H5E_DLL_INVARIANT_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_DSETNOTFOUND */
+assert(H5I_INVALID_HID == H5E_DSETNOTFOUND_g);
+if((H5E_DSETNOTFOUND_g = H5I_register(H5I_ERROR_MSG, &H5E_DSETNOTFOUND_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_HT_INTERNAL */
+assert(H5I_INVALID_HID == H5E_HT_INTERNAL_g);
+if((H5E_HT_INTERNAL_g = H5I_register(H5I_ERROR_MSG, &H5E_HT_INTERNAL_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_HT_NOTFOUND */
+assert(H5I_INVALID_HID == H5E_HT_NOTFOUND_g);
+if((H5E_HT_NOTFOUND_g = H5I_register(H5I_ERROR_MSG, &H5E_HT_NOTFOUND_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_INIT_CHUNK_SELECTION */
+assert(H5I_INVALID_HID == H5E_INIT_CHUNK_SELECTION_g);
+if((H5E_INIT_CHUNK_SELECTION_g = H5I_register(H5I_ERROR_MSG, &H5E_INIT_CHUNK_SELECTION_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_INVALIDLIMIT */
+assert(H5I_INVALID_HID == H5E_INVALIDLIMIT_g);
+if((H5E_INVALIDLIMIT_g = H5I_register(H5I_ERROR_MSG, &H5E_INVALIDLIMIT_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_IOFAIL */
+assert(H5I_INVALID_HID == H5E_IOFAIL_g);
+if((H5E_IOFAIL_g = H5I_register(H5I_ERROR_MSG, &H5E_IOFAIL_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_NOT_A_MEMBER */
+assert(H5I_INVALID_HID == H5E_NOT_A_MEMBER_g);
+if((H5E_NOT_A_MEMBER_g = H5I_register(H5I_ERROR_MSG, &H5E_NOT_A_MEMBER_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_NOT_IMPLEMTED */
+assert(H5I_INVALID_HID == H5E_NOT_IMPLEMTED_g);
+if((H5E_NOT_IMPLEMTED_g = H5I_register(H5I_ERROR_MSG, &H5E_NOT_IMPLEMTED_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_NOT_TAILMOST */
+assert(H5I_INVALID_HID == H5E_NOT_TAILMOST_g);
+if((H5E_NOT_TAILMOST_g = H5I_register(H5I_ERROR_MSG, &H5E_NOT_TAILMOST_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_SIZE_MISMATCH */
+assert(H5I_INVALID_HID == H5E_SIZE_MISMATCH_g);
+if((H5E_SIZE_MISMATCH_g = H5I_register(H5I_ERROR_MSG, &H5E_SIZE_MISMATCH_msg_s, false)) < 0)
+    HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
+/* H5E_SPLICE_FAILED */
+assert(H5I_INVALID_HID == H5E_SPLICE_FAILED_g);
+if((H5E_SPLICE_FAILED_g = H5I_register(H5I_ERROR_MSG, &H5E_SPLICE_FAILED_msg_s, false)) < 0)
     HGOTO_ERROR(H5E_ERROR, H5E_CANTREGISTER, FAIL, "can't register error message");
 
 /* System level errors */

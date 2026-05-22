@@ -217,6 +217,7 @@ typedef struct H5F_t H5F_t;
 #define H5F_CRT_FILE_SPACE_PAGE_SIZE_NAME "file_space_page_size" /* File space page size */
 
 /* ========= File Access properties ============ */
+#define H5F_ACS_SCC_INIT_CONFIG_NAME "scc_initCfg" /* Initial shared chunk cache configuration */
 #define H5F_ACS_META_CACHE_INIT_CONFIG_NAME                                                                  \
     "mdc_initCacheCfg"                                  /* Initial metadata cache resize configuration */
 #define H5F_ACS_DATA_CACHE_NUM_SLOTS_NAME "rdcc_nslots" /* Size of raw data chunk cache(slots) */

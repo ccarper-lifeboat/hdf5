@@ -116,14 +116,6 @@
   #define H5Gopen_vers 1
 #endif /* !defined(H5Gopen_vers) */
 
-#if !defined(H5Pset_filter_vers)
-  #define H5Pset_filter_vers 1
-#endif /* !defined(H5Pset_filter_vers) */
-
-#if !defined(H5Pget_nfilters_vers)
-  #define H5Pget_nfilters_vers 1
-#endif /* !defined(H5Pget_nfilters_vers) */
-
 #if !defined(H5Pget_filter_vers)
   #define H5Pget_filter_vers 1
 #endif /* !defined(H5Pget_filter_vers) */
@@ -131,14 +123,6 @@
 #if !defined(H5Pget_filter_by_id_vers)
   #define H5Pget_filter_by_id_vers 1
 #endif /* !defined(H5Pget_filter_by_id_vers) */
-
-#if !defined(H5Pmodify_filter_vers)
-  #define H5Pmodify_filter_vers 1
-#endif /* !defined(H5Pmodify_filter_vers) */
-
-#if !defined(H5Premove_filter_vers)
-  #define H5Premove_filter_vers 1
-#endif /* !defined(H5Premove_filter_vers) */
 
 #if !defined(H5Pinsert_vers)
   #define H5Pinsert_vers 1
@@ -292,14 +276,6 @@
   #define H5Ovisit_by_name_vers 1
 #endif /* !defined(H5Ovisit_by_name_vers) */
 
-#if !defined(H5Pset_filter_vers)
-  #define H5Pset_filter_vers 1
-#endif /* !defined(H5Pset_filter_vers) */
-
-#if !defined(H5Pget_nfilters_vers)
-  #define H5Pget_nfilters_vers 1
-#endif /* !defined(H5Pget_nfilters_vers) */
-
 #if !defined(H5Pget_filter_vers)
   #define H5Pget_filter_vers 2
 #endif /* !defined(H5Pget_filter_vers) */
@@ -307,14 +283,6 @@
 #if !defined(H5Pget_filter_by_id_vers)
   #define H5Pget_filter_by_id_vers 2
 #endif /* !defined(H5Pget_filter_by_id_vers) */
-
-#if !defined(H5Pmodify_filter_vers)
-  #define H5Pmodify_filter_vers 1
-#endif /* !defined(H5Pmodify_filter_vers) */
-
-#if !defined(H5Premove_filter_vers)
-  #define H5Premove_filter_vers 1
-#endif /* !defined(H5Premove_filter_vers) */
 
 #if !defined(H5Pinsert_vers)
   #define H5Pinsert_vers 2
@@ -488,14 +456,6 @@
   #define H5Pencode_vers 1
 #endif /* !defined(H5Pencode_vers) */
 
-#if !defined(H5Pset_filter_vers)
-  #define H5Pset_filter_vers 1
-#endif /* !defined(H5Pset_filter_vers) */
-
-#if !defined(H5Pget_nfilters_vers)
-  #define H5Pget_nfilters_vers 1
-#endif /* !defined(H5Pget_nfilters_vers) */
-
 #if !defined(H5Pget_filter_vers)
   #define H5Pget_filter_vers 2
 #endif /* !defined(H5Pget_filter_vers) */
@@ -503,14 +463,6 @@
 #if !defined(H5Pget_filter_by_id_vers)
   #define H5Pget_filter_by_id_vers 2
 #endif /* !defined(H5Pget_filter_by_id_vers) */
-
-#if !defined(H5Pmodify_filter_vers)
-  #define H5Pmodify_filter_vers 1
-#endif /* !defined(H5Pmodify_filter_vers) */
-
-#if !defined(H5Premove_filter_vers)
-  #define H5Premove_filter_vers 1
-#endif /* !defined(H5Premove_filter_vers) */
 
 #if !defined(H5Pinsert_vers)
   #define H5Pinsert_vers 2
@@ -684,14 +636,6 @@
   #define H5Pencode_vers 2
 #endif /* !defined(H5Pencode_vers) */
 
-#if !defined(H5Pset_filter_vers)
-  #define H5Pset_filter_vers 1
-#endif /* !defined(H5Pset_filter_vers) */
-
-#if !defined(H5Pget_nfilters_vers)
-  #define H5Pget_nfilters_vers 1
-#endif /* !defined(H5Pget_nfilters_vers) */
-
 #if !defined(H5Pget_filter_vers)
   #define H5Pget_filter_vers 2
 #endif /* !defined(H5Pget_filter_vers) */
@@ -699,14 +643,6 @@
 #if !defined(H5Pget_filter_by_id_vers)
   #define H5Pget_filter_by_id_vers 2
 #endif /* !defined(H5Pget_filter_by_id_vers) */
-
-#if !defined(H5Pmodify_filter_vers)
-  #define H5Pmodify_filter_vers 1
-#endif /* !defined(H5Pmodify_filter_vers) */
-
-#if !defined(H5Premove_filter_vers)
-  #define H5Premove_filter_vers 1
-#endif /* !defined(H5Premove_filter_vers) */
 
 #if !defined(H5Pinsert_vers)
   #define H5Pinsert_vers 2
@@ -880,14 +816,6 @@
   #define H5Pencode_vers 2
 #endif /* !defined(H5Pencode_vers) */
 
-#if !defined(H5Pset_filter_vers)
-  #define H5Pset_filter_vers 1
-#endif /* !defined(H5Pset_filter_vers) */
-
-#if !defined(H5Pget_nfilters_vers)
-  #define H5Pget_nfilters_vers 1
-#endif /* !defined(H5Pget_nfilters_vers) */
-
 #if !defined(H5Pget_filter_vers)
   #define H5Pget_filter_vers 2
 #endif /* !defined(H5Pget_filter_vers) */
@@ -895,14 +823,6 @@
 #if !defined(H5Pget_filter_by_id_vers)
   #define H5Pget_filter_by_id_vers 2
 #endif /* !defined(H5Pget_filter_by_id_vers) */
-
-#if !defined(H5Pmodify_filter_vers)
-  #define H5Pmodify_filter_vers 1
-#endif /* !defined(H5Pmodify_filter_vers) */
-
-#if !defined(H5Premove_filter_vers)
-  #define H5Premove_filter_vers 1
-#endif /* !defined(H5Premove_filter_vers) */
 
 #if !defined(H5Pinsert_vers)
   #define H5Pinsert_vers 2
@@ -961,7 +881,7 @@
 #endif /* !defined(H5O_iterate_t_vers) */
 
 #if !defined(H5Z_class_t_vers)
-  #define H5Z_class_t_vers 3
+  #define H5Z_class_t_vers 2
 #endif /* !defined(H5Z_class_t_vers) */
 
 #endif /* H5_USE_114_API */
@@ -1076,29 +996,13 @@
   #define H5Pencode_vers 2
 #endif /* !defined(H5Pencode_vers) */
 
-#if !defined(H5Pset_filter_vers)
-  #define H5Pset_filter_vers 2
-#endif /* !defined(H5Pset_filter_vers) */
-
-#if !defined(H5Pget_nfilters_vers)
-  #define H5Pget_nfilters_vers 2
-#endif /* !defined(H5Pget_nfilters_vers) */
-
 #if !defined(H5Pget_filter_vers)
-  #define H5Pget_filter_vers 3
+  #define H5Pget_filter_vers 2
 #endif /* !defined(H5Pget_filter_vers) */
 
 #if !defined(H5Pget_filter_by_id_vers)
-  #define H5Pget_filter_by_id_vers 3
+  #define H5Pget_filter_by_id_vers 2
 #endif /* !defined(H5Pget_filter_by_id_vers) */
-
-#if !defined(H5Pmodify_filter_vers)
-  #define H5Pmodify_filter_vers 2
-#endif /* !defined(H5Pmodify_filter_vers) */
-
-#if !defined(H5Premove_filter_vers)
-  #define H5Premove_filter_vers 2
-#endif /* !defined(H5Premove_filter_vers) */
 
 #if !defined(H5Pinsert_vers)
   #define H5Pinsert_vers 2
@@ -1157,7 +1061,7 @@
 #endif /* !defined(H5O_iterate_t_vers) */
 
 #if !defined(H5Z_class_t_vers)
-  #define H5Z_class_t_vers 3
+  #define H5Z_class_t_vers 2
 #endif /* !defined(H5Z_class_t_vers) */
 
 #endif /* H5_USE_200_API */
@@ -1489,34 +1393,7 @@
   #error "H5Pencode_vers set to invalid value"
 #endif /* H5Pencode_vers */
 
-#if !defined(H5Pset_filter_vers) || H5Pset_filter_vers == 2
-  #ifndef H5Pset_filter_vers
-    #define H5Pset_filter_vers 2
-  #endif /* H5Pset_filter_vers */
-  #define H5Pset_filter H5Pset_filter2
-#elif H5Pset_filter_vers == 1
-  #define H5Pset_filter H5Pset_filter1
-#else /* H5Pset_filter_vers */
-  #error "H5Pset_filter_vers set to invalid value"
-#endif /* H5Pset_filter_vers */
-
-#if !defined(H5Pget_nfilters_vers) || H5Pget_nfilters_vers == 2
-  #ifndef H5Pget_nfilters_vers
-    #define H5Pget_nfilters_vers 2
-  #endif /* H5Pget_nfilters_vers */
-  #define H5Pget_nfilters H5Pget_nfilters2
-#elif H5Pget_nfilters_vers == 1
-  #define H5Pget_nfilters H5Pget_nfilters1
-#else /* H5Pget_nfilters_vers */
-  #error "H5Pget_nfilters_vers set to invalid value"
-#endif /* H5Pget_nfilters_vers */
-
-#if !defined(H5Pget_filter_vers) || H5Pget_filter_vers == 3
-  #ifndef H5Pget_filter_vers
-    #define H5Pget_filter_vers 3
-  #endif /* H5Pget_filter_vers */
-  #define H5Pget_filter H5Pget_filter3
-#elif !defined(H5Pget_filter_vers) || H5Pget_filter_vers == 2
+#if !defined(H5Pget_filter_vers) || H5Pget_filter_vers == 2
   #ifndef H5Pget_filter_vers
     #define H5Pget_filter_vers 2
   #endif /* H5Pget_filter_vers */
@@ -1527,12 +1404,7 @@
   #error "H5Pget_filter_vers set to invalid value"
 #endif /* H5Pget_filter_vers */
 
-#if !defined(H5Pget_filter_by_id_vers) || H5Pget_filter_by_id_vers == 3
-  #ifndef H5Pget_filter_by_id_vers
-    #define H5Pget_filter_by_id_vers 3
-  #endif /* H5Pget_filter_by_id_vers */
-  #define H5Pget_filter_by_id H5Pget_filter_by_id3
-#elif !defined(H5Pget_filter_by_id_vers) || H5Pget_filter_by_id_vers == 2
+#if !defined(H5Pget_filter_by_id_vers) || H5Pget_filter_by_id_vers == 2
   #ifndef H5Pget_filter_by_id_vers
     #define H5Pget_filter_by_id_vers 2
   #endif /* H5Pget_filter_by_id_vers */
@@ -1542,29 +1414,6 @@
 #else /* H5Pget_filter_by_id_vers */
   #error "H5Pget_filter_by_id_vers set to invalid value"
 #endif /* H5Pget_filter_by_id_vers */
-
-#if !defined(H5Pmodify_filter_vers) || H5Pmodify_filter_vers == 2
-  #ifndef H5Pmodify_filter_vers
-    #define H5Pmodify_filter_vers 2
-  #endif /* H5Pmodify_filter_vers */
-  #define H5Pmodify_filter H5Pmodify_filter2
-#elif H5Pmodify_filter_vers == 1
-  #define H5Pmodify_filter H5Pmodify_filter1
-#else /* H5Pmodify_filter_vers */
-  #error "H5Pmodify_filter_vers set to invalid value"
-#endif /* H5Pmodify_filter_vers */
-
-#if !defined(H5Premove_filter_vers) || H5Premove_filter_vers == 2
-  #ifndef H5Premove_filter_vers
-    #define H5Premove_filter_vers 2
-  #endif /* H5Premove_filter_vers */
-  #define H5Premove_filter H5Premove_filter2
-#elif H5Premove_filter_vers == 1
-  #define H5Premove_filter H5Premove_filter1
-#else /* H5Premove_filter_vers */
-  #error "H5Premove_filter_vers set to invalid value"
-#endif /* H5Premove_filter_vers */
-
 
 #if !defined(H5Pinsert_vers) || H5Pinsert_vers == 2
   #ifndef H5Pinsert_vers
@@ -1716,12 +1565,7 @@
 #endif /* H5O_iterate_t_vers */
 
 
-#if !defined(H5Z_class_t_vers) || H5Z_class_t_vers == 3
-  #ifndef H5Z_class_t_vers
-    #define H5Z_class_t_vers 3
-  #endif /* H5Z_class_t_vers */
-  #define H5Z_class_t H5Z_class3_t
-#elif H5Z_class_t_vers == 2
+#if !defined(H5Z_class_t_vers) || H5Z_class_t_vers == 2
   #ifndef H5Z_class_t_vers
     #define H5Z_class_t_vers 2
   #endif /* H5Z_class_t_vers */
