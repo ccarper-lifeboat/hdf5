@@ -80,233 +80,242 @@
 /* ========= File Access properties ============ */
 /* Definitions for the initial shared chunk cache resize configuration */
 #define H5F_ACS_SCC_INIT_CONFIG_SIZE sizeof(H5SC__cache_config_t)
-#define H5F_ACS_SCC_INIT_CONFIG_DEF H5SC__DEFAULT_SCC_CONFIG
-#define H5F_ACS_SCC_INIT_CONFIG_ENC H5P__facc_scc_config_enc
-#define H5F_ACS_SCC_INIT_CONFIG_DEC H5P__facc_scc_config_dec
-#define H5F_ACS_SCC_INIT_CONFIG_CMP H5P__facc_scc_config_cmp
+#define H5F_ACS_SCC_INIT_CONFIG_DEF  H5SC__DEFAULT_SCC_CONFIG
+#define H5F_ACS_SCC_INIT_CONFIG_ENC  H5P__facc_scc_config_enc
+#define H5F_ACS_SCC_INIT_CONFIG_DEC  H5P__facc_scc_config_dec
+#define H5F_ACS_SCC_INIT_CONFIG_CMP  H5P__facc_scc_config_cmp
 /* Definitions for the initial metadata cache resize configuration */
 #define H5F_ACS_META_CACHE_INIT_CONFIG_SIZE sizeof(H5AC_cache_config_t)
-#define H5F_ACS_META_CACHE_INIT_CONFIG_DEF H5AC__DEFAULT_CACHE_CONFIG
-#define H5F_ACS_META_CACHE_INIT_CONFIG_ENC H5P__facc_cache_config_enc
-#define H5F_ACS_META_CACHE_INIT_CONFIG_DEC H5P__facc_cache_config_dec
-#define H5F_ACS_META_CACHE_INIT_CONFIG_CMP H5P__facc_cache_config_cmp
+#define H5F_ACS_META_CACHE_INIT_CONFIG_DEF  H5AC__DEFAULT_CACHE_CONFIG
+#define H5F_ACS_META_CACHE_INIT_CONFIG_ENC  H5P__facc_cache_config_enc
+#define H5F_ACS_META_CACHE_INIT_CONFIG_DEC  H5P__facc_cache_config_dec
+#define H5F_ACS_META_CACHE_INIT_CONFIG_CMP  H5P__facc_cache_config_cmp
 /* Definitions for size of raw data chunk cache(slots) */
 #define H5F_ACS_DATA_CACHE_NUM_SLOTS_SIZE sizeof(size_t)
-#define H5F_ACS_DATA_CACHE_NUM_SLOTS_DEF 521
-#define H5F_ACS_DATA_CACHE_NUM_SLOTS_ENC H5P__encode_size_t
-#define H5F_ACS_DATA_CACHE_NUM_SLOTS_DEC H5P__decode_size_t
+#define H5F_ACS_DATA_CACHE_NUM_SLOTS_DEF  521
+#define H5F_ACS_DATA_CACHE_NUM_SLOTS_ENC  H5P__encode_size_t
+#define H5F_ACS_DATA_CACHE_NUM_SLOTS_DEC  H5P__decode_size_t
 /* Definition for size of raw data chunk cache(bytes) */
 #define H5F_ACS_DATA_CACHE_BYTE_SIZE_SIZE sizeof(size_t)
-#define H5F_ACS_DATA_CACHE_BYTE_SIZE_DEF (1024 * 1024)
-#define H5F_ACS_DATA_CACHE_BYTE_SIZE_ENC H5P__encode_size_t
-#define H5F_ACS_DATA_CACHE_BYTE_SIZE_DEC H5P__decode_size_t
+#define H5F_ACS_DATA_CACHE_BYTE_SIZE_DEF  (1024 * 1024)
+#define H5F_ACS_DATA_CACHE_BYTE_SIZE_ENC  H5P__encode_size_t
+#define H5F_ACS_DATA_CACHE_BYTE_SIZE_DEC  H5P__decode_size_t
 /* Definition for preemption read chunks first */
 #define H5F_ACS_PREEMPT_READ_CHUNKS_SIZE sizeof(double)
-#define H5F_ACS_PREEMPT_READ_CHUNKS_DEF 0.75
-#define H5F_ACS_PREEMPT_READ_CHUNKS_ENC H5P__encode_double
-#define H5F_ACS_PREEMPT_READ_CHUNKS_DEC H5P__decode_double
+#define H5F_ACS_PREEMPT_READ_CHUNKS_DEF  0.75
+#define H5F_ACS_PREEMPT_READ_CHUNKS_ENC  H5P__encode_double
+#define H5F_ACS_PREEMPT_READ_CHUNKS_DEC  H5P__decode_double
 /* Definition for threshold for alignment */
 #define H5F_ACS_ALIGN_THRHD_SIZE sizeof(hsize_t)
-#define H5F_ACS_ALIGN_THRHD_DEF H5F_ALIGN_THRHD_DEF
-#define H5F_ACS_ALIGN_THRHD_ENC H5P__encode_hsize_t
-#define H5F_ACS_ALIGN_THRHD_DEC H5P__decode_hsize_t
+#define H5F_ACS_ALIGN_THRHD_DEF  H5F_ALIGN_THRHD_DEF
+#define H5F_ACS_ALIGN_THRHD_ENC  H5P__encode_hsize_t
+#define H5F_ACS_ALIGN_THRHD_DEC  H5P__decode_hsize_t
 /* Definition for alignment */
 #define H5F_ACS_ALIGN_SIZE sizeof(hsize_t)
-#define H5F_ACS_ALIGN_DEF H5F_ALIGN_DEF
-#define H5F_ACS_ALIGN_ENC H5P__encode_hsize_t
-#define H5F_ACS_ALIGN_DEC H5P__decode_hsize_t
+#define H5F_ACS_ALIGN_DEF  H5F_ALIGN_DEF
+#define H5F_ACS_ALIGN_ENC  H5P__encode_hsize_t
+#define H5F_ACS_ALIGN_DEC  H5P__decode_hsize_t
 /* Definition for minimum metadata allocation block size (when
    aggregating metadata allocations. */
 #define H5F_ACS_META_BLOCK_SIZE_SIZE sizeof(hsize_t)
-#define H5F_ACS_META_BLOCK_SIZE_DEF H5F_META_BLOCK_SIZE_DEF
-#define H5F_ACS_META_BLOCK_SIZE_ENC H5P__encode_hsize_t
-#define H5F_ACS_META_BLOCK_SIZE_DEC H5P__decode_hsize_t
+#define H5F_ACS_META_BLOCK_SIZE_DEF  H5F_META_BLOCK_SIZE_DEF
+#define H5F_ACS_META_BLOCK_SIZE_ENC  H5P__encode_hsize_t
+#define H5F_ACS_META_BLOCK_SIZE_DEC  H5P__decode_hsize_t
 /* Definition for maximum sieve buffer size (when data sieving
    is allowed by file driver */
 #define H5F_ACS_SIEVE_BUF_SIZE_SIZE sizeof(size_t)
-#define H5F_ACS_SIEVE_BUF_SIZE_DEF (64 * 1024)
-#define H5F_ACS_SIEVE_BUF_SIZE_ENC H5P__encode_size_t
-#define H5F_ACS_SIEVE_BUF_SIZE_DEC H5P__decode_size_t
+#define H5F_ACS_SIEVE_BUF_SIZE_DEF  (64 * 1024)
+#define H5F_ACS_SIEVE_BUF_SIZE_ENC  H5P__encode_size_t
+#define H5F_ACS_SIEVE_BUF_SIZE_DEC  H5P__decode_size_t
 /* Definition for minimum "small data" allocation block size (when
    aggregating "small" raw data allocations. */
 #define H5F_ACS_SDATA_BLOCK_SIZE_SIZE sizeof(hsize_t)
-#define H5F_ACS_SDATA_BLOCK_SIZE_DEF H5F_SDATA_BLOCK_SIZE_DEF
-#define H5F_ACS_SDATA_BLOCK_SIZE_ENC H5P__encode_hsize_t
-#define H5F_ACS_SDATA_BLOCK_SIZE_DEC H5P__decode_hsize_t
+#define H5F_ACS_SDATA_BLOCK_SIZE_DEF  H5F_SDATA_BLOCK_SIZE_DEF
+#define H5F_ACS_SDATA_BLOCK_SIZE_ENC  H5P__encode_hsize_t
+#define H5F_ACS_SDATA_BLOCK_SIZE_DEC  H5P__decode_hsize_t
 /* Definition for garbage-collect references */
 #define H5F_ACS_GARBG_COLCT_REF_SIZE sizeof(unsigned)
-#define H5F_ACS_GARBG_COLCT_REF_DEF 0
-#define H5F_ACS_GARBG_COLCT_REF_ENC H5P__encode_unsigned
-#define H5F_ACS_GARBG_COLCT_REF_DEC H5P__decode_unsigned
+#define H5F_ACS_GARBG_COLCT_REF_DEF  0
+#define H5F_ACS_GARBG_COLCT_REF_ENC  H5P__encode_unsigned
+#define H5F_ACS_GARBG_COLCT_REF_DEC  H5P__decode_unsigned
 /* Definition for file driver ID & info */
 #define H5F_ACS_FILE_DRV_SIZE sizeof(H5FD_driver_prop_t)
-#define H5F_ACS_FILE_DRV_DEF {H5_DEFAULT_VFD, NULL, NULL}
-#define H5F_ACS_FILE_DRV_CRT H5P__facc_file_driver_create
-#define H5F_ACS_FILE_DRV_SET H5P__facc_file_driver_set
-#define H5F_ACS_FILE_DRV_GET H5P__facc_file_driver_get
-#define H5F_ACS_FILE_DRV_DEL H5P__facc_file_driver_del
-#define H5F_ACS_FILE_DRV_COPY H5P__facc_file_driver_copy
-#define H5F_ACS_FILE_DRV_CMP H5P__facc_file_driver_cmp
+#define H5F_ACS_FILE_DRV_DEF                                                                                 \
+    {                                                                                                        \
+        H5_DEFAULT_VFD, NULL, NULL                                                                           \
+    }
+#define H5F_ACS_FILE_DRV_CRT   H5P__facc_file_driver_create
+#define H5F_ACS_FILE_DRV_SET   H5P__facc_file_driver_set
+#define H5F_ACS_FILE_DRV_GET   H5P__facc_file_driver_get
+#define H5F_ACS_FILE_DRV_DEL   H5P__facc_file_driver_del
+#define H5F_ACS_FILE_DRV_COPY  H5P__facc_file_driver_copy
+#define H5F_ACS_FILE_DRV_CMP   H5P__facc_file_driver_cmp
 #define H5F_ACS_FILE_DRV_CLOSE H5P__facc_file_driver_close
 /* Definition for file close degree */
 #define H5F_CLOSE_DEGREE_SIZE sizeof(H5F_close_degree_t)
-#define H5F_CLOSE_DEGREE_DEF H5F_CLOSE_DEFAULT
-#define H5F_CLOSE_DEGREE_ENC H5P__facc_fclose_degree_enc
-#define H5F_CLOSE_DEGREE_DEC H5P__facc_fclose_degree_dec
+#define H5F_CLOSE_DEGREE_DEF  H5F_CLOSE_DEFAULT
+#define H5F_CLOSE_DEGREE_ENC  H5P__facc_fclose_degree_enc
+#define H5F_CLOSE_DEGREE_DEC  H5P__facc_fclose_degree_dec
 /* Definition for offset position in file for family file driver */
 #define H5F_ACS_FAMILY_OFFSET_SIZE sizeof(hsize_t)
-#define H5F_ACS_FAMILY_OFFSET_DEF 0
-#define H5F_ACS_FAMILY_OFFSET_ENC H5P__encode_hsize_t
-#define H5F_ACS_FAMILY_OFFSET_DEC H5P__decode_hsize_t
+#define H5F_ACS_FAMILY_OFFSET_DEF  0
+#define H5F_ACS_FAMILY_OFFSET_ENC  H5P__encode_hsize_t
+#define H5F_ACS_FAMILY_OFFSET_DEC  H5P__decode_hsize_t
 /* Definition for new member size of family driver. It's private
  * property only used by h5repart */
 #define H5F_ACS_FAMILY_NEWSIZE_SIZE sizeof(hsize_t)
-#define H5F_ACS_FAMILY_NEWSIZE_DEF 0
+#define H5F_ACS_FAMILY_NEWSIZE_DEF  0
 /* Definition for whether to convert family to a single-file driver.
  * It's a private property only used by h5repart.
  */
 #define H5F_ACS_FAMILY_TO_SINGLE_SIZE sizeof(bool)
-#define H5F_ACS_FAMILY_TO_SINGLE_DEF false
+#define H5F_ACS_FAMILY_TO_SINGLE_DEF  false
 /* Definition for data type in multi file driver */
 #define H5F_ACS_MULTI_TYPE_SIZE sizeof(H5FD_mem_t)
-#define H5F_ACS_MULTI_TYPE_DEF H5FD_MEM_DEFAULT
-#define H5F_ACS_MULTI_TYPE_ENC H5P__facc_multi_type_enc
-#define H5F_ACS_MULTI_TYPE_DEC H5P__facc_multi_type_dec
+#define H5F_ACS_MULTI_TYPE_DEF  H5FD_MEM_DEFAULT
+#define H5F_ACS_MULTI_TYPE_ENC  H5P__facc_multi_type_enc
+#define H5F_ACS_MULTI_TYPE_DEC  H5P__facc_multi_type_dec
 
 /* Definition for "low" bound of library format versions */
 #define H5F_ACS_LIBVER_LOW_BOUND_SIZE sizeof(H5F_libver_t)
-#define H5F_ACS_LIBVER_LOW_BOUND_DEF H5F_LIBVER_EARLIEST
-#define H5F_ACS_LIBVER_LOW_BOUND_ENC H5P__facc_libver_type_enc
-#define H5F_ACS_LIBVER_LOW_BOUND_DEC H5P__facc_libver_type_dec
+#define H5F_ACS_LIBVER_LOW_BOUND_DEF  H5F_LIBVER_EARLIEST
+#define H5F_ACS_LIBVER_LOW_BOUND_ENC  H5P__facc_libver_type_enc
+#define H5F_ACS_LIBVER_LOW_BOUND_DEC  H5P__facc_libver_type_dec
 
 /* Definition for "high" bound of library format versions */
 #define H5F_ACS_LIBVER_HIGH_BOUND_SIZE sizeof(H5F_libver_t)
-#define H5F_ACS_LIBVER_HIGH_BOUND_DEF H5F_LIBVER_LATEST
-#define H5F_ACS_LIBVER_HIGH_BOUND_ENC H5P__facc_libver_type_enc
-#define H5F_ACS_LIBVER_HIGH_BOUND_DEC H5P__facc_libver_type_dec
+#define H5F_ACS_LIBVER_HIGH_BOUND_DEF  H5F_LIBVER_LATEST
+#define H5F_ACS_LIBVER_HIGH_BOUND_ENC  H5P__facc_libver_type_enc
+#define H5F_ACS_LIBVER_HIGH_BOUND_DEC  H5P__facc_libver_type_dec
 
 /* Definition for whether to query the file descriptor from the core VFD
  * instead of the memory address.  (Private to library)
  */
 #define H5F_ACS_WANT_POSIX_FD_SIZE sizeof(bool)
-#define H5F_ACS_WANT_POSIX_FD_DEF false
+#define H5F_ACS_WANT_POSIX_FD_DEF  false
 /* Definition for external file cache size */
 #define H5F_ACS_EFC_SIZE_SIZE sizeof(unsigned)
-#define H5F_ACS_EFC_SIZE_DEF 0
-#define H5F_ACS_EFC_SIZE_ENC H5P__encode_unsigned
-#define H5F_ACS_EFC_SIZE_DEC H5P__decode_unsigned
+#define H5F_ACS_EFC_SIZE_DEF  0
+#define H5F_ACS_EFC_SIZE_ENC  H5P__encode_unsigned
+#define H5F_ACS_EFC_SIZE_DEC  H5P__decode_unsigned
 /* Definition of pointer to initial file image info */
-#define H5F_ACS_FILE_IMAGE_INFO_SIZE sizeof(H5FD_file_image_info_t)
-#define H5F_ACS_FILE_IMAGE_INFO_DEF H5FD_DEFAULT_FILE_IMAGE_INFO
-#define H5F_ACS_FILE_IMAGE_INFO_SET H5P__facc_file_image_info_set
-#define H5F_ACS_FILE_IMAGE_INFO_GET H5P__facc_file_image_info_get
-#define H5F_ACS_FILE_IMAGE_INFO_DEL H5P__facc_file_image_info_del
-#define H5F_ACS_FILE_IMAGE_INFO_COPY H5P__facc_file_image_info_copy
-#define H5F_ACS_FILE_IMAGE_INFO_CMP H5P__facc_file_image_info_cmp
+#define H5F_ACS_FILE_IMAGE_INFO_SIZE  sizeof(H5FD_file_image_info_t)
+#define H5F_ACS_FILE_IMAGE_INFO_DEF   H5FD_DEFAULT_FILE_IMAGE_INFO
+#define H5F_ACS_FILE_IMAGE_INFO_SET   H5P__facc_file_image_info_set
+#define H5F_ACS_FILE_IMAGE_INFO_GET   H5P__facc_file_image_info_get
+#define H5F_ACS_FILE_IMAGE_INFO_DEL   H5P__facc_file_image_info_del
+#define H5F_ACS_FILE_IMAGE_INFO_COPY  H5P__facc_file_image_info_copy
+#define H5F_ACS_FILE_IMAGE_INFO_CMP   H5P__facc_file_image_info_cmp
 #define H5F_ACS_FILE_IMAGE_INFO_CLOSE H5P__facc_file_image_info_close
 /* Definition for # of metadata read attempts */
 #define H5F_ACS_METADATA_READ_ATTEMPTS_SIZE sizeof(unsigned)
-#define H5F_ACS_METADATA_READ_ATTEMPTS_DEF 0
-#define H5F_ACS_METADATA_READ_ATTEMPTS_ENC H5P__encode_unsigned
-#define H5F_ACS_METADATA_READ_ATTEMPTS_DEC H5P__decode_unsigned
+#define H5F_ACS_METADATA_READ_ATTEMPTS_DEF  0
+#define H5F_ACS_METADATA_READ_ATTEMPTS_ENC  H5P__encode_unsigned
+#define H5F_ACS_METADATA_READ_ATTEMPTS_DEC  H5P__decode_unsigned
 /* Definition for object flush callback */
 #define H5F_ACS_OBJECT_FLUSH_CB_SIZE sizeof(H5F_object_flush_t)
-#define H5F_ACS_OBJECT_FLUSH_CB_DEF {NULL, NULL}
+#define H5F_ACS_OBJECT_FLUSH_CB_DEF                                                                          \
+    {                                                                                                        \
+        NULL, NULL                                                                                           \
+    }
 /* Definition for status_flags in the superblock */
 #define H5F_ACS_CLEAR_STATUS_FLAGS_SIZE sizeof(bool)
-#define H5F_ACS_CLEAR_STATUS_FLAGS_DEF false
+#define H5F_ACS_CLEAR_STATUS_FLAGS_DEF  false
 
 /* Definition for dropping free-space to the floor when reading in the superblock */
 #define H5F_ACS_NULL_FSM_ADDR_SIZE sizeof(bool)
-#define H5F_ACS_NULL_FSM_ADDR_DEF false
+#define H5F_ACS_NULL_FSM_ADDR_DEF  false
 /* Definition for skipping EOF check when reading in the superblock */
 #define H5F_ACS_SKIP_EOF_CHECK_SIZE sizeof(bool)
-#define H5F_ACS_SKIP_EOF_CHECK_DEF false
+#define H5F_ACS_SKIP_EOF_CHECK_DEF  false
 
 /* Definition for 'use metadata cache logging' flag */
 #define H5F_ACS_USE_MDC_LOGGING_SIZE sizeof(bool)
-#define H5F_ACS_USE_MDC_LOGGING_DEF false
-#define H5F_ACS_USE_MDC_LOGGING_ENC H5P__encode_bool
-#define H5F_ACS_USE_MDC_LOGGING_DEC H5P__decode_bool
+#define H5F_ACS_USE_MDC_LOGGING_DEF  false
+#define H5F_ACS_USE_MDC_LOGGING_ENC  H5P__encode_bool
+#define H5F_ACS_USE_MDC_LOGGING_DEC  H5P__decode_bool
 /* Definition for 'mdc log location' flag */
-#define H5F_ACS_MDC_LOG_LOCATION_SIZE sizeof(char *)
-#define H5F_ACS_MDC_LOG_LOCATION_DEF NULL /* default is no log location */
-#define H5F_ACS_MDC_LOG_LOCATION_ENC H5P__facc_mdc_log_location_enc
-#define H5F_ACS_MDC_LOG_LOCATION_DEC H5P__facc_mdc_log_location_dec
-#define H5F_ACS_MDC_LOG_LOCATION_DEL H5P__facc_mdc_log_location_del
-#define H5F_ACS_MDC_LOG_LOCATION_COPY H5P__facc_mdc_log_location_copy
-#define H5F_ACS_MDC_LOG_LOCATION_CMP H5P__facc_mdc_log_location_cmp
+#define H5F_ACS_MDC_LOG_LOCATION_SIZE  sizeof(char *)
+#define H5F_ACS_MDC_LOG_LOCATION_DEF   NULL /* default is no log location */
+#define H5F_ACS_MDC_LOG_LOCATION_ENC   H5P__facc_mdc_log_location_enc
+#define H5F_ACS_MDC_LOG_LOCATION_DEC   H5P__facc_mdc_log_location_dec
+#define H5F_ACS_MDC_LOG_LOCATION_DEL   H5P__facc_mdc_log_location_del
+#define H5F_ACS_MDC_LOG_LOCATION_COPY  H5P__facc_mdc_log_location_copy
+#define H5F_ACS_MDC_LOG_LOCATION_CMP   H5P__facc_mdc_log_location_cmp
 #define H5F_ACS_MDC_LOG_LOCATION_CLOSE H5P__facc_mdc_log_location_close
 /* Definition for 'start metadata cache logging on access' flag */
 #define H5F_ACS_START_MDC_LOG_ON_ACCESS_SIZE sizeof(bool)
-#define H5F_ACS_START_MDC_LOG_ON_ACCESS_DEF false
-#define H5F_ACS_START_MDC_LOG_ON_ACCESS_ENC H5P__encode_bool
-#define H5F_ACS_START_MDC_LOG_ON_ACCESS_DEC H5P__decode_bool
+#define H5F_ACS_START_MDC_LOG_ON_ACCESS_DEF  false
+#define H5F_ACS_START_MDC_LOG_ON_ACCESS_ENC  H5P__encode_bool
+#define H5F_ACS_START_MDC_LOG_ON_ACCESS_DEC  H5P__decode_bool
 /* Definition for evict on close property */
 #define H5F_ACS_EVICT_ON_CLOSE_FLAG_SIZE sizeof(bool)
-#define H5F_ACS_EVICT_ON_CLOSE_FLAG_DEF false
-#define H5F_ACS_EVICT_ON_CLOSE_FLAG_ENC H5P__encode_bool
-#define H5F_ACS_EVICT_ON_CLOSE_FLAG_DEC H5P__decode_bool
+#define H5F_ACS_EVICT_ON_CLOSE_FLAG_DEF  false
+#define H5F_ACS_EVICT_ON_CLOSE_FLAG_ENC  H5P__encode_bool
+#define H5F_ACS_EVICT_ON_CLOSE_FLAG_DEC  H5P__decode_bool
 #ifdef H5_HAVE_PARALLEL
 /* Definition of collective metadata read mode flag */
 #define H5F_ACS_COLL_MD_READ_FLAG_SIZE sizeof(H5P_coll_md_read_flag_t)
-#define H5F_ACS_COLL_MD_READ_FLAG_DEF H5P_USER_FALSE
-#define H5F_ACS_COLL_MD_READ_FLAG_ENC H5P__encode_coll_md_read_flag_t
-#define H5F_ACS_COLL_MD_READ_FLAG_DEC H5P__decode_coll_md_read_flag_t
+#define H5F_ACS_COLL_MD_READ_FLAG_DEF  H5P_USER_FALSE
+#define H5F_ACS_COLL_MD_READ_FLAG_ENC  H5P__encode_coll_md_read_flag_t
+#define H5F_ACS_COLL_MD_READ_FLAG_DEC  H5P__decode_coll_md_read_flag_t
 /* Definition of collective metadata write mode flag */
 #define H5F_ACS_COLL_MD_WRITE_FLAG_SIZE sizeof(bool)
-#define H5F_ACS_COLL_MD_WRITE_FLAG_DEF false
-#define H5F_ACS_COLL_MD_WRITE_FLAG_ENC H5P__encode_bool
-#define H5F_ACS_COLL_MD_WRITE_FLAG_DEC H5P__decode_bool
+#define H5F_ACS_COLL_MD_WRITE_FLAG_DEF  false
+#define H5F_ACS_COLL_MD_WRITE_FLAG_ENC  H5P__encode_bool
+#define H5F_ACS_COLL_MD_WRITE_FLAG_DEC  H5P__decode_bool
 /* Definition for the file's MPI communicator */
-#define H5F_ACS_MPI_PARAMS_COMM_SIZE sizeof(MPI_Comm)
-#define H5F_ACS_MPI_PARAMS_COMM_DEF MPI_COMM_NULL
-#define H5F_ACS_MPI_PARAMS_COMM_SET H5P__facc_mpi_comm_set
-#define H5F_ACS_MPI_PARAMS_COMM_GET H5P__facc_mpi_comm_get
-#define H5F_ACS_MPI_PARAMS_COMM_DEL H5P__facc_mpi_comm_del
-#define H5F_ACS_MPI_PARAMS_COMM_COPY H5P__facc_mpi_comm_copy
-#define H5F_ACS_MPI_PARAMS_COMM_CMP H5P__facc_mpi_comm_cmp
+#define H5F_ACS_MPI_PARAMS_COMM_SIZE  sizeof(MPI_Comm)
+#define H5F_ACS_MPI_PARAMS_COMM_DEF   MPI_COMM_NULL
+#define H5F_ACS_MPI_PARAMS_COMM_SET   H5P__facc_mpi_comm_set
+#define H5F_ACS_MPI_PARAMS_COMM_GET   H5P__facc_mpi_comm_get
+#define H5F_ACS_MPI_PARAMS_COMM_DEL   H5P__facc_mpi_comm_del
+#define H5F_ACS_MPI_PARAMS_COMM_COPY  H5P__facc_mpi_comm_copy
+#define H5F_ACS_MPI_PARAMS_COMM_CMP   H5P__facc_mpi_comm_cmp
 #define H5F_ACS_MPI_PARAMS_COMM_CLOSE H5P__facc_mpi_comm_close
 /* Definition for the file's MPI info */
-#define H5F_ACS_MPI_PARAMS_INFO_SIZE sizeof(MPI_Info)
-#define H5F_ACS_MPI_PARAMS_INFO_DEF MPI_INFO_NULL
-#define H5F_ACS_MPI_PARAMS_INFO_SET H5P__facc_mpi_info_set
-#define H5F_ACS_MPI_PARAMS_INFO_GET H5P__facc_mpi_info_get
-#define H5F_ACS_MPI_PARAMS_INFO_DEL H5P__facc_mpi_info_del
-#define H5F_ACS_MPI_PARAMS_INFO_COPY H5P__facc_mpi_info_copy
-#define H5F_ACS_MPI_PARAMS_INFO_CMP H5P__facc_mpi_info_cmp
+#define H5F_ACS_MPI_PARAMS_INFO_SIZE  sizeof(MPI_Info)
+#define H5F_ACS_MPI_PARAMS_INFO_DEF   MPI_INFO_NULL
+#define H5F_ACS_MPI_PARAMS_INFO_SET   H5P__facc_mpi_info_set
+#define H5F_ACS_MPI_PARAMS_INFO_GET   H5P__facc_mpi_info_get
+#define H5F_ACS_MPI_PARAMS_INFO_DEL   H5P__facc_mpi_info_del
+#define H5F_ACS_MPI_PARAMS_INFO_COPY  H5P__facc_mpi_info_copy
+#define H5F_ACS_MPI_PARAMS_INFO_CMP   H5P__facc_mpi_info_cmp
 #define H5F_ACS_MPI_PARAMS_INFO_CLOSE H5P__facc_mpi_info_close
 #endif /* H5_HAVE_PARALLEL */
 /* Definitions for the initial metadata cache image configuration */
 #define H5F_ACS_META_CACHE_INIT_IMAGE_CONFIG_SIZE sizeof(H5AC_cache_image_config_t)
-#define H5F_ACS_META_CACHE_INIT_IMAGE_CONFIG_DEF H5AC__DEFAULT_CACHE_IMAGE_CONFIG
-#define H5F_ACS_META_CACHE_INIT_IMAGE_CONFIG_ENC H5P__facc_cache_image_config_enc
-#define H5F_ACS_META_CACHE_INIT_IMAGE_CONFIG_DEC H5P__facc_cache_image_config_dec
-#define H5F_ACS_META_CACHE_INIT_IMAGE_CONFIG_CMP H5P__facc_cache_image_config_cmp
+#define H5F_ACS_META_CACHE_INIT_IMAGE_CONFIG_DEF  H5AC__DEFAULT_CACHE_IMAGE_CONFIG
+#define H5F_ACS_META_CACHE_INIT_IMAGE_CONFIG_ENC  H5P__facc_cache_image_config_enc
+#define H5F_ACS_META_CACHE_INIT_IMAGE_CONFIG_DEC  H5P__facc_cache_image_config_dec
+#define H5F_ACS_META_CACHE_INIT_IMAGE_CONFIG_CMP  H5P__facc_cache_image_config_cmp
 /* Definition for total size of page buffer(bytes) */
 #define H5F_ACS_PAGE_BUFFER_SIZE_SIZE sizeof(size_t)
-#define H5F_ACS_PAGE_BUFFER_SIZE_DEF 0
-#define H5F_ACS_PAGE_BUFFER_SIZE_ENC H5P__encode_size_t
-#define H5F_ACS_PAGE_BUFFER_SIZE_DEC H5P__decode_size_t
+#define H5F_ACS_PAGE_BUFFER_SIZE_DEF  0
+#define H5F_ACS_PAGE_BUFFER_SIZE_ENC  H5P__encode_size_t
+#define H5F_ACS_PAGE_BUFFER_SIZE_DEC  H5P__decode_size_t
 /* Definition for minimum metadata size of page buffer(bytes) */
 #define H5F_ACS_PAGE_BUFFER_MIN_META_PERC_SIZE sizeof(unsigned)
-#define H5F_ACS_PAGE_BUFFER_MIN_META_PERC_DEF 0
-#define H5F_ACS_PAGE_BUFFER_MIN_META_PERC_ENC H5P__encode_unsigned
-#define H5F_ACS_PAGE_BUFFER_MIN_META_PERC_DEC H5P__decode_unsigned
+#define H5F_ACS_PAGE_BUFFER_MIN_META_PERC_DEF  0
+#define H5F_ACS_PAGE_BUFFER_MIN_META_PERC_ENC  H5P__encode_unsigned
+#define H5F_ACS_PAGE_BUFFER_MIN_META_PERC_DEC  H5P__decode_unsigned
 /* Definition for minimum raw data size of page buffer(bytes) */
 #define H5F_ACS_PAGE_BUFFER_MIN_RAW_PERC_SIZE sizeof(unsigned)
-#define H5F_ACS_PAGE_BUFFER_MIN_RAW_PERC_DEF 0
-#define H5F_ACS_PAGE_BUFFER_MIN_RAW_PERC_ENC H5P__encode_unsigned
-#define H5F_ACS_PAGE_BUFFER_MIN_RAW_PERC_DEC H5P__decode_unsigned
+#define H5F_ACS_PAGE_BUFFER_MIN_RAW_PERC_DEF  0
+#define H5F_ACS_PAGE_BUFFER_MIN_RAW_PERC_ENC  H5P__encode_unsigned
+#define H5F_ACS_PAGE_BUFFER_MIN_RAW_PERC_DEC  H5P__decode_unsigned
 /* Definition for file VOL connector properties (ID, etc.) */
 #define H5F_ACS_VOL_CONN_SIZE sizeof(H5VL_connector_prop_t)
-#define H5F_ACS_VOL_CONN_DEF {H5_DEFAULT_VOL, NULL}
-#define H5F_ACS_VOL_CONN_CRT H5P__facc_vol_create
-#define H5F_ACS_VOL_CONN_SET H5P__facc_vol_set
-#define H5F_ACS_VOL_CONN_GET H5P__facc_vol_get
-#define H5F_ACS_VOL_CONN_DEL H5P__facc_vol_del
-#define H5F_ACS_VOL_CONN_COPY H5P__facc_vol_copy
-#define H5F_ACS_VOL_CONN_CMP H5P__facc_vol_cmp
+#define H5F_ACS_VOL_CONN_DEF                                                                                 \
+    {                                                                                                        \
+        H5_DEFAULT_VOL, NULL                                                                                 \
+    }
+#define H5F_ACS_VOL_CONN_CRT   H5P__facc_vol_create
+#define H5F_ACS_VOL_CONN_SET   H5P__facc_vol_set
+#define H5F_ACS_VOL_CONN_GET   H5P__facc_vol_get
+#define H5F_ACS_VOL_CONN_DEL   H5P__facc_vol_del
+#define H5F_ACS_VOL_CONN_COPY  H5P__facc_vol_copy
+#define H5F_ACS_VOL_CONN_CMP   H5P__facc_vol_cmp
 #define H5F_ACS_VOL_CONN_CLOSE H5P__facc_vol_close
 /* Definition for using file locking or not. The default is set
  * via the configure step.
@@ -333,9 +342,9 @@
 #define H5F_ACS_IGNORE_DISABLED_FILE_LOCKS_DEC H5P__decode_bool
 /* Definition for 'rfic' flags */
 #define H5F_ACS_RFIC_FLAGS_SIZE sizeof(uint64_t)
-#define H5F_ACS_RFIC_FLAGS_DEF 0
-#define H5F_ACS_RFIC_FLAGS_ENC H5P__encode_uint64_t
-#define H5F_ACS_RFIC_FLAGS_DEC H5P__decode_uint64_t
+#define H5F_ACS_RFIC_FLAGS_DEF  0
+#define H5F_ACS_RFIC_FLAGS_ENC  H5P__encode_uint64_t
+#define H5F_ACS_RFIC_FLAGS_DEC  H5P__decode_uint64_t
 
 /******************/
 /* Local Typedefs */
@@ -358,7 +367,7 @@ static herr_t H5P__facc_file_driver_set(hid_t prop_id, const char *name, size_t 
 static herr_t H5P__facc_file_driver_get(hid_t prop_id, const char *name, size_t size, void *value);
 static herr_t H5P__facc_file_driver_del(hid_t prop_id, const char *name, size_t size, void *value);
 static herr_t H5P__facc_file_driver_copy(const char *name, size_t size, void *value);
-static int H5P__facc_file_driver_cmp(const void *value1, const void *value2, size_t size);
+static int    H5P__facc_file_driver_cmp(const void *value1, const void *value2, size_t size);
 static herr_t H5P__facc_file_driver_close(const char *name, size_t size, void *value);
 
 /* File image info property callbacks */
@@ -368,16 +377,16 @@ static herr_t H5P__facc_file_image_info_set(hid_t prop_id, const char *name, siz
 static herr_t H5P__facc_file_image_info_get(hid_t prop_id, const char *name, size_t size, void *value);
 static herr_t H5P__facc_file_image_info_del(hid_t prop_id, const char *name, size_t size, void *value);
 static herr_t H5P__facc_file_image_info_copy(const char *name, size_t size, void *value);
-static int H5P__facc_file_image_info_cmp(const void *value1, const void *value2, size_t size);
+static int    H5P__facc_file_image_info_cmp(const void *value1, const void *value2, size_t size);
 static herr_t H5P__facc_file_image_info_close(const char *name, size_t size, void *value);
 
 /* encode & decode callbacks */
 static herr_t H5P__facc_scc_config_enc(const void *value, void **_pp, size_t *size);
 static herr_t H5P__facc_scc_config_dec(const void **_pp, void *value);
-static int H5P__facc_scc_config_cmp(const void *value1, const void *value2, size_t size);
+static int    H5P__facc_scc_config_cmp(const void *value1, const void *value2, size_t size);
 static herr_t H5P__facc_cache_config_enc(const void *value, void **_pp, size_t *size);
 static herr_t H5P__facc_cache_config_dec(const void **_pp, void *value);
-static int H5P__facc_cache_config_cmp(const void *value1, const void *value2, size_t size);
+static int    H5P__facc_cache_config_cmp(const void *value1, const void *value2, size_t size);
 static herr_t H5P__facc_fclose_degree_enc(const void *value, void **_pp, size_t *size);
 static herr_t H5P__facc_fclose_degree_dec(const void **pp, void *value);
 static herr_t H5P__facc_multi_type_enc(const void *value, void **_pp, size_t *size);
@@ -390,12 +399,12 @@ static herr_t H5P__facc_mdc_log_location_enc(const void *value, void **_pp, size
 static herr_t H5P__facc_mdc_log_location_dec(const void **_pp, void *value);
 static herr_t H5P__facc_mdc_log_location_del(hid_t prop_id, const char *name, size_t size, void *value);
 static herr_t H5P__facc_mdc_log_location_copy(const char *name, size_t size, void *value);
-static int H5P__facc_mdc_log_location_cmp(const void *value1, const void *value2, size_t size);
+static int    H5P__facc_mdc_log_location_cmp(const void *value1, const void *value2, size_t size);
 static herr_t H5P__facc_mdc_log_location_close(const char *name, size_t size, void *value);
 
 /* Metadata cache image property callbacks */
-static int H5P__facc_cache_image_config_cmp(const void *_config1, const void *_config2,
-                                            size_t H5_ATTR_UNUSED size);
+static int    H5P__facc_cache_image_config_cmp(const void *_config1, const void *_config2,
+                                               size_t H5_ATTR_UNUSED size);
 static herr_t H5P__facc_cache_image_config_enc(const void *value, void **_pp, size_t *size);
 static herr_t H5P__facc_cache_image_config_dec(const void **_pp, void *_value);
 
@@ -405,7 +414,7 @@ static herr_t H5P__facc_vol_set(hid_t prop_id, const char *name, size_t size, vo
 static herr_t H5P__facc_vol_get(hid_t prop_id, const char *name, size_t size, void *value);
 static herr_t H5P__facc_vol_del(hid_t prop_id, const char *name, size_t size, void *value);
 static herr_t H5P__facc_vol_copy(const char *name, size_t size, void *value);
-static int H5P__facc_vol_cmp(const void *value1, const void *value2, size_t size);
+static int    H5P__facc_vol_cmp(const void *value1, const void *value2, size_t size);
 static herr_t H5P__facc_vol_close(const char *name, size_t size, void *value);
 
 #ifdef H5_HAVE_PARALLEL
@@ -414,7 +423,7 @@ static herr_t H5P__facc_mpi_comm_set(hid_t prop_id, const char *name, size_t siz
 static herr_t H5P__facc_mpi_comm_get(hid_t prop_id, const char *name, size_t size, void *value);
 static herr_t H5P__facc_mpi_comm_del(hid_t prop_id, const char *name, size_t size, void *value);
 static herr_t H5P__facc_mpi_comm_copy(const char *name, size_t size, void *value);
-static int H5P__facc_mpi_comm_cmp(const void *value1, const void *value2, size_t size);
+static int    H5P__facc_mpi_comm_cmp(const void *value1, const void *value2, size_t size);
 static herr_t H5P__facc_mpi_comm_close(const char *name, size_t size, void *value);
 
 /* MPI info callbacks */
@@ -422,7 +431,7 @@ static herr_t H5P__facc_mpi_info_set(hid_t prop_id, const char *name, size_t siz
 static herr_t H5P__facc_mpi_info_get(hid_t prop_id, const char *name, size_t size, void *value);
 static herr_t H5P__facc_mpi_info_del(hid_t prop_id, const char *name, size_t size, void *value);
 static herr_t H5P__facc_mpi_info_copy(const char *name, size_t size, void *value);
-static int H5P__facc_mpi_info_cmp(const void *value1, const void *value2, size_t size);
+static int    H5P__facc_mpi_info_cmp(const void *value1, const void *value2, size_t size);
 static herr_t H5P__facc_mpi_info_close(const char *name, size_t size, void *value);
 #endif /* H5_HAVE_PARALLEL */
 
@@ -514,7 +523,7 @@ static const bool H5F_def_null_fsm_addr_g =
 static const bool H5F_def_use_mdc_logging_g =
     H5F_ACS_USE_MDC_LOGGING_DEF; /* Default metadata cache logging flag */
 static const char *H5F_def_mdc_log_location_g = H5F_ACS_MDC_LOG_LOCATION_DEF; /* Default mdc log location */
-static const bool H5F_def_start_mdc_log_on_access_g =
+static const bool  H5F_def_start_mdc_log_on_access_g =
     H5F_ACS_START_MDC_LOG_ON_ACCESS_DEF; /* Default mdc log start on access flag */
 static const bool H5F_def_evict_on_close_flag_g =
     H5F_ACS_EVICT_ON_CLOSE_FLAG_DEF; /* Default setting for evict on close property */
@@ -528,7 +537,7 @@ static const MPI_Info H5F_def_mpi_params_info_g = H5F_ACS_MPI_PARAMS_INFO_DEF; /
 #endif                                                                         /* H5_HAVE_PARALLEL */
 static const H5AC_cache_image_config_t H5F_def_mdc_initCacheImageCfg_g =
     H5F_ACS_META_CACHE_INIT_IMAGE_CONFIG_DEF; /* Default metadata cache image settings */
-static const size_t H5F_def_page_buf_size_g = H5F_ACS_PAGE_BUFFER_SIZE_DEF; /* Default page buffer size */
+static const size_t   H5F_def_page_buf_size_g = H5F_ACS_PAGE_BUFFER_SIZE_DEF; /* Default page buffer size */
 static const unsigned H5F_def_page_buf_min_meta_perc_g =
     H5F_ACS_PAGE_BUFFER_MIN_META_PERC_DEF; /* Default page buffer minimum metadata size */
 static const unsigned H5F_def_page_buf_min_raw_perc_g =
@@ -548,7 +557,8 @@ static const uint64_t H5F_def_rfic_flags_g = H5F_ACS_RFIC_FLAGS_DEF; /* Default 
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_reg_prop(H5P_genclass_t *pclass)
+static herr_t
+H5P__facc_reg_prop(H5P_genclass_t *pclass)
 {
     const H5FD_driver_prop_t def_driver_prop =
         H5F_ACS_FILE_DRV_DEF; /* Default VFL driver ID & info (initialized from a variable) */
@@ -860,12 +870,13 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5P__facc_set_def_driver(void)
+herr_t
+H5P__facc_set_def_driver(void)
 {
     const char *driver_env_var;
-    bool driver_ref_inc = false;
-    hid_t driver_id     = H5I_INVALID_HID; /* VFL driver ID */
-    herr_t ret_value    = SUCCEED;
+    bool        driver_ref_inc = false;
+    hid_t       driver_id      = H5I_INVALID_HID; /* VFL driver ID */
+    herr_t      ret_value      = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
@@ -875,10 +886,10 @@ herr_t H5P__facc_set_def_driver(void)
     /* Only parse VFL driver string if it's set */
     if (driver_env_var && *driver_env_var) {
         H5FD_driver_prop_t driver_prop;
-        H5P_genplist_t *def_fapl;     /* Default file access property list */
-        H5P_genclass_t *def_fapclass; /* Default file access property class */
-        const char *driver_config_env_var;
-        htri_t driver_is_registered;
+        H5P_genplist_t    *def_fapl;     /* Default file access property list */
+        H5P_genclass_t    *def_fapclass; /* Default file access property class */
+        const char        *driver_config_env_var;
+        htri_t             driver_is_registered;
 
         /* Check to see if the driver is already registered */
         if ((driver_is_registered = H5FD_is_driver_registered_by_name(driver_env_var, &driver_id)) < 0)
@@ -905,7 +916,7 @@ herr_t H5P__facc_set_def_driver(void)
                     HGOTO_ERROR(H5E_VFL, H5E_CANTREGISTER, FAIL, "can't register VFL driver");
                 driver_ref_inc = true;
             } /* end else */
-        } /* end else */
+        }     /* end else */
 
         /* Retrieve driver configuration string from environment variable, if set. */
         driver_config_env_var = getenv(HDF5_DRIVER_CONFIG);
@@ -957,7 +968,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_set_def_driver_check_predefined(const char *driver_name, hid_t *driver_id)
+static herr_t
+H5P__facc_set_def_driver_check_predefined(const char *driver_name, hid_t *driver_id)
 {
     herr_t ret_value = SUCCEED;
 
@@ -1079,10 +1091,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_alignment(hid_t fapl_id, hsize_t threshold, hsize_t alignment)
+herr_t
+H5Pset_alignment(hid_t fapl_id, hsize_t threshold, hsize_t alignment)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -1115,10 +1128,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_alignment(hid_t fapl_id, hsize_t *threshold /*out*/, hsize_t *alignment /*out*/)
+herr_t
+H5Pget_alignment(hid_t fapl_id, hsize_t *threshold /*out*/, hsize_t *alignment /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* Return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -1157,8 +1171,9 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5P_set_driver(H5P_genplist_t *plist, hid_t new_driver_id, const void *new_driver_info,
-                      const char *new_driver_config_str)
+herr_t
+H5P_set_driver(H5P_genplist_t *plist, hid_t new_driver_id, const void *new_driver_info,
+               const char *new_driver_config_str)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -1207,10 +1222,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_driver(hid_t plist_id, hid_t new_driver_id, const void *new_driver_info)
+herr_t
+H5Pset_driver(hid_t plist_id, hid_t new_driver_id, const void *new_driver_info)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* Return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -1245,11 +1261,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5P_set_driver_by_name(H5P_genplist_t *plist, const char *driver_name, const char *driver_config,
-                              bool app_ref)
+herr_t
+H5P_set_driver_by_name(H5P_genplist_t *plist, const char *driver_name, const char *driver_config,
+                       bool app_ref)
 {
-    hid_t new_driver_id = H5I_INVALID_HID;
-    herr_t ret_value    = SUCCEED;
+    hid_t  new_driver_id = H5I_INVALID_HID;
+    herr_t ret_value     = SUCCEED;
 
     FUNC_ENTER_NOAPI(FAIL)
 
@@ -1290,10 +1307,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_driver_by_name(hid_t plist_id, const char *driver_name, const char *driver_config)
+herr_t
+H5Pset_driver_by_name(hid_t plist_id, const char *driver_name, const char *driver_config)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* Return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -1330,11 +1348,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5P_set_driver_by_value(H5P_genplist_t *plist, H5FD_class_value_t driver_value,
-                               const char *driver_config, bool app_ref)
+herr_t
+H5P_set_driver_by_value(H5P_genplist_t *plist, H5FD_class_value_t driver_value, const char *driver_config,
+                        bool app_ref)
 {
-    hid_t new_driver_id = H5I_INVALID_HID;
-    herr_t ret_value    = SUCCEED;
+    hid_t  new_driver_id = H5I_INVALID_HID;
+    herr_t ret_value     = SUCCEED;
 
     FUNC_ENTER_NOAPI(FAIL)
 
@@ -1375,10 +1394,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_driver_by_value(hid_t plist_id, H5FD_class_value_t driver_value, const char *driver_config)
+herr_t
+H5Pset_driver_by_value(hid_t plist_id, H5FD_class_value_t driver_value, const char *driver_config)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* Return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -1411,7 +1431,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-hid_t H5P_peek_driver(H5P_genplist_t *plist)
+hid_t
+H5P_peek_driver(H5P_genplist_t *plist)
 {
     hid_t ret_value = FAIL; /* Return value */
 
@@ -1452,10 +1473,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-hid_t H5Pget_driver(hid_t plist_id)
+hid_t
+H5Pget_driver(hid_t plist_id)
 {
-    H5P_genplist_t *plist; /* Property list pointer */
-    hid_t ret_value;       /* Return value */
+    H5P_genplist_t *plist;     /* Property list pointer */
+    hid_t           ret_value; /* Return value */
 
     FUNC_ENTER_API(H5I_INVALID_HID)
 
@@ -1485,7 +1507,8 @@ done:
  *                          this case.
  *-------------------------------------------------------------------------
  */
-const void *H5P_peek_driver_info(H5P_genplist_t *plist)
+const void *
+H5P_peek_driver_info(H5P_genplist_t *plist)
 {
     const void *ret_value = NULL;
 
@@ -1522,10 +1545,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-const void *H5Pget_driver_info(hid_t plist_id)
+const void *
+H5Pget_driver_info(hid_t plist_id)
 {
-    H5P_genplist_t *plist = NULL; /* Property list pointer            */
-    const void *ret_value = NULL; /* Return value                     */
+    H5P_genplist_t *plist     = NULL; /* Property list pointer            */
+    const void     *ret_value = NULL; /* Return value                     */
 
     FUNC_ENTER_API(NULL)
 
@@ -1554,7 +1578,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-const char *H5P_peek_driver_config_str(H5P_genplist_t *plist)
+const char *
+H5P_peek_driver_config_str(H5P_genplist_t *plist)
 {
     const char *ret_value = NULL; /* Return value */
 
@@ -1593,11 +1618,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-ssize_t H5Pget_driver_config_str(hid_t fapl_id, char *config_buf, size_t buf_size)
+ssize_t
+H5Pget_driver_config_str(hid_t fapl_id, char *config_buf, size_t buf_size)
 {
     H5P_genplist_t *plist; /* Property list pointer */
-    const char *config_str = NULL;
-    ssize_t ret_value      = -1;
+    const char     *config_str = NULL;
+    ssize_t         ret_value  = -1;
 
     FUNC_ENTER_API((-1))
 
@@ -1642,7 +1668,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__file_driver_copy(void *value)
+static herr_t
+H5P__file_driver_copy(void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -1660,7 +1687,7 @@ static herr_t H5P__file_driver_copy(void *value)
             /* Copy driver info, if it exists */
             if (info->driver_info) {
                 H5FD_class_t *driver; /* Pointer to driver */
-                void *new_pl;         /* Copy of driver info */
+                void         *new_pl; /* Copy of driver info */
 
                 /* Retrieve the driver for the ID */
                 if (NULL == (driver = (H5FD_class_t *)H5I_object(info->driver_id)))
@@ -1691,8 +1718,8 @@ static herr_t H5P__file_driver_copy(void *value)
                     HGOTO_ERROR(H5E_PLIST, H5E_CANTCOPY, FAIL, "driver configuration string copy failed");
                 info->driver_config_str = new_config_str;
             } /* end if */
-        } /* end if */
-    } /* end if */
+        }     /* end if */
+    }         /* end if */
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
@@ -1708,7 +1735,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__file_driver_free(void *value)
+static herr_t
+H5P__file_driver_free(void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -1747,8 +1775,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_file_driver_create(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size,
-                                           void *value)
+static herr_t
+H5P__facc_file_driver_create(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -1772,8 +1800,9 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_file_driver_set(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
-                                        size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_file_driver_set(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
+                          size_t H5_ATTR_UNUSED size, void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -1800,8 +1829,9 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_file_driver_get(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
-                                        size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_file_driver_get(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
+                          size_t H5_ATTR_UNUSED size, void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -1828,8 +1858,9 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_file_driver_del(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
-                                        size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_file_driver_del(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
+                          size_t H5_ATTR_UNUSED size, void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -1853,8 +1884,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_file_driver_copy(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size,
-                                         void *value)
+static herr_t
+H5P__facc_file_driver_copy(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -1880,14 +1911,15 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static int H5P__facc_file_driver_cmp(const void *_info1, const void *_info2, size_t H5_ATTR_UNUSED size)
+static int
+H5P__facc_file_driver_cmp(const void *_info1, const void *_info2, size_t H5_ATTR_UNUSED size)
 {
     const H5FD_driver_prop_t *info1 =
                                  (const H5FD_driver_prop_t *)_info1, /* Create local aliases for values */
         *info2 = (const H5FD_driver_prop_t *)_info2;
-    H5FD_class_t *cls1, *cls2; /* Driver class for each property */
-    int cmp_value;             /* Value from comparison */
-    herr_t ret_value = 0;      /* Return value */
+    H5FD_class_t *cls1, *cls2;   /* Driver class for each property */
+    int           cmp_value;     /* Value from comparison */
+    herr_t        ret_value = 0; /* Return value */
 
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -1948,8 +1980,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_file_driver_close(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size,
-                                          void *value)
+static herr_t
+H5P__facc_file_driver_close(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -1975,10 +2007,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_family_offset(hid_t fapl_id, hsize_t offset)
+herr_t
+H5Pset_family_offset(hid_t fapl_id, hsize_t offset)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* Return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2008,10 +2041,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_family_offset(hid_t fapl_id, hsize_t *offset /*out*/)
+herr_t
+H5Pget_family_offset(hid_t fapl_id, hsize_t *offset /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* Return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2043,10 +2077,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_multi_type(hid_t fapl_id, H5FD_mem_t type)
+herr_t
+H5Pset_multi_type(hid_t fapl_id, H5FD_mem_t type)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2076,10 +2111,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_multi_type(hid_t fapl_id, H5FD_mem_t *type /*out*/)
+herr_t
+H5Pget_multi_type(hid_t fapl_id, H5FD_mem_t *type /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* Return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2118,11 +2154,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_cache(hid_t plist_id, int H5_ATTR_UNUSED mdc_nelmts, size_t rdcc_nslots, size_t rdcc_nbytes,
-                    double rdcc_w0)
+herr_t
+H5Pset_cache(hid_t plist_id, int H5_ATTR_UNUSED mdc_nelmts, size_t rdcc_nslots, size_t rdcc_nbytes,
+             double rdcc_w0)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2160,11 +2197,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_cache(hid_t plist_id, int *mdc_nelmts, size_t *rdcc_nslots /*out*/, size_t *rdcc_nbytes /*out*/,
-                    double *rdcc_w0 /*out*/)
+herr_t
+H5Pget_cache(hid_t plist_id, int *mdc_nelmts, size_t *rdcc_nslots /*out*/, size_t *rdcc_nbytes /*out*/,
+             double *rdcc_w0 /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2202,10 +2240,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_mdc_image_config(hid_t plist_id, H5AC_cache_image_config_t *config_ptr)
+herr_t
+H5Pset_mdc_image_config(hid_t plist_id, H5AC_cache_image_config_t *config_ptr)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2244,10 +2283,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_mdc_image_config(hid_t plist_id, H5AC_cache_image_config_t *config /*out*/)
+herr_t
+H5Pget_mdc_image_config(hid_t plist_id, H5AC_cache_image_config_t *config /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2284,10 +2324,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_mdc_config(hid_t plist_id, H5AC_cache_config_t *config_ptr)
+herr_t
+H5Pset_mdc_config(hid_t plist_id, H5AC_cache_config_t *config_ptr)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2326,10 +2367,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_mdc_config(hid_t plist_id, H5AC_cache_config_t *config /*out*/)
+herr_t
+H5Pget_mdc_config(hid_t plist_id, H5AC_cache_config_t *config /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2377,10 +2419,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_gc_references(hid_t plist_id, unsigned gc_ref)
+herr_t
+H5Pset_gc_references(hid_t plist_id, unsigned gc_ref)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2406,10 +2449,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_gc_references(hid_t plist_id, unsigned *gc_ref /*out*/)
+herr_t
+H5Pget_gc_references(hid_t plist_id, unsigned *gc_ref /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2435,10 +2479,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_fclose_degree(hid_t plist_id, H5F_close_degree_t degree)
+herr_t
+H5Pset_fclose_degree(hid_t plist_id, H5F_close_degree_t degree)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2463,10 +2508,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_fclose_degree(hid_t plist_id, H5F_close_degree_t *degree /*out*/)
+herr_t
+H5Pget_fclose_degree(hid_t plist_id, H5F_close_degree_t *degree /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2500,10 +2546,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_meta_block_size(hid_t plist_id, hsize_t size)
+herr_t
+H5Pset_meta_block_size(hid_t plist_id, hsize_t size)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2529,10 +2576,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_meta_block_size(hid_t plist_id, hsize_t *size /*out*/)
+herr_t
+H5Pget_meta_block_size(hid_t plist_id, hsize_t *size /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2569,10 +2617,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_sieve_buf_size(hid_t plist_id, size_t size)
+herr_t
+H5Pset_sieve_buf_size(hid_t plist_id, size_t size)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2598,10 +2647,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_sieve_buf_size(hid_t plist_id, size_t *size /*out*/)
+herr_t
+H5Pget_sieve_buf_size(hid_t plist_id, size_t *size /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2637,10 +2687,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_small_data_block_size(hid_t plist_id, hsize_t size)
+herr_t
+H5Pset_small_data_block_size(hid_t plist_id, hsize_t size)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2666,10 +2717,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_small_data_block_size(hid_t plist_id, hsize_t *size /*out*/)
+herr_t
+H5Pget_small_data_block_size(hid_t plist_id, hsize_t *size /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2788,10 +2840,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_libver_bounds(hid_t plist_id, H5F_libver_t low, H5F_libver_t high)
+herr_t
+H5Pset_libver_bounds(hid_t plist_id, H5F_libver_t low, H5F_libver_t high)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2832,10 +2885,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_libver_bounds(hid_t plist_id, H5F_libver_t *low /*out*/, H5F_libver_t *high /*out*/)
+herr_t
+H5Pget_libver_bounds(hid_t plist_id, H5F_libver_t *low /*out*/, H5F_libver_t *high /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2869,10 +2923,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_elink_file_cache_size(hid_t plist_id, unsigned efc_size)
+herr_t
+H5Pset_elink_file_cache_size(hid_t plist_id, unsigned efc_size)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2901,10 +2956,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_elink_file_cache_size(hid_t plist_id, unsigned *efc_size /*out*/)
+herr_t
+H5Pget_elink_file_cache_size(hid_t plist_id, unsigned *efc_size /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2931,11 +2987,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_file_image(hid_t fapl_id, void *buf_ptr, size_t buf_len)
+herr_t
+H5Pset_file_image(hid_t fapl_id, void *buf_ptr, size_t buf_len)
 {
-    H5P_genplist_t *fapl;              /* Property list pointer */
-    H5FD_file_image_info_t image_info; /* File image info */
-    herr_t ret_value = SUCCEED;        /* Return value */
+    H5P_genplist_t        *fapl;                /* Property list pointer */
+    H5FD_file_image_info_t image_info;          /* File image info */
+    herr_t                 ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -2956,10 +3013,10 @@ herr_t H5Pset_file_image(hid_t fapl_id, void *buf_ptr, size_t buf_len)
         if (image_info.callbacks.image_free) {
             /* Prepare & restore library for user callback */
             H5_BEFORE_USER_CB(FAIL)
-            {
-                ret_value = image_info.callbacks.image_free(
-                    image_info.buffer, H5FD_FILE_IMAGE_OP_PROPERTY_LIST_SET, image_info.callbacks.udata);
-            }
+                {
+                    ret_value = image_info.callbacks.image_free(
+                        image_info.buffer, H5FD_FILE_IMAGE_OP_PROPERTY_LIST_SET, image_info.callbacks.udata);
+                }
             H5_AFTER_USER_CB(FAIL)
             if (ret_value < 0)
                 HGOTO_ERROR(H5E_PLIST, H5E_CANTFREE, FAIL, "image_free callback failed");
@@ -2974,10 +3031,10 @@ herr_t H5Pset_file_image(hid_t fapl_id, void *buf_ptr, size_t buf_len)
         if (image_info.callbacks.image_malloc) {
             /* Prepare & restore library for user callback */
             H5_BEFORE_USER_CB(FAIL)
-            {
-                image_info.buffer = image_info.callbacks.image_malloc(
-                    buf_len, H5FD_FILE_IMAGE_OP_PROPERTY_LIST_SET, image_info.callbacks.udata);
-            }
+                {
+                    image_info.buffer = image_info.callbacks.image_malloc(
+                        buf_len, H5FD_FILE_IMAGE_OP_PROPERTY_LIST_SET, image_info.callbacks.udata);
+                }
             H5_AFTER_USER_CB(FAIL)
             if (NULL == image_info.buffer)
                 HGOTO_ERROR(H5E_PLIST, H5E_CANTALLOC, FAIL, "image malloc callback failed");
@@ -2991,11 +3048,11 @@ herr_t H5Pset_file_image(hid_t fapl_id, void *buf_ptr, size_t buf_len)
 
             /* Prepare & restore library for user callback */
             H5_BEFORE_USER_CB(FAIL)
-            {
-                tmp = image_info.callbacks.image_memcpy(image_info.buffer, buf_ptr, buf_len,
-                                                        H5FD_FILE_IMAGE_OP_PROPERTY_LIST_SET,
-                                                        image_info.callbacks.udata);
-            }
+                {
+                    tmp = image_info.callbacks.image_memcpy(image_info.buffer, buf_ptr, buf_len,
+                                                            H5FD_FILE_IMAGE_OP_PROPERTY_LIST_SET,
+                                                            image_info.callbacks.udata);
+                }
             H5_AFTER_USER_CB(FAIL)
             if (image_info.buffer != tmp)
                 HGOTO_ERROR(H5E_PLIST, H5E_CANTCOPY, FAIL, "image_memcpy callback failed");
@@ -3042,11 +3099,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_file_image(hid_t fapl_id, void **buf /*out*/, size_t *buf_len /*out*/)
+herr_t
+H5Pget_file_image(hid_t fapl_id, void **buf /*out*/, size_t *buf_len /*out*/)
 {
-    H5P_genplist_t *fapl;              /* Property list pointer */
-    H5FD_file_image_info_t image_info; /* File image info */
-    herr_t ret_value = SUCCEED;        /* Return value */
+    H5P_genplist_t        *fapl;                /* Property list pointer */
+    H5FD_file_image_info_t image_info;          /* File image info */
+    herr_t                 ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -3075,10 +3133,11 @@ herr_t H5Pget_file_image(hid_t fapl_id, void **buf /*out*/, size_t *buf_len /*ou
             if (image_info.callbacks.image_malloc) {
                 /* Prepare & restore library for user callback */
                 H5_BEFORE_USER_CB(FAIL)
-                {
-                    copy_ptr = image_info.callbacks.image_malloc(
-                        image_info.size, H5FD_FILE_IMAGE_OP_PROPERTY_LIST_GET, image_info.callbacks.udata);
-                }
+                    {
+                        copy_ptr = image_info.callbacks.image_malloc(image_info.size,
+                                                                     H5FD_FILE_IMAGE_OP_PROPERTY_LIST_GET,
+                                                                     image_info.callbacks.udata);
+                    }
                 H5_AFTER_USER_CB(FAIL)
                 if (NULL == copy_ptr)
                     HGOTO_ERROR(H5E_PLIST, H5E_CANTALLOC, FAIL, "image malloc callback failed");
@@ -3092,11 +3151,11 @@ herr_t H5Pget_file_image(hid_t fapl_id, void **buf /*out*/, size_t *buf_len /*ou
 
                 /* Prepare & restore library for user callback */
                 H5_BEFORE_USER_CB(FAIL)
-                {
-                    tmp = image_info.callbacks.image_memcpy(copy_ptr, image_info.buffer, image_info.size,
-                                                            H5FD_FILE_IMAGE_OP_PROPERTY_LIST_GET,
-                                                            image_info.callbacks.udata);
-                }
+                    {
+                        tmp = image_info.callbacks.image_memcpy(copy_ptr, image_info.buffer, image_info.size,
+                                                                H5FD_FILE_IMAGE_OP_PROPERTY_LIST_GET,
+                                                                image_info.callbacks.udata);
+                    }
                 H5_AFTER_USER_CB(FAIL)
                 if (copy_ptr != tmp)
                     HGOTO_ERROR(H5E_PLIST, H5E_CANTCOPY, FAIL, "image_memcpy callback failed");
@@ -3125,12 +3184,13 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_file_image_callbacks(hid_t fapl_id, H5FD_file_image_callbacks_t *callbacks_ptr)
+herr_t
+H5Pset_file_image_callbacks(hid_t fapl_id, H5FD_file_image_callbacks_t *callbacks_ptr)
 {
-    H5P_genplist_t *fapl;        /* Property list pointer */
-    H5FD_file_image_info_t info; /* File image info */
-    bool copied_udata = false;   /* Whether udata structure was copied */
-    herr_t ret_value  = SUCCEED; /* Return value */
+    H5P_genplist_t        *fapl;                   /* Property list pointer */
+    H5FD_file_image_info_t info;                   /* File image info */
+    bool                   copied_udata = false;   /* Whether udata structure was copied */
+    herr_t                 ret_value    = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -3165,7 +3225,10 @@ herr_t H5Pset_file_image_callbacks(hid_t fapl_id, H5FD_file_image_callbacks_t *c
         assert(info.callbacks.udata_free);
 
         /* Prepare & restore library for user callback */
-        H5_BEFORE_USER_CB(FAIL) { ret_value = info.callbacks.udata_free(info.callbacks.udata); }
+        H5_BEFORE_USER_CB(FAIL)
+            {
+                ret_value = info.callbacks.udata_free(info.callbacks.udata);
+            }
         H5_AFTER_USER_CB(FAIL)
         if (ret_value < 0)
             HGOTO_ERROR(H5E_PLIST, H5E_CANTFREE, FAIL, "udata_free callback failed");
@@ -3179,7 +3242,10 @@ herr_t H5Pset_file_image_callbacks(hid_t fapl_id, H5FD_file_image_callbacks_t *c
         assert(callbacks_ptr->udata_free);
 
         /* Prepare & restore library for user callback */
-        H5_BEFORE_USER_CB(FAIL) { info.callbacks.udata = callbacks_ptr->udata_copy(callbacks_ptr->udata); }
+        H5_BEFORE_USER_CB(FAIL)
+            {
+                info.callbacks.udata = callbacks_ptr->udata_copy(callbacks_ptr->udata);
+            }
         H5_AFTER_USER_CB(FAIL)
         if (NULL == info.callbacks.udata)
             HGOTO_ERROR(H5E_PLIST, H5E_CANTSET, FAIL, "can't copy the supplied udata");
@@ -3195,7 +3261,10 @@ done:
     if (ret_value < 0) {
         if (copied_udata) {
             /* Prepare & restore library for user callback */
-            H5_BEFORE_USER_CB(FAIL) { ret_value = callbacks_ptr->udata_free(info.callbacks.udata); }
+            H5_BEFORE_USER_CB(FAIL)
+                {
+                    ret_value = callbacks_ptr->udata_free(info.callbacks.udata);
+                }
             H5_AFTER_USER_CB(FAIL)
             if (ret_value < 0)
                 HDONE_ERROR(H5E_PLIST, H5E_CANTFREE, FAIL, "udata_free callback failed");
@@ -3217,11 +3286,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_file_image_callbacks(hid_t fapl_id, H5FD_file_image_callbacks_t *callbacks /*out*/)
+herr_t
+H5Pget_file_image_callbacks(hid_t fapl_id, H5FD_file_image_callbacks_t *callbacks /*out*/)
 {
-    H5P_genplist_t *fapl;        /* Property list pointer */
-    H5FD_file_image_info_t info; /* File image info */
-    herr_t ret_value = SUCCEED;  /* Return value */
+    H5P_genplist_t        *fapl;                /* Property list pointer */
+    H5FD_file_image_info_t info;                /* File image info */
+    herr_t                 ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -3248,7 +3318,10 @@ herr_t H5Pget_file_image_callbacks(hid_t fapl_id, H5FD_file_image_callbacks_t *c
         assert(info.callbacks.udata_copy);
 
         /* Prepare & restore library for user callback */
-        H5_BEFORE_USER_CB(FAIL) { callbacks->udata = info.callbacks.udata_copy(info.callbacks.udata); }
+        H5_BEFORE_USER_CB(FAIL)
+            {
+                callbacks->udata = info.callbacks.udata_copy(info.callbacks.udata);
+            }
         H5_AFTER_USER_CB(FAIL)
         if (NULL == callbacks->udata)
             HGOTO_ERROR(H5E_PLIST, H5E_CANTSET, FAIL, "can't copy udata");
@@ -3268,10 +3341,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_scc_config(hid_t plist_id, H5SC__cache_config_t *config_ptr)
+herr_t
+H5Pset_scc_config(hid_t plist_id, H5SC__cache_config_t *config_ptr)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -3309,10 +3383,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_scc_config(hid_t plist_id, H5SC__cache_config_t *config /*out*/)
+herr_t
+H5Pget_scc_config(hid_t plist_id, H5SC__cache_config_t *config /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -3355,7 +3430,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__file_image_info_copy(void *value)
+static herr_t
+H5P__file_image_info_copy(void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -3379,10 +3455,10 @@ static herr_t H5P__file_image_info_copy(void *value)
             if (info->callbacks.image_malloc) {
                 /* Prepare & restore library for user callback */
                 H5_BEFORE_USER_CB(FAIL)
-                {
-                    info->buffer = info->callbacks.image_malloc(
-                        info->size, H5FD_FILE_IMAGE_OP_PROPERTY_LIST_COPY, info->callbacks.udata);
-                }
+                    {
+                        info->buffer = info->callbacks.image_malloc(
+                            info->size, H5FD_FILE_IMAGE_OP_PROPERTY_LIST_COPY, info->callbacks.udata);
+                    }
                 H5_AFTER_USER_CB(FAIL)
                 if (NULL == info->buffer)
                     HGOTO_ERROR(H5E_PLIST, H5E_CANTALLOC, FAIL, "image malloc callback failed");
@@ -3396,11 +3472,11 @@ static herr_t H5P__file_image_info_copy(void *value)
 
                 /* Prepare & restore library for user callback */
                 H5_BEFORE_USER_CB(FAIL)
-                {
-                    tmp = info->callbacks.image_memcpy(info->buffer, old_buffer, info->size,
-                                                       H5FD_FILE_IMAGE_OP_PROPERTY_LIST_COPY,
-                                                       info->callbacks.udata);
-                }
+                    {
+                        tmp = info->callbacks.image_memcpy(info->buffer, old_buffer, info->size,
+                                                           H5FD_FILE_IMAGE_OP_PROPERTY_LIST_COPY,
+                                                           info->callbacks.udata);
+                    }
                 H5_AFTER_USER_CB(FAIL)
                 if (info->buffer != tmp)
                     HGOTO_ERROR(H5E_PLIST, H5E_CANTCOPY, FAIL, "image_memcpy callback failed");
@@ -3417,10 +3493,13 @@ static herr_t H5P__file_image_info_copy(void *value)
                 HGOTO_ERROR(H5E_PLIST, H5E_BADVALUE, FAIL, "udata_copy not defined");
 
             /* Prepare & restore library for user callback */
-            H5_BEFORE_USER_CB(FAIL) { info->callbacks.udata = info->callbacks.udata_copy(old_udata); }
+            H5_BEFORE_USER_CB(FAIL)
+                {
+                    info->callbacks.udata = info->callbacks.udata_copy(old_udata);
+                }
             H5_AFTER_USER_CB(FAIL)
         } /* end if */
-    } /* end if */
+    }     /* end if */
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
@@ -3438,7 +3517,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__file_image_info_free(void *value)
+static herr_t
+H5P__file_image_info_free(void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -3457,10 +3537,10 @@ static herr_t H5P__file_image_info_free(void *value)
             if (info->callbacks.image_free) {
                 /* Prepare & restore library for user callback */
                 H5_BEFORE_USER_CB(FAIL)
-                {
-                    ret_value = (*info->callbacks.image_free)(
-                        info->buffer, H5FD_FILE_IMAGE_OP_PROPERTY_LIST_CLOSE, info->callbacks.udata);
-                }
+                    {
+                        ret_value = (*info->callbacks.image_free)(
+                            info->buffer, H5FD_FILE_IMAGE_OP_PROPERTY_LIST_CLOSE, info->callbacks.udata);
+                    }
                 H5_AFTER_USER_CB(FAIL)
                 if (ret_value < 0)
                     HGOTO_ERROR(H5E_PLIST, H5E_CANTFREE, FAIL, "image_free callback failed");
@@ -3474,12 +3554,15 @@ static herr_t H5P__file_image_info_free(void *value)
             if (NULL == info->callbacks.udata_free)
                 HGOTO_ERROR(H5E_PLIST, H5E_BADVALUE, FAIL, "udata_free not defined");
             /* Prepare & restore library for user callback */
-            H5_BEFORE_USER_CB(FAIL) { ret_value = (*info->callbacks.udata_free)(info->callbacks.udata); }
+            H5_BEFORE_USER_CB(FAIL)
+                {
+                    ret_value = (*info->callbacks.udata_free)(info->callbacks.udata);
+                }
             H5_AFTER_USER_CB(FAIL)
             if (ret_value < 0)
                 HGOTO_ERROR(H5E_PLIST, H5E_CANTFREE, FAIL, "udata_free callback failed");
         } /* end if */
-    } /* end if */
+    }     /* end if */
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
@@ -3495,8 +3578,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static int H5P__facc_cache_image_config_cmp(const void *_config1, const void *_config2,
-                                            size_t H5_ATTR_UNUSED size)
+static int
+H5P__facc_cache_image_config_cmp(const void *_config1, const void *_config2, size_t H5_ATTR_UNUSED size)
 {
     const H5AC_cache_image_config_t *config1 =
         (const H5AC_cache_image_config_t *)_config1; /* Create local aliases for values */
@@ -3548,7 +3631,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_cache_image_config_enc(const void *value, void **_pp, size_t *size)
+static herr_t
+H5P__facc_cache_image_config_enc(const void *value, void **_pp, size_t *size)
 {
     const H5AC_cache_image_config_t *config =
         (const H5AC_cache_image_config_t *)value; /* Create local aliases for value */
@@ -3587,12 +3671,13 @@ static herr_t H5P__facc_cache_image_config_enc(const void *value, void **_pp, si
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_cache_image_config_dec(const void **_pp, void *_value)
+static herr_t
+H5P__facc_cache_image_config_dec(const void **_pp, void *_value)
 {
     H5AC_cache_image_config_t *config = (H5AC_cache_image_config_t *)_value;
-    const uint8_t **pp                = (const uint8_t **)_pp;
-    unsigned enc_size;
-    herr_t ret_value = SUCCEED; /* Return value */
+    const uint8_t            **pp     = (const uint8_t **)_pp;
+    unsigned                   enc_size;
+    herr_t                     ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_PACKAGE
 
@@ -3629,8 +3714,9 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_file_image_info_set(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
-                                            size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_file_image_info_set(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
+                              size_t H5_ATTR_UNUSED size, void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -3657,8 +3743,9 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_file_image_info_get(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
-                                            size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_file_image_info_get(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
+                              size_t H5_ATTR_UNUSED size, void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -3687,8 +3774,9 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_file_image_info_del(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
-                                            size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_file_image_info_del(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
+                              size_t H5_ATTR_UNUSED size, void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -3713,8 +3801,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_file_image_info_copy(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size,
-                                             void *value)
+static herr_t
+H5P__facc_file_image_info_copy(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -3740,7 +3828,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static int H5P__facc_file_image_info_cmp(const void *_info1, const void *_info2, size_t H5_ATTR_UNUSED size)
+static int
+H5P__facc_file_image_info_cmp(const void *_info1, const void *_info2, size_t H5_ATTR_UNUSED size)
 {
     const H5FD_file_image_info_t *info1 = (const H5FD_file_image_info_t *)
                                      _info1, /* Create local aliases for values */
@@ -3805,8 +3894,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_file_image_info_close(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size,
-                                              void *value)
+static herr_t
+H5P__facc_file_image_info_close(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -3830,7 +3919,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static int H5P__facc_cache_config_cmp(const void *_config1, const void *_config2, size_t H5_ATTR_UNUSED size)
+static int
+H5P__facc_cache_config_cmp(const void *_config1, const void *_config2, size_t H5_ATTR_UNUSED size)
 {
     const H5AC_cache_config_t *config1 =
         (const H5AC_cache_config_t *)_config1; /* Create local aliases for values */
@@ -3997,13 +4087,14 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_cache_config_enc(const void *value, void **_pp, size_t *size)
+static herr_t
+H5P__facc_cache_config_enc(const void *value, void **_pp, size_t *size)
 {
     const H5AC_cache_config_t *config =
         (const H5AC_cache_config_t *)value; /* Create local aliases for values */
     uint8_t **pp = (uint8_t **)_pp;
-    unsigned enc_size;  /* Size of encoded property */
-    uint64_t enc_value; /* Property to encode */
+    unsigned  enc_size;  /* Size of encoded property */
+    uint64_t  enc_value; /* Property to encode */
 
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -4138,13 +4229,14 @@ static herr_t H5P__facc_cache_config_enc(const void *value, void **_pp, size_t *
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_cache_config_dec(const void **_pp, void *_value)
+static herr_t
+H5P__facc_cache_config_dec(const void **_pp, void *_value)
 {
     H5AC_cache_config_t *config = (H5AC_cache_config_t *)_value;
-    const uint8_t **pp          = (const uint8_t **)_pp;
-    unsigned enc_size;
-    uint64_t enc_value;
-    herr_t ret_value = SUCCEED; /* Return value */
+    const uint8_t      **pp     = (const uint8_t **)_pp;
+    unsigned             enc_size;
+    uint64_t             enc_value;
+    herr_t               ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_PACKAGE
 
@@ -4268,7 +4360,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_fclose_degree_enc(const void *value, void **_pp, size_t *size)
+static herr_t
+H5P__facc_fclose_degree_enc(const void *value, void **_pp, size_t *size)
 {
     const H5F_close_degree_t *fclose_degree =
         (const H5F_close_degree_t *)value; /* Create local alias for values */
@@ -4302,10 +4395,11 @@ static herr_t H5P__facc_fclose_degree_enc(const void *value, void **_pp, size_t 
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_fclose_degree_dec(const void **_pp, void *_value)
+static herr_t
+H5P__facc_fclose_degree_dec(const void **_pp, void *_value)
 {
     H5F_close_degree_t *fclose_degree = (H5F_close_degree_t *)_value; /* File close degree */
-    const uint8_t **pp                = (const uint8_t **)_pp;
+    const uint8_t     **pp            = (const uint8_t **)_pp;
 
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -4332,10 +4426,11 @@ static herr_t H5P__facc_fclose_degree_dec(const void **_pp, void *_value)
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_multi_type_enc(const void *value, void **_pp, size_t *size)
+static herr_t
+H5P__facc_multi_type_enc(const void *value, void **_pp, size_t *size)
 {
     const H5FD_mem_t *type = (const H5FD_mem_t *)value; /* Create local alias for values */
-    uint8_t **pp           = (uint8_t **)_pp;
+    uint8_t         **pp   = (uint8_t **)_pp;
 
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -4365,10 +4460,11 @@ static herr_t H5P__facc_multi_type_enc(const void *value, void **_pp, size_t *si
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_multi_type_dec(const void **_pp, void *_value)
+static herr_t
+H5P__facc_multi_type_dec(const void **_pp, void *_value)
 {
-    H5FD_mem_t *type   = (H5FD_mem_t *)_value; /* File close degree */
-    const uint8_t **pp = (const uint8_t **)_pp;
+    H5FD_mem_t     *type = (H5FD_mem_t *)_value; /* File close degree */
+    const uint8_t **pp   = (const uint8_t **)_pp;
 
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -4395,10 +4491,11 @@ static herr_t H5P__facc_multi_type_dec(const void **_pp, void *_value)
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_libver_type_enc(const void *value, void **_pp, size_t *size)
+static herr_t
+H5P__facc_libver_type_enc(const void *value, void **_pp, size_t *size)
 {
     const H5F_libver_t *type = (const H5F_libver_t *)value; /* Create local alias for values */
-    uint8_t **pp             = (uint8_t **)_pp;
+    uint8_t           **pp   = (uint8_t **)_pp;
 
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -4428,10 +4525,11 @@ static herr_t H5P__facc_libver_type_enc(const void *value, void **_pp, size_t *s
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_libver_type_dec(const void **_pp, void *_value)
+static herr_t
+H5P__facc_libver_type_dec(const void **_pp, void *_value)
 {
-    H5F_libver_t *type = (H5F_libver_t *)_value;
-    const uint8_t **pp = (const uint8_t **)_pp;
+    H5F_libver_t   *type = (H5F_libver_t *)_value;
+    const uint8_t **pp   = (const uint8_t **)_pp;
 
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -4461,10 +4559,11 @@ static herr_t H5P__facc_libver_type_dec(const void **_pp, void *_value)
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_metadata_read_attempts(hid_t plist_id, unsigned attempts)
+herr_t
+H5Pset_metadata_read_attempts(hid_t plist_id, unsigned attempts)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -4494,7 +4593,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_metadata_read_attempts(hid_t plist_id, unsigned *attempts /*out*/)
+herr_t
+H5Pget_metadata_read_attempts(hid_t plist_id, unsigned *attempts /*out*/)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -4531,11 +4631,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_object_flush_cb(hid_t plist_id, H5F_flush_cb_t func, void *udata)
+herr_t
+H5Pset_object_flush_cb(hid_t plist_id, H5F_flush_cb_t func, void *udata)
 {
-    H5P_genplist_t *plist; /* Property list pointer */
+    H5P_genplist_t    *plist; /* Property list pointer */
     H5F_object_flush_t flush_info;
-    herr_t ret_value = SUCCEED; /* return value */
+    herr_t             ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -4570,11 +4671,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_object_flush_cb(hid_t plist_id, H5F_flush_cb_t *func /*out*/, void **udata /*out*/)
+herr_t
+H5Pget_object_flush_cb(hid_t plist_id, H5F_flush_cb_t *func /*out*/, void **udata /*out*/)
 {
-    H5P_genplist_t *plist; /* Property list pointer */
+    H5P_genplist_t    *plist; /* Property list pointer */
     H5F_object_flush_t flush_info;
-    herr_t ret_value = SUCCEED; /* return value */
+    herr_t             ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -4605,12 +4707,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_mdc_log_options(hid_t plist_id, hbool_t is_enabled, const char *location,
-                              hbool_t start_on_access)
+herr_t
+H5Pset_mdc_log_options(hid_t plist_id, hbool_t is_enabled, const char *location, hbool_t start_on_access)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    char *new_location;         /* Working location pointer */
-    herr_t ret_value = SUCCEED; /* Return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    char           *new_location;        /* Working location pointer */
+    herr_t          ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -4649,12 +4751,13 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_mdc_log_options(hid_t plist_id, hbool_t *is_enabled /*out*/, char *location /*out*/,
-                              size_t *location_size /*out*/, hbool_t *start_on_access /*out*/)
+herr_t
+H5Pget_mdc_log_options(hid_t plist_id, hbool_t *is_enabled /*out*/, char *location /*out*/,
+                       size_t *location_size /*out*/, hbool_t *start_on_access /*out*/)
 {
-    H5P_genplist_t *plist;        /* Property list pointer */
-    char *location_ptr = NULL;    /* Pointer to location string */
-    herr_t ret_value   = SUCCEED; /* Return value */
+    H5P_genplist_t *plist;                  /* Property list pointer */
+    char           *location_ptr = NULL;    /* Pointer to location string */
+    herr_t          ret_value    = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -4703,13 +4806,14 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_mdc_log_location_enc(const void *value, void **_pp, size_t *size)
+static herr_t
+H5P__facc_mdc_log_location_enc(const void *value, void **_pp, size_t *size)
 {
     const char *log_location = *(const char *const *)value;
-    uint8_t **pp             = (uint8_t **)_pp;
-    size_t len               = 0;
-    uint64_t enc_value;
-    unsigned enc_size;
+    uint8_t   **pp           = (uint8_t **)_pp;
+    size_t      len          = 0;
+    uint64_t    enc_value;
+    unsigned    enc_size;
 
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -4733,7 +4837,7 @@ static herr_t H5P__facc_mdc_log_location_enc(const void *value, void **_pp, size
             H5MM_memcpy(*(char **)pp, log_location, len);
             *pp += len;
         } /* end if */
-    } /* end if */
+    }     /* end if */
 
     *size += (1 + enc_size);
     if (NULL != log_location)
@@ -4754,14 +4858,15 @@ static herr_t H5P__facc_mdc_log_location_enc(const void *value, void **_pp, size
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_mdc_log_location_dec(const void **_pp, void *_value)
+static herr_t
+H5P__facc_mdc_log_location_dec(const void **_pp, void *_value)
 {
-    char **log_location = (char **)_value;
-    const uint8_t **pp  = (const uint8_t **)_pp;
-    size_t len;
-    uint64_t enc_value; /* Decoded property value */
-    unsigned enc_size;  /* Size of encoded property */
-    herr_t ret_value = SUCCEED;
+    char          **log_location = (char **)_value;
+    const uint8_t **pp           = (const uint8_t **)_pp;
+    size_t          len;
+    uint64_t        enc_value; /* Decoded property value */
+    unsigned        enc_size;  /* Size of encoded property */
+    herr_t          ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
@@ -4803,8 +4908,9 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_mdc_log_location_del(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
-                                             size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_mdc_log_location_del(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
+                               size_t H5_ATTR_UNUSED size, void *value)
 {
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -4824,8 +4930,8 @@ static herr_t H5P__facc_mdc_log_location_del(hid_t H5_ATTR_UNUSED prop_id, const
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_mdc_log_location_copy(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size,
-                                              void *value)
+static herr_t
+H5P__facc_mdc_log_location_copy(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
 {
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -4847,12 +4953,12 @@ static herr_t H5P__facc_mdc_log_location_copy(const char H5_ATTR_UNUSED *name, s
  *
  *-------------------------------------------------------------------------
  */
-static H5_ATTR_PURE int H5P__facc_mdc_log_location_cmp(const void *value1, const void *value2,
-                                                       size_t H5_ATTR_UNUSED size)
+static H5_ATTR_PURE int
+H5P__facc_mdc_log_location_cmp(const void *value1, const void *value2, size_t H5_ATTR_UNUSED size)
 {
-    const char *pref1 = *(const char *const *)value1;
-    const char *pref2 = *(const char *const *)value2;
-    int ret_value     = 0;
+    const char *pref1     = *(const char *const *)value1;
+    const char *pref2     = *(const char *const *)value2;
+    int         ret_value = 0;
 
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -4877,8 +4983,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_mdc_log_location_close(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size,
-                                               void *value)
+static herr_t
+H5P__facc_mdc_log_location_close(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
 {
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -4904,10 +5010,11 @@ static herr_t H5P__facc_mdc_log_location_close(const char H5_ATTR_UNUSED *name, 
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_evict_on_close(hid_t fapl_id, hbool_t evict_on_close)
+herr_t
+H5Pset_evict_on_close(hid_t fapl_id, hbool_t evict_on_close)
 {
-    H5P_genplist_t *plist;      /* property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -4942,10 +5049,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_evict_on_close(hid_t fapl_id, hbool_t *evict_on_close /*out*/)
+herr_t
+H5Pget_evict_on_close(hid_t fapl_id, hbool_t *evict_on_close /*out*/)
 {
-    H5P_genplist_t *plist;      /* property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -4982,10 +5090,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_file_locking(hid_t fapl_id, hbool_t use_file_locking, hbool_t ignore_when_disabled)
+herr_t
+H5Pset_file_locking(hid_t fapl_id, hbool_t use_file_locking, hbool_t ignore_when_disabled)
 {
-    H5P_genplist_t *plist;      /* property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -5019,11 +5128,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_file_locking(hid_t fapl_id, hbool_t *use_file_locking /*out*/,
-                           hbool_t *ignore_when_disabled /*out*/)
+herr_t
+H5Pget_file_locking(hid_t fapl_id, hbool_t *use_file_locking /*out*/, hbool_t *ignore_when_disabled /*out*/)
 {
-    H5P_genplist_t *plist;      /* property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -5061,10 +5170,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5P__encode_coll_md_read_flag_t(const void *value, void **_pp, size_t *size)
+herr_t
+H5P__encode_coll_md_read_flag_t(const void *value, void **_pp, size_t *size)
 {
     const H5P_coll_md_read_flag_t *coll_md_read_flag = (const H5P_coll_md_read_flag_t *)value;
-    uint8_t **pp                                     = (uint8_t **)_pp;
+    uint8_t                      **pp                = (uint8_t **)_pp;
 
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -5096,10 +5206,11 @@ herr_t H5P__encode_coll_md_read_flag_t(const void *value, void **_pp, size_t *si
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5P__decode_coll_md_read_flag_t(const void **_pp, void *_value)
+herr_t
+H5P__decode_coll_md_read_flag_t(const void **_pp, void *_value)
 {
     H5P_coll_md_read_flag_t *coll_md_read_flag = (H5P_coll_md_read_flag_t *)_value; /* File close degree */
-    const uint8_t **pp                         = (const uint8_t **)_pp;
+    const uint8_t          **pp                = (const uint8_t **)_pp;
 
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -5132,11 +5243,12 @@ herr_t H5P__decode_coll_md_read_flag_t(const void **_pp, void *_value)
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_all_coll_metadata_ops(hid_t plist_id, hbool_t is_collective)
+herr_t
+H5Pset_all_coll_metadata_ops(hid_t plist_id, hbool_t is_collective)
 {
-    H5P_genplist_t *plist;                  /* Property list pointer */
-    H5P_coll_md_read_flag_t coll_meta_read; /* Property value */
-    herr_t ret_value = SUCCEED;             /* return value */
+    H5P_genplist_t         *plist;               /* Property list pointer */
+    H5P_coll_md_read_flag_t coll_meta_read;      /* Property value */
+    herr_t                  ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -5179,7 +5291,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_all_coll_metadata_ops(hid_t plist_id, hbool_t *is_collective /*out*/)
+herr_t
+H5Pget_all_coll_metadata_ops(hid_t plist_id, hbool_t *is_collective /*out*/)
 {
     herr_t ret_value = SUCCEED; /* return value */
 
@@ -5195,8 +5308,8 @@ herr_t H5Pget_all_coll_metadata_ops(hid_t plist_id, hbool_t *is_collective /*out
     /* Get value */
     if (is_collective) {
         H5P_coll_md_read_flag_t
-            internal_flag;     /* property setting. we need to convert to either true or false */
-        H5P_genplist_t *plist; /* Property list pointer */
+                        internal_flag; /* property setting. we need to convert to either true or false */
+        H5P_genplist_t *plist;         /* Property list pointer */
 
         /* Get the plist structure */
         if (NULL == (plist = (H5P_genplist_t *)H5I_object(plist_id)))
@@ -5225,10 +5338,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_coll_metadata_write(hid_t plist_id, hbool_t is_collective)
+herr_t
+H5Pset_coll_metadata_write(hid_t plist_id, hbool_t is_collective)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -5257,10 +5371,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_mpi_params(hid_t plist_id, MPI_Comm *comm /*out*/, MPI_Info *info /*out*/)
+herr_t
+H5Pget_mpi_params(hid_t plist_id, MPI_Comm *comm /*out*/, MPI_Info *info /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -5291,10 +5406,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_mpi_params(hid_t plist_id, MPI_Comm comm, MPI_Info info)
+herr_t
+H5Pset_mpi_params(hid_t plist_id, MPI_Comm comm, MPI_Info info)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -5330,12 +5446,13 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_mpi_comm_set(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
-                                     size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_mpi_comm_set(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
+                       size_t H5_ATTR_UNUSED size, void *value)
 {
-    MPI_Comm *comm    = (MPI_Comm *)value;
-    MPI_Comm comm_tmp = MPI_COMM_NULL;
-    herr_t ret_value  = SUCCEED;
+    MPI_Comm *comm      = (MPI_Comm *)value;
+    MPI_Comm  comm_tmp  = MPI_COMM_NULL;
+    herr_t    ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
@@ -5363,12 +5480,13 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_mpi_comm_get(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
-                                     size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_mpi_comm_get(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
+                       size_t H5_ATTR_UNUSED size, void *value)
 {
-    MPI_Comm *comm    = (MPI_Comm *)value;
-    MPI_Comm comm_tmp = MPI_COMM_NULL;
-    herr_t ret_value  = SUCCEED;
+    MPI_Comm *comm      = (MPI_Comm *)value;
+    MPI_Comm  comm_tmp  = MPI_COMM_NULL;
+    herr_t    ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
@@ -5396,11 +5514,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_mpi_comm_del(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
-                                     size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_mpi_comm_del(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
+                       size_t H5_ATTR_UNUSED size, void *value)
 {
-    MPI_Comm *comm   = (MPI_Comm *)value;
-    herr_t ret_value = SUCCEED;
+    MPI_Comm *comm      = (MPI_Comm *)value;
+    herr_t    ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
@@ -5422,12 +5541,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_mpi_comm_copy(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size,
-                                      void *value)
+static herr_t
+H5P__facc_mpi_comm_copy(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
 {
-    MPI_Comm *comm    = (MPI_Comm *)value;
-    MPI_Comm comm_tmp = MPI_COMM_NULL;
-    herr_t ret_value  = SUCCEED;
+    MPI_Comm *comm      = (MPI_Comm *)value;
+    MPI_Comm  comm_tmp  = MPI_COMM_NULL;
+    herr_t    ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
@@ -5458,11 +5577,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static int H5P__facc_mpi_comm_cmp(const void *_comm1, const void *_comm2, size_t H5_ATTR_UNUSED size)
+static int
+H5P__facc_mpi_comm_cmp(const void *_comm1, const void *_comm2, size_t H5_ATTR_UNUSED size)
 {
-    const MPI_Comm *comm1 = (const MPI_Comm *)_comm1;
-    const MPI_Comm *comm2 = (const MPI_Comm *)_comm2;
-    int ret_value         = 0;
+    const MPI_Comm *comm1     = (const MPI_Comm *)_comm1;
+    const MPI_Comm *comm2     = (const MPI_Comm *)_comm2;
+    int             ret_value = 0;
 
     FUNC_ENTER_PACKAGE
 
@@ -5484,11 +5604,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_mpi_comm_close(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size,
-                                       void *value)
+static herr_t
+H5P__facc_mpi_comm_close(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
 {
-    MPI_Comm *comm   = (MPI_Comm *)value;
-    herr_t ret_value = SUCCEED;
+    MPI_Comm *comm      = (MPI_Comm *)value;
+    herr_t    ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
@@ -5510,12 +5630,13 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_mpi_info_set(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
-                                     size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_mpi_info_set(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
+                       size_t H5_ATTR_UNUSED size, void *value)
 {
-    MPI_Info *info    = (MPI_Info *)value;
-    MPI_Info info_tmp = MPI_INFO_NULL;
-    herr_t ret_value  = SUCCEED;
+    MPI_Info *info      = (MPI_Info *)value;
+    MPI_Info  info_tmp  = MPI_INFO_NULL;
+    herr_t    ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
@@ -5543,12 +5664,13 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_mpi_info_get(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
-                                     size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_mpi_info_get(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
+                       size_t H5_ATTR_UNUSED size, void *value)
 {
-    MPI_Info *info    = (MPI_Info *)value;
-    MPI_Info info_tmp = MPI_INFO_NULL;
-    herr_t ret_value  = SUCCEED;
+    MPI_Info *info      = (MPI_Info *)value;
+    MPI_Info  info_tmp  = MPI_INFO_NULL;
+    herr_t    ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
@@ -5576,11 +5698,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_mpi_info_del(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
-                                     size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_mpi_info_del(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
+                       size_t H5_ATTR_UNUSED size, void *value)
 {
-    MPI_Info *info   = (MPI_Info *)value;
-    herr_t ret_value = SUCCEED;
+    MPI_Info *info      = (MPI_Info *)value;
+    herr_t    ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
@@ -5602,12 +5725,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_mpi_info_copy(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size,
-                                      void *value)
+static herr_t
+H5P__facc_mpi_info_copy(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
 {
-    MPI_Info *info    = (MPI_Info *)value;
-    MPI_Info info_tmp = MPI_INFO_NULL;
-    herr_t ret_value  = SUCCEED;
+    MPI_Info *info      = (MPI_Info *)value;
+    MPI_Info  info_tmp  = MPI_INFO_NULL;
+    herr_t    ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
@@ -5638,11 +5761,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static int H5P__facc_mpi_info_cmp(const void *_info1, const void *_info2, size_t H5_ATTR_UNUSED size)
+static int
+H5P__facc_mpi_info_cmp(const void *_info1, const void *_info2, size_t H5_ATTR_UNUSED size)
 {
-    const MPI_Info *info1 = (const MPI_Info *)_info1;
-    const MPI_Info *info2 = (const MPI_Info *)_info2;
-    int ret_value         = 0;
+    const MPI_Info *info1     = (const MPI_Info *)_info1;
+    const MPI_Info *info2     = (const MPI_Info *)_info2;
+    int             ret_value = 0;
 
     FUNC_ENTER_PACKAGE
 
@@ -5664,11 +5788,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_mpi_info_close(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size,
-                                       void *value)
+static herr_t
+H5P__facc_mpi_info_close(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
 {
-    MPI_Info *info   = (MPI_Info *)value;
-    herr_t ret_value = SUCCEED;
+    MPI_Info *info      = (MPI_Info *)value;
+    herr_t    ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
@@ -5689,10 +5813,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_coll_metadata_write(hid_t plist_id, hbool_t *is_collective /*out*/)
+herr_t
+H5Pget_coll_metadata_write(hid_t plist_id, hbool_t *is_collective /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -5723,10 +5848,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_page_buffer_size(hid_t plist_id, size_t buf_size, unsigned min_meta_perc, unsigned min_raw_perc)
+herr_t
+H5Pset_page_buffer_size(hid_t plist_id, size_t buf_size, unsigned min_meta_perc, unsigned min_raw_perc)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -5766,11 +5892,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_page_buffer_size(hid_t plist_id, size_t *buf_size /*out*/, unsigned *min_meta_perc /*out*/,
-                               unsigned *min_raw_perc /*out*/)
+herr_t
+H5Pget_page_buffer_size(hid_t plist_id, size_t *buf_size /*out*/, unsigned *min_meta_perc /*out*/,
+                        unsigned *min_raw_perc /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -5806,7 +5933,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5P_set_vol(H5P_genplist_t *plist, H5VL_connector_t *connector, const void *vol_info)
+herr_t
+H5P_set_vol(H5P_genplist_t *plist, H5VL_connector_t *connector, const void *vol_info)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -5846,10 +5974,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5P_reset_vol_class(const H5P_genclass_t *pclass, const H5VL_connector_prop_t *vol_prop)
+herr_t
+H5P_reset_vol_class(const H5P_genclass_t *pclass, const H5VL_connector_prop_t *vol_prop)
 {
-    H5VL_connector_prop_t old_vol_prop; /* Previous VOL connector property */
-    herr_t ret_value = SUCCEED;         /* Return value */
+    H5VL_connector_prop_t old_vol_prop;        /* Previous VOL connector property */
+    herr_t                ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_NOAPI(FAIL)
 
@@ -5876,11 +6005,12 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_vol(hid_t plist_id, hid_t new_vol_id, const void *new_vol_info)
+herr_t
+H5Pset_vol(hid_t plist_id, hid_t new_vol_id, const void *new_vol_info)
 {
-    H5P_genplist_t *plist;       /* Property list pointer */
-    H5VL_connector_t *connector; /* VOL connector */
-    herr_t ret_value = SUCCEED;  /* Return value */
+    H5P_genplist_t   *plist;               /* Property list pointer */
+    H5VL_connector_t *connector;           /* VOL connector */
+    herr_t            ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -5909,10 +6039,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_vol_id(hid_t plist_id, hid_t *vol_id /*out*/)
+herr_t
+H5Pget_vol_id(hid_t plist_id, hid_t *vol_id /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* Return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -5953,10 +6084,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_vol_info(hid_t plist_id, void **vol_info /*out*/)
+herr_t
+H5Pget_vol_info(hid_t plist_id, void **vol_info /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* Return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -5966,8 +6098,8 @@ herr_t H5Pget_vol_info(hid_t plist_id, void **vol_info /*out*/)
 
     /* Get the current VOL info */
     if (true == H5P_isa_class(plist->plist_id, H5P_FILE_ACCESS)) {
-        void *new_connector_info = NULL;      /* Copy of connector info */
-        H5VL_connector_prop_t connector_prop; /* Property for VOL connector ID & info */
+        void                 *new_connector_info = NULL; /* Copy of connector info */
+        H5VL_connector_prop_t connector_prop;            /* Property for VOL connector ID & info */
 
         /* Get the connector property */
         if (H5P_peek(plist, H5F_ACS_VOL_CONN_NAME, &connector_prop) < 0)
@@ -6014,7 +6146,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_vol_cap_flags(hid_t plist_id, uint64_t *cap_flags)
+herr_t
+H5Pget_vol_cap_flags(hid_t plist_id, uint64_t *cap_flags)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -6026,7 +6159,7 @@ herr_t H5Pget_vol_cap_flags(hid_t plist_id, uint64_t *cap_flags)
             plist_id = H5P_FILE_ACCESS_DEFAULT;
 
         if (true == H5P_isa_class(plist_id, H5P_FILE_ACCESS)) {
-            H5P_genplist_t *plist;                /* Property list pointer */
+            H5P_genplist_t       *plist;          /* Property list pointer */
             H5VL_connector_prop_t connector_prop; /* Property for VOL connector ID & info */
 
             /* Get property list for ID */
@@ -6059,7 +6192,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_vol_create(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_vol_create(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -6083,8 +6217,9 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_vol_set(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
-                                size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_vol_set(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size,
+                  void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -6111,8 +6246,9 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_vol_get(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
-                                size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_vol_get(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size,
+                  void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -6139,8 +6275,9 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_vol_del(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name,
-                                size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_vol_del(hid_t H5_ATTR_UNUSED prop_id, const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size,
+                  void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -6164,7 +6301,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_vol_copy(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_vol_copy(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -6191,13 +6329,14 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static int H5P__facc_vol_cmp(const void *_prop1, const void *_prop2, size_t H5_ATTR_UNUSED size)
+static int
+H5P__facc_vol_cmp(const void *_prop1, const void *_prop2, size_t H5_ATTR_UNUSED size)
 {
     const H5VL_connector_prop_t *prop1 =
         (const H5VL_connector_prop_t *)_prop1; /* Create local aliases for values */
     const H5VL_connector_prop_t *prop2 = (const H5VL_connector_prop_t *)_prop2;
-    herr_t H5_ATTR_NDEBUG_UNUSED status; /* Status from info comparison */
-    int ret_value = 0;                   /* Return value */
+    herr_t H5_ATTR_NDEBUG_UNUSED status;        /* Status from info comparison */
+    int                          ret_value = 0; /* Return value */
 
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -6223,7 +6362,8 @@ static int H5P__facc_vol_cmp(const void *_prop1, const void *_prop2, size_t H5_A
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_vol_close(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
+static herr_t
+H5P__facc_vol_close(const char H5_ATTR_UNUSED *name, size_t H5_ATTR_UNUSED size, void *value)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -6248,10 +6388,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pset_relax_file_integrity_checks(hid_t plist_id, uint64_t flags)
+herr_t
+H5Pset_relax_file_integrity_checks(hid_t plist_id, uint64_t flags)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* Return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -6282,10 +6423,11 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5Pget_relax_file_integrity_checks(hid_t plist_id, uint64_t *flags /*out*/)
+herr_t
+H5Pget_relax_file_integrity_checks(hid_t plist_id, uint64_t *flags /*out*/)
 {
-    H5P_genplist_t *plist;      /* Property list pointer */
-    herr_t ret_value = SUCCEED; /* Return value */
+    H5P_genplist_t *plist;               /* Property list pointer */
+    herr_t          ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_API(FAIL)
 
@@ -6315,7 +6457,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static int H5P__facc_scc_config_cmp(const void *_config1, const void *_config2, size_t H5_ATTR_UNUSED size)
+static int
+H5P__facc_scc_config_cmp(const void *_config1, const void *_config2, size_t H5_ATTR_UNUSED size)
 {
     const H5SC__cache_config_t *config1 =
         (const H5SC__cache_config_t *)_config1; /* Create local aliases for values */
@@ -6362,13 +6505,14 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_scc_config_enc(const void *value, void **_pp, size_t *size)
+static herr_t
+H5P__facc_scc_config_enc(const void *value, void **_pp, size_t *size)
 {
     const H5SC__cache_config_t *config =
         (const H5SC__cache_config_t *)value; /* Create local aliases for values */
     uint8_t **pp = (uint8_t **)_pp;
-    unsigned enc_size;  /* Size of encoded property */
-    uint64_t enc_value; /* Property to encode */
+    unsigned  enc_size;  /* Size of encoded property */
+    uint64_t  enc_value; /* Property to encode */
 
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -6426,13 +6570,14 @@ static herr_t H5P__facc_scc_config_enc(const void *value, void **_pp, size_t *si
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5P__facc_scc_config_dec(const void **_pp, void *_value)
+static herr_t
+H5P__facc_scc_config_dec(const void **_pp, void *_value)
 {
     H5SC__cache_config_t *config = (H5SC__cache_config_t *)_value;
-    const uint8_t **pp           = (const uint8_t **)_pp;
-    unsigned enc_size;
-    uint64_t enc_value;
-    herr_t ret_value = SUCCEED; /* Return value */
+    const uint8_t       **pp     = (const uint8_t **)_pp;
+    unsigned              enc_size;
+    uint64_t              enc_value;
+    herr_t                ret_value = SUCCEED; /* Return value */
 
     FUNC_ENTER_PACKAGE
 

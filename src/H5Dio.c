@@ -74,35 +74,36 @@ H5FL_BLK_DEFINE(type_conv);
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5D__read(size_t count, H5D_dset_io_info_t *dset_info)
+herr_t
+H5D__read(size_t count, H5D_dset_io_info_t *dset_info)
 {
-    H5D_io_info_t io_info;               /* Dataset I/O info  for multi dsets */
-    H5S_t *orig_mem_space_local;         /* Local buffer for orig_mem_space */
-    H5S_t **orig_mem_space = NULL;       /* If not NULL, ptr to an array of dataspaces       */
-                                         /* containing the original memory spaces contained  */
-                                         /* in dset_info.  This is needed in order to        */
-                                         /* restore the original state of  dset_info if we   */
-                                         /* replaced any mem spaces with equivalents         */
-                                         /* projected to a rank equal to that of file_space. */
-                                         /*                                                  */
-                                         /* This field is only used if                       */
-                                         /* H5S_select_shape_same() returns true when        */
-                                         /* comparing at least one mem_space and data_space, */
-                                         /* and the mem_space has a different rank.          */
-                                         /*                                                  */
-                                         /* Note that this is a temporary variable - the     */
-                                         /* projected memory space is stored in dset_info,   */
-                                         /* and will be freed when that structure is         */
-                                         /* freed. */
-    H5D_storage_t store_local;           /* Local buffer for store */
-    H5D_storage_t *store = &store_local; /* Union of EFL and chunk pointer in file space */
-    bool any_scc         = false;        /* Whether any datasets support the shared chunk cache */
-    bool any_nonscc      = false;        /* Whether any datasets do not support the shared chunk cache */
-    size_t io_op_init    = 0;            /* Number I/O ops that have been initialized */
-    size_t io_skipped =
-        0;          /* Number I/O ops that have been skipped (due to the dataset not being allocated) */
-    size_t i;       /* Local index variable */
-    char fake_char; /* Temporary variable for NULL buffer pointers */
+    H5D_io_info_t io_info;                    /* Dataset I/O info  for multi dsets */
+    H5S_t        *orig_mem_space_local;       /* Local buffer for orig_mem_space */
+    H5S_t       **orig_mem_space = NULL;      /* If not NULL, ptr to an array of dataspaces       */
+                                              /* containing the original memory spaces contained  */
+                                              /* in dset_info.  This is needed in order to        */
+                                              /* restore the original state of  dset_info if we   */
+                                              /* replaced any mem spaces with equivalents         */
+                                              /* projected to a rank equal to that of file_space. */
+                                              /*                                                  */
+                                              /* This field is only used if                       */
+                                              /* H5S_select_shape_same() returns true when        */
+                                              /* comparing at least one mem_space and data_space, */
+                                              /* and the mem_space has a different rank.          */
+                                              /*                                                  */
+                                              /* Note that this is a temporary variable - the     */
+                                              /* projected memory space is stored in dset_info,   */
+                                              /* and will be freed when that structure is         */
+                                              /* freed. */
+    H5D_storage_t  store_local;               /* Local buffer for store */
+    H5D_storage_t *store      = &store_local; /* Union of EFL and chunk pointer in file space */
+    bool           any_scc    = false;        /* Whether any datasets support the shared chunk cache */
+    bool           any_nonscc = false;        /* Whether any datasets do not support the shared chunk cache */
+    size_t         io_op_init = 0;            /* Number I/O ops that have been initialized */
+    size_t         io_skipped =
+        0;            /* Number I/O ops that have been skipped (due to the dataset not being allocated) */
+    size_t i;         /* Local index variable */
+    char   fake_char; /* Temporary variable for NULL buffer pointers */
     herr_t ret_value = SUCCEED; /* Return value	*/
 
     FUNC_ENTER_PACKAGE
@@ -140,7 +141,7 @@ herr_t H5D__read(size_t count, H5D_dset_io_info_t *dset_info)
         /* Collective access is not permissible without a MPI based VFD */
         if (io_xfer_mode == H5FD_MPIO_COLLECTIVE)
             HGOTO_ERROR(H5E_DATASET, H5E_UNSUPPORTED, FAIL, "collective access for MPI-based drivers only");
-    } /* end if */
+    }  /* end if */
 #endif /*H5_HAVE_PARALLEL*/
 
     /* Iterate over all dsets and construct I/O information necessary to do I/O */
@@ -527,34 +528,35 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5D__write(size_t count, H5D_dset_io_info_t *dset_info)
+herr_t
+H5D__write(size_t count, H5D_dset_io_info_t *dset_info)
 {
-    H5D_io_info_t io_info;               /* Dataset I/O info for multi dsets */
-    H5S_t *orig_mem_space_local;         /* Local buffer for orig_mem_space */
-    H5S_t **orig_mem_space = NULL;       /* If not NULL, ptr to an array of dataspaces       */
-                                         /* containing the original memory spaces contained  */
-                                         /* in dset_info.  This is needed in order to        */
-                                         /* restore the original state of  dset_info if we   */
-                                         /* replaced any mem spaces with equivalents         */
-                                         /* projected to a rank equal to that of file_space. */
-                                         /*                                                  */
-                                         /* This field is only used if                       */
-                                         /* H5S_select_shape_same() returns true when        */
-                                         /* comparing at least one mem_space and data_space, */
-                                         /* and the mem_space has a different rank.          */
-                                         /*                                                  */
-                                         /* Note that this is a temporary variable - the     */
-                                         /* projected memory space is stored in dset_info,   */
-                                         /* and will be freed when that structure is         */
-                                         /* freed. */
-    H5D_storage_t store_local;           /* Local buffer for store */
-    H5D_storage_t *store = &store_local; /* Union of EFL and chunk pointer in file space */
-    bool any_scc         = false;        /* Whether any datasets support the shared chunk cache */
-    bool any_nonscc      = false;        /* Whether any datasets do not support the shared chunk cache */
-    size_t io_op_init    = 0;            /* Number I/O ops that have been initialized */
-    size_t i;                            /* Local index variable */
-    char fake_char;                      /* Temporary variable for NULL buffer pointers */
-    herr_t ret_value = SUCCEED;          /* Return value	*/
+    H5D_io_info_t io_info;                    /* Dataset I/O info for multi dsets */
+    H5S_t        *orig_mem_space_local;       /* Local buffer for orig_mem_space */
+    H5S_t       **orig_mem_space = NULL;      /* If not NULL, ptr to an array of dataspaces       */
+                                              /* containing the original memory spaces contained  */
+                                              /* in dset_info.  This is needed in order to        */
+                                              /* restore the original state of  dset_info if we   */
+                                              /* replaced any mem spaces with equivalents         */
+                                              /* projected to a rank equal to that of file_space. */
+                                              /*                                                  */
+                                              /* This field is only used if                       */
+                                              /* H5S_select_shape_same() returns true when        */
+                                              /* comparing at least one mem_space and data_space, */
+                                              /* and the mem_space has a different rank.          */
+                                              /*                                                  */
+                                              /* Note that this is a temporary variable - the     */
+                                              /* projected memory space is stored in dset_info,   */
+                                              /* and will be freed when that structure is         */
+                                              /* freed. */
+    H5D_storage_t  store_local;               /* Local buffer for store */
+    H5D_storage_t *store      = &store_local; /* Union of EFL and chunk pointer in file space */
+    bool           any_scc    = false;        /* Whether any datasets support the shared chunk cache */
+    bool           any_nonscc = false;        /* Whether any datasets do not support the shared chunk cache */
+    size_t         io_op_init = 0;            /* Number I/O ops that have been initialized */
+    size_t         i;                         /* Local index variable */
+    char           fake_char;                 /* Temporary variable for NULL buffer pointers */
+    herr_t         ret_value = SUCCEED;       /* Return value	*/
 
     FUNC_ENTER_PACKAGE
 
@@ -580,8 +582,8 @@ herr_t H5D__write(size_t count, H5D_dset_io_info_t *dset_info)
 
     /* Iterate over all dsets and construct I/O information */
     for (i = 0; i < count; i++) {
-        bool should_alloc_space = false; /* Whether or not to initialize dataset's storage */
-        haddr_t prev_tag        = HADDR_UNDEF;
+        bool    should_alloc_space = false; /* Whether or not to initialize dataset's storage */
+        haddr_t prev_tag           = HADDR_UNDEF;
 
         /* Check args */
         if (NULL == dset_info[i].dset)
@@ -608,7 +610,7 @@ herr_t H5D__write(size_t count, H5D_dset_io_info_t *dset_info)
         if (H5D__typeinfo_init(&io_info, &(dset_info[i]), dset_info[i].mem_type) < 0)
             HGOTO_ERROR(H5E_DATASET, H5E_CANTINIT, FAIL, "unable to set up type info");
 
-        /* Various MPI based checks */
+            /* Various MPI based checks */
 #ifdef H5_HAVE_PARALLEL
         if (H5F_HAS_FEATURE(dset_info[i].dset->oloc.file, H5FD_FEAT_HAS_MPI)) {
             /* If MPI based VFD is used, no VL or region reference datatype support yet. */
@@ -630,7 +632,7 @@ herr_t H5D__write(size_t count, H5D_dset_io_info_t *dset_info)
                 HGOTO_ERROR(H5E_DATASET, H5E_UNSUPPORTED, FAIL,
                             "collective access for MPI-based driver only");
         } /* end else */
-#endif /*H5_HAVE_PARALLEL*/
+#endif    /*H5_HAVE_PARALLEL*/
 
         /* Make certain that the number of elements in each selection is the same, and cache nelmts in
          * dset_info */
@@ -736,8 +738,8 @@ herr_t H5D__write(size_t count, H5D_dset_io_info_t *dset_info)
             should_alloc_space = should_alloc_space && (dset_info[i].nelmts > 0);
 
         if (should_alloc_space) {
-            hssize_t file_nelmts; /* Number of elements in file dataset's dataspace */
-            bool full_overwrite;  /* Whether we are over-writing all the elements */
+            hssize_t file_nelmts;    /* Number of elements in file dataset's dataspace */
+            bool     full_overwrite; /* Whether we are over-writing all the elements */
 
             /* Get the number of elements in file dataset's dataspace */
             if ((file_nelmts = H5S_GET_EXTENT_NPOINTS(dset_info[i].file_space)) < 0)
@@ -988,8 +990,9 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5D__ioinfo_init(size_t count, H5D_io_op_type_t op_type, H5D_dset_io_info_t *dset_info,
-                               H5D_io_info_t *io_info)
+static herr_t
+H5D__ioinfo_init(size_t count, H5D_io_op_type_t op_type, H5D_dset_io_info_t *dset_info,
+                 H5D_io_info_t *io_info)
 {
     H5D_selection_io_mode_t selection_io_mode;
 
@@ -1052,7 +1055,8 @@ static herr_t H5D__ioinfo_init(size_t count, H5D_io_op_type_t op_type, H5D_dset_
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5D__dset_ioinfo_init(H5D_t *dset, H5D_dset_io_info_t *dset_info, H5D_storage_t *store)
+static herr_t
+H5D__dset_ioinfo_init(H5D_t *dset, H5D_dset_io_info_t *dset_info, H5D_storage_t *store)
 {
     FUNC_ENTER_PACKAGE_NOERR
 
@@ -1107,12 +1111,13 @@ static herr_t H5D__dset_ioinfo_init(H5D_t *dset, H5D_dset_io_info_t *dset_info, 
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5D__typeinfo_init(H5D_io_info_t *io_info, H5D_dset_io_info_t *dset_info, const H5T_t *mem_type)
+static herr_t
+H5D__typeinfo_init(H5D_io_info_t *io_info, H5D_dset_io_info_t *dset_info, const H5T_t *mem_type)
 {
-    H5D_type_info_t *type_info;
-    const H5D_t *dset;
-    H5Z_data_xform_t *data_transform; /* Data transform info */
-    herr_t ret_value = SUCCEED;       /* Return value	*/
+    H5D_type_info_t  *type_info;
+    const H5D_t      *dset;
+    H5Z_data_xform_t *data_transform;      /* Data transform info */
+    herr_t            ret_value = SUCCEED; /* Return value	*/
 
     FUNC_ENTER_PACKAGE
 
@@ -1196,8 +1201,8 @@ static herr_t H5D__typeinfo_init(H5D_io_info_t *io_info, H5D_dset_io_info_t *dse
             } /* end if */
             else
                 type_info->need_bkg = H5T_BKG_NO; /*never needed even if app says yes*/
-        } /* end else */
-    } /* end else */
+        }                                         /* end else */
+    }                                             /* end else */
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
@@ -1217,7 +1222,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5D__typeinfo_init_phase2(H5D_io_info_t *io_info)
+static herr_t
+H5D__typeinfo_init_phase2(H5D_io_info_t *io_info)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -1299,7 +1305,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5D__ioinfo_adjust(H5D_io_info_t *io_info)
+static herr_t
+H5D__ioinfo_adjust(H5D_io_info_t *io_info)
 {
     H5D_t *dset0;               /* only the first dset , also for single dsets case */
     herr_t ret_value = SUCCEED; /* Return value	*/
@@ -1317,7 +1324,7 @@ static herr_t H5D__ioinfo_adjust(H5D_io_info_t *io_info)
     /* Make any parallel I/O adjustments */
     if (io_info->using_mpi_vfd) {
         H5FD_mpio_xfer_t xfer_mode; /* Parallel transfer for this request */
-        htri_t opt;                 /* Flag whether a selection is optimizable */
+        htri_t           opt;       /* Flag whether a selection is optimizable */
 
         /* Get the original state of parallel I/O transfer mode */
         if (H5CX_get_io_xfer_mode(&xfer_mode) < 0)
@@ -1343,7 +1350,7 @@ static herr_t H5D__ioinfo_adjust(H5D_io_info_t *io_info)
                 io_info->md_io_ops.single_read_md  = H5D__mpio_select_read;
                 io_info->md_io_ops.single_write_md = H5D__mpio_select_write;
             } /* end if */
-        } /* end if */
+        }     /* end if */
         else {
             /* Fail when file sync is required, since it requires collective write */
             if (io_info->op_type == H5D_IO_OP_WRITE) {
@@ -1405,8 +1412,8 @@ static herr_t H5D__ioinfo_adjust(H5D_io_info_t *io_info)
                 if (H5CX_set_io_xfer_mode(H5FD_MPIO_INDEPENDENT) < 0)
                     HGOTO_ERROR(H5E_DATASET, H5E_CANTSET, FAIL, "can't set MPI-I/O transfer mode");
             } /* end if */
-        } /* end else */
-    } /* end if */
+        }     /* end else */
+    }         /* end if */
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
@@ -1425,7 +1432,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5D__typeinfo_init_phase3(H5D_io_info_t *io_info)
+static herr_t
+H5D__typeinfo_init_phase3(H5D_io_info_t *io_info)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -1553,7 +1561,8 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-static herr_t H5D__typeinfo_term(H5D_io_info_t *io_info)
+static herr_t
+H5D__typeinfo_term(H5D_io_info_t *io_info)
 {
     FUNC_ENTER_PACKAGE_NOERR
 
