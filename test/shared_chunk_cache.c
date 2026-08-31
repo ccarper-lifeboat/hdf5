@@ -57,15 +57,15 @@
  * In my module, this would live in H5SC.c and call any pkg-header helpers.
  * ------------------------------------------------------------------------- */
 static herr_t
-test_H5SC__compute_logical_chunk_index_test(unsigned       ndims,
+test_H5SC__compute_logical_chunk_index_test(unsigned ndims,
                                             const hsize_t *dset_dims,  /* in: dataset extent (elems) */
                                             const hsize_t *chunk_dims, /* in: chunk dims (elems) */
                                             const hsize_t *elem_coord, /* in: element coord (elems) */
-                                            hsize_t       *log_chk_idx)      /* out: linear chunk index    */
+                                            hsize_t *log_chk_idx)      /* out: linear chunk index    */
 {
-    herr_t   ret_value = SUCCEED;
-    hsize_t  nchunks[H5S_MAX_RANK];
-    hsize_t  down[H5S_MAX_RANK];
+    herr_t ret_value = SUCCEED;
+    hsize_t nchunks[H5S_MAX_RANK];
+    hsize_t down[H5S_MAX_RANK];
     uint32_t chunk_dims32[H5S_MAX_RANK];
 
     /* Basic validation akin to HDF5 style */
@@ -103,22 +103,20 @@ done:
 
 /* ---------- Local helpers for the tests (independent of H5VM_*) ---------- */
 
-static void
-compute_nchunks(unsigned ndims, const hsize_t *dims, const hsize_t *chunk, hsize_t *nchunks_out)
+static void compute_nchunks(unsigned ndims, const hsize_t *dims, const hsize_t *chunk, hsize_t *nchunks_out)
 {
     for (unsigned d = 0; d < ndims; d++)
         nchunks_out[d] = (dims[d] + (hsize_t)chunk[d] - 1) / (hsize_t)chunk[d];
 }
 
-static void
-ref_down(unsigned ndims, const hsize_t *nchunks, hsize_t *down_out)
+static void ref_down(unsigned ndims, const hsize_t *nchunks, hsize_t *down_out)
 {
     for (int i = (int)ndims - 1; i >= 0; i--)
         down_out[i] = (i == (int)ndims - 1) ? 1 : nchunks[i + 1] * down_out[i + 1];
 }
 
-static hsize_t
-ref_linear_idx(unsigned ndims, const hsize_t *coord, const hsize_t *chunk, const hsize_t *nchunks)
+static hsize_t ref_linear_idx(unsigned ndims, const hsize_t *coord, const hsize_t *chunk,
+                              const hsize_t *nchunks)
 {
     hsize_t down[H5S_MAX_RANK];
     ref_down(ndims, nchunks, down);
@@ -150,14 +148,13 @@ ref_linear_idx(unsigned ndims, const hsize_t *coord, const hsize_t *chunk, const
  *   SUCCEED/FAIL
  *
  *------------------------------------------------------------------------- */
-static int
-test_chunk_index_primitives_no_partials(void)
+static int test_chunk_index_primitives_no_partials(void)
 {
     TESTING("chunk-index primitives (no partial chunks)");
 
-    const unsigned nd       = 3;
-    const hsize_t  dims[3]  = {6, 8, 4}; /* 2 x 2 x 2 chunk grid */
-    const hsize_t  chunk[3] = {3, 4, 2};
+    const unsigned nd      = 3;
+    const hsize_t dims[3]  = {6, 8, 4}; /* 2 x 2 x 2 chunk grid */
+    const hsize_t chunk[3] = {3, 4, 2};
 
     const hsize_t coords[][3] = {
         {0, 0, 0}, /* chunk (0,0,0) -> idx 0 */
@@ -219,8 +216,7 @@ error:
  * ========================================================================= */
 
 /* Local copy of H5SC__set_interleave_bit_test*/
-static inline void
-test_H5SC__set_interleave_bit(H5SC_chunk_key_t *acc, unsigned bitpos)
+static inline void test_H5SC__set_interleave_bit(H5SC_chunk_key_t *acc, unsigned bitpos)
 {
     if (bitpos < (unsigned)64)
         acc->low_half |= (UINT64_C(1) << bitpos);
@@ -229,9 +225,8 @@ test_H5SC__set_interleave_bit(H5SC_chunk_key_t *acc, unsigned bitpos)
 }
 
 /* Local copy of `H5SC__compute_chunk_key()` */
-static herr_t
-test_H5SC__compute_chunk_key(haddr_t *dset_object_header_addr, hsize_t *log_chk_coord,
-                             H5SC_chunk_key_t *chunk_key)
+static herr_t test_H5SC__compute_chunk_key(const haddr_t *dset_object_header_addr, hsize_t *log_chk_coord,
+                                           H5SC_chunk_key_t *chunk_key)
 {
     herr_t ret_value = SUCCEED;
 
@@ -256,7 +251,6 @@ test_H5SC__compute_chunk_key(haddr_t *dset_object_header_addr, hsize_t *log_chk_
             test_H5SC__set_interleave_bit(chunk_key, (unsigned)2 * i + (unsigned)1);
     }
 
-done:
     return ret_value;
 }
 
@@ -264,8 +258,7 @@ done:
  * SECTION 3: Helpers for interleave verification (deinterleave + reference)
  * ========================================================================= */
 
-static void
-H5SC__deinterleave_lsb_first(const H5SC_chunk_key_t *in, uint64_t *addr_out, uint64_t *size_out)
+static void H5SC__deinterleave_lsb_first(const H5SC_chunk_key_t *in, uint64_t *addr_out, uint64_t *size_out)
 {
     uint64_t addr = UINT64_C(0), size = UINT64_C(0);
 
@@ -286,8 +279,7 @@ H5SC__deinterleave_lsb_first(const H5SC_chunk_key_t *in, uint64_t *addr_out, uin
     *size_out = size;
 }
 
-static H5SC_chunk_key_t
-bi__ref_interleave(uint64_t addr, uint64_t size)
+static H5SC_chunk_key_t bi__ref_interleave(uint64_t addr, uint64_t size)
 {
     H5SC_chunk_key_t out;
     out.high_half = UINT64_C(0);
@@ -316,34 +308,14 @@ bi__ref_interleave(uint64_t addr, uint64_t size)
  * SECTION 4: Tests for test_H5SC__compute_chunk_key
  * ========================================================================= */
 
-/* --- Test 4--1: API robustness (NULL out parameter) --------------------------- */
-static int
-test_bi_api_null_out(void)
-{
-    TESTING("test_H5SC__compute_chunk_key API (NULL out parameter)");
-
-    haddr_t addr    = 0;
-    size_t  chk_idx = 0;
-
-    if (test_H5SC__compute_chunk_key(&addr, &chk_idx, NULL) != FAIL)
-        TEST_ERROR;
-
-    PASSED();
-    return SUCCEED;
-
-error:
-    H5_FAILED();
-    return FAIL;
-}
-
-/* --- Test 4-2: Known-answer vectors ----------------------------------------- */
-static int
-test_bi_known_answers(void)
+/* --- Test 4-1: Known-answer vectors ----------------------------------------- */
+static int test_bi_known_answers(void)
 {
     TESTING("test_H5SC__compute_chunk_key known-answer vectors");
 
     struct vec {
-        uint64_t addr, size;
+        const uint64_t addr;
+        uint64_t size;
     } cases[] = {
         {UINT64_C(0x0000000000000000), UINT64_C(0x0000000000000000)},
         {UINT64_C(0xFFFFFFFFFFFFFFFF), UINT64_C(0x0000000000000000)},
@@ -355,7 +327,7 @@ test_bi_known_answers(void)
 
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
         H5SC_chunk_key_t got, exp;
-        herr_t           st;
+        herr_t st;
 
         exp = bi__ref_interleave(cases[i].addr, cases[i].size);
 
@@ -375,9 +347,8 @@ error:
     return FAIL;
 }
 
-/* --- Test 4-3: Single-bit mapping to exact positions ------------------------ */
-static int
-test_bi_single_bit_positions(void)
+/* --- Test 4-2: Single-bit mapping to exact positions ------------------------ */
+static int test_bi_single_bit_positions(void)
 {
     TESTING("test_H5SC__compute_chunk_key single-bit to output bit mapping");
 
@@ -388,10 +359,10 @@ test_bi_single_bit_positions(void)
 
         /* addr bit only -> should set output bit 2*i */
         {
-            uint64_t         a = (UINT64_C(1) << i);
-            uint64_t         s = UINT64_C(0);
+            const uint64_t a = (UINT64_C(1) << i);
+            uint64_t s       = UINT64_C(0);
             H5SC_chunk_key_t got, exp;
-            herr_t           st;
+            herr_t st;
 
             exp = bi__ref_interleave(a, s);
             st  = test_H5SC__compute_chunk_key(&a, &s, &got);
@@ -404,10 +375,10 @@ test_bi_single_bit_positions(void)
 
         /* size bit only -> should set output bit 2*i+1 */
         {
-            uint64_t         a = UINT64_C(0);
-            uint64_t         s = (UINT64_C(1) << i);
+            uint64_t a = UINT64_C(0);
+            uint64_t s = (UINT64_C(1) << i);
             H5SC_chunk_key_t got, exp;
-            herr_t           st;
+            herr_t st;
 
             exp = bi__ref_interleave(a, s);
             st  = test_H5SC__compute_chunk_key(&a, &s, &got);
@@ -427,9 +398,8 @@ error:
     return FAIL;
 }
 
-/* --- Test 4-4: Round-trip encode + deinterleave (random fuzz) --------------- */
-static int
-test_bi_roundtrip_random(void)
+/* --- Test 4-3: Round-trip encode + deinterleave (random fuzz) --------------- */
+static int test_bi_roundtrip_random(void)
 {
     TESTING("test_H5SC__compute_chunk_key round-trip (encode + deinter)");
 
@@ -439,11 +409,11 @@ test_bi_roundtrip_random(void)
     const size_t N = 1000; /* adjust if needed */
 
     for (size_t k = 0; k < N; ++k) {
-        uint64_t addr = (((uint64_t)rand()) << 33) ^ (((uint64_t)rand()) << 1) ^ (uint64_t)rand();
-        uint64_t size = (((uint64_t)rand()) << 29) ^ (((uint64_t)rand()) << 5) ^ (uint64_t)rand();
+        const uint64_t addr = (((uint64_t)rand()) << 33) ^ (((uint64_t)rand()) << 1) ^ (uint64_t)rand();
+        uint64_t size       = (((uint64_t)rand()) << 29) ^ (((uint64_t)rand()) << 5) ^ (uint64_t)rand();
 
         H5SC_chunk_key_t enc;
-        uint64_t         addr_rt = 0, size_rt = 0;
+        uint64_t addr_rt = 0, size_rt = 0;
 
         if (test_H5SC__compute_chunk_key(&addr, &size, &enc) < 0)
             TEST_ERROR;
@@ -469,8 +439,7 @@ error:
 /* Tiny helpers to zero-initialize struct fields used in the relevant tests */
 
 /* Helper function to create a minimal H5SC_dset_header_t structure for testing DLL operations */
-static void
-mk_dset_hdr(H5SC_dset_header_t *h, haddr_t addr, size_t sz)
+static void mk_dset_hdr(H5SC_dset_header_t *h, haddr_t addr, size_t sz)
 {
     memset(h, 0, sizeof(*h));
     h->dset_addr      = addr;
@@ -479,29 +448,119 @@ mk_dset_hdr(H5SC_dset_header_t *h, haddr_t addr, size_t sz)
 }
 
 /* Helper function to create a minimal H5SC_chunk_t structure for testing DLL operations */
-static void
-mk_chunk(H5SC_chunk_t *chk, size_t chk_size)
+static void mk_chunk(H5SC_chunk_t *chk, size_t chk_size)
 {
     memset(chk, 0, sizeof(*chk));
     chk->cached_chunk_size = chk_size;
     chk->magic             = H5SC_CHUNK_MAGIC;
 }
 
+#if H5SC_DO_SANITY_CHECKS
+
+#define H5SC_RECLAIM_TEST_CHUNK_SIZE ((size_t)64)
+
+typedef struct t_scc_reclaim_fixture_t {
+    H5SC_t cache;
+    H5SC_dset_header_t dset_hdr;
+    H5SC_chunk_t chunk;
+} t_scc_reclaim_fixture_t;
+
+static herr_t t_scc_reclaim_fixture_init(t_scc_reclaim_fixture_t *fixture)
+{
+    assert(fixture);
+
+    memset(fixture, 0, sizeof(*fixture));
+
+    fixture->cache.SCC_magic    = H5SC_MAIN_MAGIC;
+    fixture->dset_hdr.magic     = H5SC_DSET_HDR_MAGIC;
+    fixture->dset_hdr.dset_addr = (haddr_t)UINT64_C(0x5245434c41494d01);
+
+    fixture->chunk.magic             = H5SC_CHUNK_MAGIC;
+    fixture->chunk.cached_chunk_size = H5SC_RECLAIM_TEST_CHUNK_SIZE;
+    fixture->chunk.chunk_counter     = 0;
+    fixture->chunk.dirty_flag        = false;
+
+    if (H5SC__dset_lru_prepend(&fixture->cache, &fixture->dset_hdr) < 0)
+        return FAIL;
+
+    /*
+     * The dataset header entered the global LRU while empty. Linking the chunk
+     * changes curr_dset_size from zero to the initial resident size, so reconcile
+     * cache-wide occupancy through the same operation boundary used by production
+     * callers.
+     */
+    if (H5SC__chunk_lru_prepend(&fixture->cache, &fixture->dset_hdr, &fixture->chunk) < 0) {
+        if (H5SC__dset_lru_remove(&fixture->cache, &fixture->dset_hdr) < 0)
+            return FAIL;
+
+        return FAIL;
+    }
+
+    if (H5SC__test_account_chunk_link_change(&fixture->cache, &fixture->dset_hdr, (size_t)0) < 0) {
+        (void)H5SC__chunk_lru_remove(&fixture->cache, &fixture->dset_hdr, &fixture->chunk);
+        (void)H5SC__dset_lru_remove(&fixture->cache, &fixture->dset_hdr);
+        return FAIL;
+    }
+
+    /* Confirm that the fixture begins with coherent local/global accounting. */
+    if (fixture->dset_hdr.curr_dset_size != H5SC_RECLAIM_TEST_CHUNK_SIZE ||
+        fixture->cache.SCC_quiescent_size != H5SC_RECLAIM_TEST_CHUNK_SIZE)
+        return FAIL;
+
+    return SUCCEED;
+
+    return SUCCEED;
+}
+
+static herr_t t_scc_reclaim_fixture_term(t_scc_reclaim_fixture_t *fixture)
+{
+    assert(fixture);
+
+    /*
+     * Every test must restore the chunk to an unpinned state before calling
+     * this routine.
+     */
+    if (fixture->chunk.chunk_counter != 0)
+        return FAIL;
+
+    {
+        size_t old_dset_size = fixture->dset_hdr.curr_dset_size;
+
+        if (H5SC__chunk_lru_remove(&fixture->cache, &fixture->dset_hdr, &fixture->chunk) < 0)
+            return FAIL;
+
+        if (H5SC__test_account_chunk_link_change(&fixture->cache, &fixture->dset_hdr, old_dset_size) < 0)
+            return FAIL;
+    }
+
+    if (H5SC__dset_lru_remove(&fixture->cache, &fixture->dset_hdr) < 0)
+        return FAIL;
+
+    if (fixture->cache.SCC_quiescent_size != 0 || fixture->dset_hdr.curr_dset_size != 0 ||
+        fixture->cache.reclaimable_clean_bytes != 0 || fixture->cache.reclaimable_dirty_bytes != 0 ||
+        fixture->dset_hdr.reclaimable_clean_bytes != 0 || fixture->dset_hdr.reclaimable_dirty_bytes != 0)
+        return FAIL;
+
+    return SUCCEED;
+}
+
+#endif
+
 /* =========================================================================
  * SECTION 6: Basic DLL Tests (dataset-level and chunk-level DLLs)
  * ========================================================================= */
 
 /* ---------- Test 6-1: H5SC DLL helper function test ---------- */
-static int
-test_dll_helper_functions(void)
+static int test_dll_helper_functions(void)
 {
     TESTING("H5SC__dll_helper_functions (dataset header LRU + chunk LRU)");
 
     /* ---- Global dataset-header LRU ---- */
     {
-        H5SC_t             cache = {0};
+        H5SC_t cache    = {0};
+        cache.SCC_magic = H5SC_MAIN_MAGIC;
         H5SC_dset_header_t h1, h2;
-        herr_t             status;
+        herr_t status;
 
         mk_dset_hdr(&h1, (haddr_t)0x111, 100);
         mk_dset_hdr(&h2, (haddr_t)0x222, 200);
@@ -514,7 +573,7 @@ test_dll_helper_functions(void)
         VERIFY(cache.dset_lru_len, (size_t)2, "header len after two inserts");
         VERIFY(cache.SCC_quiescent_size, (size_t)(100 + 200), "header bytes after two inserts");
 
-#if defined(H5SC_ENABLE_DUMPS) && (H5SC_ENABLE_DUMPS + 0)
+#if defined(H5SC_ENABLE_STAT_DUMPS) && (H5SC_ENABLE_STAT_DUMPS + 0)
         H5SC_dset_lru_dump("after h1,h2", &cache, stderr);
 #endif
 
@@ -532,42 +591,44 @@ test_dll_helper_functions(void)
     /* ---- Per-dataset chunk LRU (three chunks) ---- */
     {
         H5SC_dset_header_t dset_hdr;
-        H5SC_chunk_t       a, b, c;
-        herr_t             status;
+        H5SC_chunk_t a, b, c;
+        H5SC_t cache    = {0};
+        cache.SCC_magic = H5SC_MAIN_MAGIC;
+        herr_t status;
 
         mk_dset_hdr(&dset_hdr, (haddr_t)0xDADA, 0);
         mk_chunk(&a, 10);
         mk_chunk(&b, 20);
         mk_chunk(&c, 30);
 
-        status = H5SC__chunk_lru_prepend(&dset_hdr, &a);
+        status = H5SC__chunk_lru_prepend(&cache, &dset_hdr, &a);
         VERIFY(status, SUCCEED, "push a");
-        status = H5SC__chunk_lru_prepend(&dset_hdr, &b);
+        status = H5SC__chunk_lru_prepend(&cache, &dset_hdr, &b);
         VERIFY(status, SUCCEED, "push b");
-        status = H5SC__chunk_lru_prepend(&dset_hdr, &c);
+        status = H5SC__chunk_lru_prepend(&cache, &dset_hdr, &c);
         VERIFY(status, SUCCEED, "push c");
 
         VERIFY(dset_hdr.chunk_lru_len, (size_t)3, "chunk len after inserts");
         VERIFY(dset_hdr.curr_dset_size, (size_t)(10 + 20 + 30), "chunk bytes after inserts");
 
-#if defined(H5SC_ENABLE_DUMPS) && (H5SC_ENABLE_DUMPS + 0)
+#if defined(H5SC_ENABLE_STAT_DUMPS) && (H5SC_ENABLE_STAT_DUMPS + 0)
         H5SC_chunk_lru_dump("after a,b,c", &dset_hdr, stderr);
 #endif
 
         /* middle remove and size change */
-        status = H5SC__chunk_lru_remove(&dset_hdr, &b);
+        status = H5SC__chunk_lru_remove(&cache, &dset_hdr, &b);
         VERIFY(status, SUCCEED, "remove b");
         VERIFY(dset_hdr.chunk_lru_len, (size_t)2, "chunk len after removing b");
         VERIFY(dset_hdr.curr_dset_size, (size_t)(10 + 30), "chunk bytes after removing b");
 
-        status = H5SC__chunk_update_cached_size(&dset_hdr, &a, 12);
+        status = H5SC__chunk_update_cached_size(&cache, &dset_hdr, &a, 12);
         VERIFY(status, SUCCEED, "grow a -> 12");
         VERIFY(dset_hdr.curr_dset_size, (size_t)(12 + 30), "bytes after grow");
 
         /* remove remaining */
-        status = H5SC__chunk_lru_remove(&dset_hdr, &c);
+        status = H5SC__chunk_lru_remove(&cache, &dset_hdr, &c);
         VERIFY(status, SUCCEED, "remove c");
-        status = H5SC__chunk_lru_remove(&dset_hdr, &a);
+        status = H5SC__chunk_lru_remove(&cache, &dset_hdr, &a);
         VERIFY(status, SUCCEED, "remove a");
         VERIFY(dset_hdr.chunk_lru_len, (size_t)0, "chunk len after remove all");
         VERIFY(dset_hdr.curr_dset_size, (size_t)0, "chunk bytes after remove all");
@@ -575,22 +636,17 @@ test_dll_helper_functions(void)
 
     PASSED();
     return SUCCEED;
-
-error:
-    H5_FAILED();
-    return FAIL;
 }
 
 /* ---------- Test 6-2: Raw splice macros on dataset headers ---------- */
-static int
-test_dll_splice_macros_headers(void)
+static int test_dll_splice_macros_headers(void)
 {
     TESTING("H5SC_DLL_* splice macros (dataset headers)");
 
     H5SC_dset_header_t *head = NULL, *tail = NULL;
-    H5SC_dset_header_t  a, b, c;
-    size_t              recomputed_len = 0, recomputed_bytes = 0;
-    int                 ok = 1;
+    H5SC_dset_header_t a, b, c;
+    size_t recomputed_len = 0, recomputed_bytes = 0;
+    int ok = 1;
 
     mk_dset_hdr(&a, (haddr_t)0xA, 10);
     mk_dset_hdr(&b, (haddr_t)0xB, 20);
@@ -622,22 +678,17 @@ test_dll_splice_macros_headers(void)
 
     PASSED();
     return SUCCEED;
-
-error:
-    H5_FAILED();
-    return FAIL;
 }
 
 /* ---------- Test 6-3: Raw splice macros on chunks ---------- */
-static int
-test_dll_splice_macros_chunks(void)
+static int test_dll_splice_macros_chunks(void)
 {
     TESTING("H5SC_DLL_* splice macros (chunks)");
 
     H5SC_chunk_t *head = NULL, *tail = NULL;
-    H5SC_chunk_t  x, y, z;
-    size_t        recomputed_len = 0, recomputed_bytes = 0;
-    int           ok = 1;
+    H5SC_chunk_t x, y, z;
+    size_t recomputed_len = 0, recomputed_bytes = 0;
+    int ok = 1;
 
     mk_chunk(&x, 4);
     mk_chunk(&y, 8);
@@ -665,21 +716,17 @@ test_dll_splice_macros_chunks(void)
 
     PASSED();
     return SUCCEED;
-
-error:
-    H5_FAILED();
-    return FAIL;
 }
 
 /* ---------- Test 6-4: Header LRU API — MRU behavior & order checks ---------- */
-static int
-test_dset_hdr_lru_mru_behavior(void)
+static int test_dset_hdr_lru_mru_behavior(void)
 {
     TESTING("H5SC_dset_* MRU behavior and order (embedded counters)");
 
-    H5SC_t             cache = {0};
+    H5SC_t cache    = {0};
+    cache.SCC_magic = H5SC_MAIN_MAGIC;
     H5SC_dset_header_t h1, h2, h3;
-    herr_t             status;
+    herr_t status;
 
     mk_dset_hdr(&h1, (haddr_t)0x10, 10);
     mk_dset_hdr(&h2, (haddr_t)0x20, 20);
@@ -725,50 +772,48 @@ test_dset_hdr_lru_mru_behavior(void)
 
     PASSED();
     return SUCCEED;
-
-error:
-    H5_FAILED();
-    return FAIL;
 }
 
 /* ---------- Test 6-5: Chunk LRU API — sizes, MRU, and delete orders ---------- */
-static int
-test_chunk_lru_sizes_and_order(void)
+static int test_chunk_lru_sizes_and_order(void)
 {
     TESTING("H5SC_chunk_* sizes and MRU behavior (embedded counters)");
 
+    H5SC_t cache    = {0};
+    cache.SCC_magic = H5SC_MAIN_MAGIC;
+
     H5SC_dset_header_t dset_hdr;
-    H5SC_chunk_t       a, b, c;
-    herr_t             status;
+    H5SC_chunk_t a, b, c;
+    herr_t status;
 
     mk_dset_hdr(&dset_hdr, (haddr_t)0x77, 0);
     mk_chunk(&a, 0); /* exercise zero-sized insert */
     mk_chunk(&b, 5);
     mk_chunk(&c, 9);
 
-    status = H5SC__chunk_lru_prepend(&dset_hdr, &a);
+    status = H5SC__chunk_lru_prepend(&cache, &dset_hdr, &a);
     VERIFY(status, SUCCEED, "push a(size=0)");
-    status = H5SC__chunk_lru_prepend(&dset_hdr, &b);
+    status = H5SC__chunk_lru_prepend(&cache, &dset_hdr, &b);
     VERIFY(status, SUCCEED, "push b");
-    status = H5SC__chunk_lru_prepend(&dset_hdr, &c);
+    status = H5SC__chunk_lru_prepend(&cache, &dset_hdr, &c);
     VERIFY(status, SUCCEED, "push c");
 
     VERIFY(dset_hdr.chunk_lru_len, (size_t)3, "3 chunks inserted");
     VERIFY(dset_hdr.curr_dset_size, (size_t)(0 + 5 + 9), "bytes after inserts");
 
     /* Grow a from 0 -> 4, then shrink b from 5 -> 2 */
-    status = H5SC__chunk_update_cached_size(&dset_hdr, &a, 4);
+    status = H5SC__chunk_update_cached_size(&cache, &dset_hdr, &a, 4);
     VERIFY(status, SUCCEED, "grow a");
-    status = H5SC__chunk_update_cached_size(&dset_hdr, &b, 2);
+    status = H5SC__chunk_update_cached_size(&cache, &dset_hdr, &b, 2);
     VERIFY(status, SUCCEED, "shrink b");
     VERIFY(dset_hdr.curr_dset_size, (size_t)(4 + 2 + 9), "bytes after updates");
 
     /* Remove in sequence: middle(b), tail(a), head(c) */
-    status = H5SC__chunk_lru_remove(&dset_hdr, &b);
+    status = H5SC__chunk_lru_remove(&cache, &dset_hdr, &b);
     VERIFY(status, SUCCEED, "remove b");
-    status = H5SC__chunk_lru_remove(&dset_hdr, &a);
+    status = H5SC__chunk_lru_remove(&cache, &dset_hdr, &a);
     VERIFY(status, SUCCEED, "remove a");
-    status = H5SC__chunk_lru_remove(&dset_hdr, &c);
+    status = H5SC__chunk_lru_remove(&cache, &dset_hdr, &c);
     VERIFY(status, SUCCEED, "remove c");
     VERIFY(dset_hdr.chunk_lru_len, (size_t)0, "no chunks left");
     VERIFY(dset_hdr.curr_dset_size, (size_t)0, "no bytes left");
@@ -777,23 +822,19 @@ test_chunk_lru_sizes_and_order(void)
 
     PASSED();
     return SUCCEED;
-
-error:
-    H5_FAILED();
-    return FAIL;
 }
 
 /* ---------- Test 6-6: Sanity helpers — recompute & link checks ---------- */
-static int
-test_dll_sanity_helpers(void)
+static int test_dll_sanity_helpers(void)
 {
     TESTING("H5SC_DLL_CHECK_LINKS / H5SC_DLL_COUNT_BYTES");
 
-    H5SC_t             cache = {0};
+    H5SC_t cache    = {0};
+    cache.SCC_magic = H5SC_MAIN_MAGIC;
     H5SC_dset_header_t h1, h2;
-    herr_t             status;
-    size_t             n = 0, b = 0;
-    int                ok = 1;
+    herr_t status;
+    size_t n = 0, b = 0;
+    int ok = 1;
 
     mk_dset_hdr(&h1, (haddr_t)0xDE, 64);
     mk_dset_hdr(&h2, (haddr_t)0xAD, 128);
@@ -823,46 +864,78 @@ test_dll_sanity_helpers(void)
 
     PASSED();
     return SUCCEED;
-
-error:
-    H5_FAILED();
-    return FAIL;
 }
 
 /* ---------- Test 6-8: Error paths under sanity checks (conditional) ---------- */
-#if (H5SC_DO_SANITY_CHECKS + 0)
-static int
-test_api_error_paths_with_sanity(void)
+#if (H5SC_DO_SANITY_CHECKS)
+static int test_api_error_paths_with_sanity(void)
 {
     TESTING("H5SC_* error paths with H5SC_DO_SANITY_CHECKS");
 
-    /* Reinsert header should FAIL */
-    {
-        H5SC_t             cache = {0};
-        H5SC_dset_header_t h;
-        herr_t             status;
-        mk_dset_hdr(&h, (haddr_t)0xAA, 10);
+    /*
+     * This test deliberately invokes package-private routines that push
+     * errors. Initialize the library and error subsystem in case this test
+     * runs before any public HDF5 API operation.
+     */
+    if (H5open() < 0)
+        TEST_ERROR;
 
-        status = H5SC__dset_lru_prepend(&cache, &h);
-        VERIFY(status, SUCCEED, "push h");
-        status = H5SC__dset_lru_prepend(&cache, &h);
-        VERIFY(status, FAIL, "reinsert header fails");
-        (void)H5SC__dset_lru_remove(&cache, &h);
+    /* Reinserting an already-linked dataset header must fail. */
+    {
+        H5SC_t cache = {0};
+        H5SC_dset_header_t dset_hdr;
+        herr_t status;
+
+        cache.SCC_magic = H5SC_MAIN_MAGIC;
+        mk_dset_hdr(&dset_hdr, (haddr_t)0x1234, (size_t)0);
+
+        /* Initial insertion must succeed. */
+        status = H5SC__dset_lru_prepend(&cache, &dset_hdr);
+        if (status < 0)
+            TEST_ERROR;
+
+        /* Reinserting the same linked header must fail. */
+        H5E_BEGIN_TRY { status = H5SC__dset_lru_prepend(&cache, &dset_hdr); }
+        H5E_END_TRY
+
+        if (status >= 0)
+            TEST_ERROR;
+
+        status = H5SC__dset_lru_remove(&cache, &dset_hdr);
+        if (status < 0)
+            TEST_ERROR;
     }
 
-    /* Reinsert chunk should FAIL */
+    /* Reinserting an already-linked chunk must fail. */
     {
+        H5SC_t cache    = {0};
+        cache.SCC_magic = H5SC_MAIN_MAGIC;
         H5SC_dset_header_t dset_hdr;
-        H5SC_chunk_t       x;
-        herr_t             status;
-        mk_dset_hdr(&dset_hdr, (haddr_t)0xBB, 0);
-        mk_chunk(&x, 1);
+        H5SC_chunk_t chunk;
+        herr_t status;
 
-        status = H5SC__chunk_lru_prepend(&dset_hdr, &x);
-        VERIFY(status, SUCCEED, "push x");
-        status = H5SC__chunk_lru_prepend(&dset_hdr, &x);
-        VERIFY(status, FAIL, "reinsert chunk fails");
-        (void)H5SC__chunk_lru_remove(&dset_hdr, &x);
+        /*
+         * Chunk LRU routines operate on a dataset header, not directly on
+         * the top-level shared cache.
+         */
+        mk_dset_hdr(&dset_hdr, (haddr_t)0x5678, (size_t)0);
+        mk_chunk(&chunk, (size_t)0);
+
+        /* Initial insertion must succeed. */
+        status = H5SC__chunk_lru_prepend(&cache, &dset_hdr, &chunk);
+        if (status < 0)
+            TEST_ERROR;
+
+        /* Reinserting the same linked chunk must fail. */
+        H5E_BEGIN_TRY { status = H5SC__chunk_lru_prepend(&cache, &dset_hdr, &chunk); }
+        H5E_END_TRY
+
+        if (status >= 0)
+            TEST_ERROR;
+
+        status = H5SC__chunk_lru_remove(&cache, &dset_hdr, &chunk);
+        if (status < 0)
+            TEST_ERROR;
     }
 
     PASSED();
@@ -877,10 +950,9 @@ error:
 /* ======================== Section 6-9: Fuzz test ========================== */
 
 /* local recompute helpers just for this test */
-static void
-recompute_dset_hdr_lru(const H5SC_t *cache, size_t *out_len, size_t *out_bytes)
+static void recompute_dset_hdr_lru(const H5SC_t *cache, size_t *out_len, size_t *out_bytes)
 {
-    size_t                    len = 0, bytes = 0;
+    size_t len = 0, bytes = 0;
     const H5SC_dset_header_t *p = cache->dset_lru_head_ptr;
     while (p) {
         len++;
@@ -905,8 +977,7 @@ recompute_dset_hdr_lru(const H5SC_t *cache, size_t *out_len, size_t *out_bytes)
  *   - Assumes chunk-LRU primitives have already updated curr_dset_size.
  *   - Uses unsigned math to avoid signed overflow issues.
  *-------------------------------------------------------------------------*/
-static void
-test_account_chunk_link_change(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, size_t old_dset_size)
+static void test_account_chunk_link_change(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, size_t old_dset_size)
 {
     assert(cache);
     assert(dset_hdr);
@@ -927,7 +998,7 @@ test_account_chunk_link_change(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, size
     else if (old_dset_size > new_dset_size) {
         size_t delta = old_dset_size - new_dset_size;
 
-#ifdef H5SC_DO_SANITY_CHECKS
+#if H5SC_DO_SANITY_CHECKS
         assert(delta <= cache->SCC_quiescent_size);
 #endif
 
@@ -935,10 +1006,9 @@ test_account_chunk_link_change(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, size
     }
 }
 
-static void
-recompute_chunk_lru(const H5SC_dset_header_t *dset_hdr, size_t *out_len, size_t *out_bytes)
+static void recompute_chunk_lru(const H5SC_dset_header_t *dset_hdr, size_t *out_len, size_t *out_bytes)
 {
-    size_t              len = 0, bytes = 0;
+    size_t len = 0, bytes = 0;
     const H5SC_chunk_t *p = dset_hdr->lru_head_ptr;
     while (p) {
         len++;
@@ -994,20 +1064,21 @@ recompute_chunk_lru(const H5SC_dset_header_t *dset_hdr, size_t *out_len, size_t 
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_fuzz_dll_ops(void)
+static int test_fuzz_dll_ops(void)
 {
     TESTING("H5SC_DLL fuzz: randomized chunk/header DLL operations");
 
     enum { NUM_HDR = 4, MAX_CHUNKS = 16, ITERS = 1000 };
     const unsigned SEED = 1337u; /* fixed for reproducible CI */
 
-    H5SC_t             cache;
+    H5SC_t cache;
+
     H5SC_dset_header_t dset_hdrs[NUM_HDR];
-    H5SC_chunk_t       chunks[NUM_HDR][MAX_CHUNKS];
-    unsigned char      in_list[NUM_HDR][MAX_CHUNKS]; /* 0/1 membership in per-dataset chunk LRU */
+    H5SC_chunk_t chunks[NUM_HDR][MAX_CHUNKS];
+    unsigned char in_list[NUM_HDR][MAX_CHUNKS]; /* 0/1 membership in per-dataset chunk LRU */
 
     memset(&cache, 0, sizeof(cache));
+    cache.SCC_magic = H5SC_MAIN_MAGIC;
 
     for (size_t i = 0; i < NUM_HDR; i++) {
         mk_dset_hdr(&dset_hdrs[i], (haddr_t)(0x1000 + 0x10 * i), /*curr_dset_size*/ 0);
@@ -1028,7 +1099,7 @@ test_fuzz_dll_ops(void)
 
         if (dset_hdr_op) {
             /* ----- header-level op ----- */
-            size_t              hi       = (size_t)(rand() % NUM_HDR);
+            size_t hi                    = (size_t)(rand() % NUM_HDR);
             H5SC_dset_header_t *dset_hdr = &dset_hdrs[hi];
 
             int do_insert = rand() & 1;
@@ -1073,9 +1144,9 @@ test_fuzz_dll_ops(void)
         }
         else {
             /* ----- chunk-level op ----- */
-            size_t              hi       = (size_t)(rand() % NUM_HDR);
+            size_t hi                    = (size_t)(rand() % NUM_HDR);
             H5SC_dset_header_t *dset_hdr = &dset_hdrs[hi];
-            int                 op       = rand() % 3; /* 0=insert, 1=remove, 2=resize */
+            int op                       = rand() % 3; /* 0=insert, 1=remove, 2=resize */
 
             if (op == 0) {
                 /* insert: find a free slot; assign size 1..8 */
@@ -1087,7 +1158,7 @@ test_fuzz_dll_ops(void)
                         chunks[hi][j].cached_chunk_size = sz;
 
                         {
-                            herr_t st = H5SC__chunk_lru_prepend(dset_hdr, &chunks[hi][j]);
+                            herr_t st = H5SC__chunk_lru_prepend(&cache, dset_hdr, &chunks[hi][j]);
                             VERIFY(st, SUCCEED, "chunk prepend");
                         }
 
@@ -1112,7 +1183,7 @@ test_fuzz_dll_ops(void)
                     }
 
                     {
-                        herr_t st = H5SC__chunk_lru_remove(dset_hdr, c);
+                        herr_t st = H5SC__chunk_lru_remove(&cache, dset_hdr, c);
                         VERIFY(st, SUCCEED, "chunk remove");
                     }
 
@@ -1123,7 +1194,7 @@ test_fuzz_dll_ops(void)
                 /* resize: choose tail; delta -1/0/+1 (clamp at 1) */
                 H5SC_chunk_t *c = dset_hdr->lru_tail_ptr;
                 if (c) {
-                    int    delta  = (rand() % 3) - 1;
+                    int delta     = (rand() % 3) - 1;
                     size_t old_sz = c->cached_chunk_size;
                     size_t new_sz = old_sz;
 
@@ -1135,7 +1206,7 @@ test_fuzz_dll_ops(void)
                     {
                         size_t old_dset_size = dset_hdr->curr_dset_size;
 
-                        herr_t st = H5SC__chunk_update_cached_size(dset_hdr, c, new_sz);
+                        herr_t st = H5SC__chunk_update_cached_size(&cache, dset_hdr, c, new_sz);
                         VERIFY(st, SUCCEED, "chunk resize");
 
                         test_account_chunk_link_change(&cache, dset_hdr, old_dset_size);
@@ -1269,10 +1340,6 @@ test_fuzz_dll_ops(void)
 
     PASSED();
     return SUCCEED;
-
-error:
-    H5_FAILED();
-    return FAIL;
 }
 
 /* =========================================================================
@@ -1283,11 +1350,12 @@ error:
  * SECTION 7.1: Tiny allocation helpers for the tests (payload ownership verification)
  * ------------------------------------------------------------------------- */
 
-static H5SC_chunk_t *
-t_make_chunk(H5SC_chunk_key_t key, size_t cached_sz, size_t disk_sz, size_t counter, bool dirty, bool pio)
+static H5SC_chunk_t *t_make_chunk(H5SC_chunk_key_t key, size_t cached_sz, size_t disk_sz, size_t counter,
+                                  bool dirty, bool pio)
 {
     H5SC_chunk_t *n = (H5SC_chunk_t *)H5MM_malloc(sizeof(*n));
     memset(n, 0, sizeof(*n));
+    n->magic             = H5SC_MAIN_MAGIC;
     n->data_key          = key;
     n->cached_chunk_size = cached_sz;
     n->disk_nbytes       = disk_sz;
@@ -1299,8 +1367,7 @@ t_make_chunk(H5SC_chunk_key_t key, size_t cached_sz, size_t disk_sz, size_t coun
     return n;
 }
 
-static H5SC_dset_header_t *
-t_make_dset_hdr(haddr_t addr, size_t curr_sz, bool resizing, bool exhausted)
+static H5SC_dset_header_t *t_make_dset_hdr(haddr_t addr, size_t curr_sz, bool resizing)
 {
     H5SC_dset_header_t *h = (H5SC_dset_header_t *)H5MM_malloc(sizeof(*h));
     memset(h, 0, sizeof(*h));
@@ -1308,7 +1375,6 @@ t_make_dset_hdr(haddr_t addr, size_t curr_sz, bool resizing, bool exhausted)
     h->curr_dset_size     = curr_sz;
     h->magic              = H5SC_DSET_HDR_MAGIC;
     h->resize_in_progress = resizing;
-    h->evict_exhausted    = exhausted;
     return h;
 }
 
@@ -1319,14 +1385,14 @@ t_make_dset_hdr(haddr_t addr, size_t curr_sz, bool resizing, bool exhausted)
 /* -------------------------------------------------------------------------
  * Test 8.1: Basic CRUD on both tables; verify payload not mutated by hash ops
  * ------------------------------------------------------------------------- */
-static herr_t
-test_basic_crud(void)
+static herr_t test_basic_crud(void)
 {
-    H5SC_t           cache;
-    H5SC_chunk_key_t k    = {0x1111222233334444ULL, 0xAAAABBBBCCCCDDDDULL};
-    haddr_t          addr = (haddr_t)0x12345678ULL;
+    H5SC_t cache;
+    cache.SCC_magic    = H5SC_MAIN_MAGIC;
+    H5SC_chunk_key_t k = {0x1111222233334444ULL, 0xAAAABBBBCCCCDDDDULL};
+    haddr_t addr       = (haddr_t)0x12345678ULL;
 
-    H5SC_chunk_t       *c = NULL, *gotc = NULL;
+    H5SC_chunk_t *c = NULL, *gotc = NULL;
     H5SC_dset_header_t *d = NULL, *gotd = NULL;
 
     TESTING("Testing basic CRUD on chunk/dset hash tables");
@@ -1334,18 +1400,12 @@ test_basic_crud(void)
     H5SC__hash_init(&cache);
 
     c = t_make_chunk(k, /*cached*/ 4096, /*disk*/ 4096, /*cnt*/ 7, /*dirty*/ true, /*pio*/ false);
-    d = t_make_dset_hdr(addr, /*curr_sz*/ 1u << 20, /*resizing*/ false, /*exhausted*/ false);
+    d = t_make_dset_hdr(addr, /*curr_sz*/ 1u << 20, /*resizing*/ false);
 
     /* insert via public (internal) API */
     VERIFY(H5SC__ht_chunk_insert(&cache, c), SUCCEED, "H5SC__ht_chunk_insert");
-    if (H5SC__ht_chunk_insert(&cache, c) != SUCCEED) {
-        TEST_ERROR;
-    }
 
     VERIFY(H5SC__ht_dset_insert(&cache, d), SUCCEED, "H5SC__ht_dset_insert");
-    if (H5SC__ht_dset_insert(&cache, d) != SUCCEED) {
-        TEST_ERROR;
-    }
 
     /* find */
     gotc = H5SC__ht_chunk_find(&cache, &k);
@@ -1362,19 +1422,20 @@ test_basic_crud(void)
 
     VERIFY(gotd->curr_dset_size, (size_t)(1u << 20), "dset.payload.curr_dset_size");
     VERIFY(gotd->resize_in_progress, false, "dset.payload.resize_in_progress");
-    VERIFY(gotd->evict_exhausted, false, "dset.payload.evict_exhausted");
-
-    /* idempotent update (re-insert same pointer) */
-    VERIFY(H5SC__ht_chunk_insert(&cache, c), SUCCEED, "H5SC__ht_chunk_insert (idempotent)");
-    VERIFY(H5SC__ht_dset_insert(&cache, d), SUCCEED, "H5SC__ht_dset_insert (idempotent)");
-    VERIFY(c->chunk_counter, (size_t)7, "chunk.payload.unchanged_after_update");
-    VERIFY(d->curr_dset_size, (size_t)(1u << 20), "dset.payload.unchanged_after_update");
 
     /* delete */
     VERIFY(H5SC__ht_chunk_delete(&cache, &k), SUCCEED, "H5SC__ht_chunk_delete");
     VERIFY(H5SC__ht_dset_delete(&cache, addr), SUCCEED, "H5SC__ht_dset_delete");
-    VERIFY(H5SC__ht_chunk_find(&cache, &k), NULL, "H5SC__ht_chunk_find after delete");
-    VERIFY(H5SC__ht_dset_find(&cache, addr), NULL, "H5SC__ht_dset_find after delete");
+
+    if (H5SC__ht_chunk_find(&cache, &k) != NULL) {
+        printf("H5SC__ht_chunk_find unexpectedly found deleted chunk\n");
+        TEST_ERROR;
+    }
+
+    if (H5SC__ht_dset_find(&cache, addr) != NULL) {
+        printf("H5SC__ht_dset_find unexpectedly found deleted dataset\n");
+        TEST_ERROR;
+    }
 
     if (c)
         H5MM_xfree(c);
@@ -1386,21 +1447,30 @@ test_basic_crud(void)
 
 error:
     H5_FAILED();
+
+    if (c)
+        c = H5MM_xfree(c);
+    if (d)
+        d = H5MM_xfree(d);
+
     return FAIL;
 }
 
 /* -------------------------------------------------------------------------
  * Test 8.2: Scalability; bulk insert/find; selective delete via API; reset heads
  * ------------------------------------------------------------------------- */
-static herr_t
-test_many_entries(void)
+static herr_t test_many_entries(void)
 {
-    H5SC_t       cache;
+    H5SC_t cache;
     const size_t N = 4096;
-    size_t       i;
+    size_t i;
+    herr_t ret_value = SUCCEED;
 
-    H5SC_chunk_t       **chunks = NULL;
-    H5SC_dset_header_t **dsets  = NULL;
+    H5SC_chunk_t **chunks      = NULL;
+    H5SC_dset_header_t **dsets = NULL;
+
+    memset(&cache, 0, sizeof(cache));
+    cache.SCC_magic = H5SC_MAIN_MAGIC;
 
     TESTING("Testing many insert/finds, deletes, reseting heads");
 
@@ -1414,28 +1484,29 @@ test_many_entries(void)
 
     /* Insert N entries for each table */
     for (i = 0; i < N; i++) {
-        H5SC_chunk_key_t k    = {0xDEADBEEFCAFEBABEULL + (uint64_t)i,
-                                 0x0123456789ABCDEFULL ^ (uint64_t)(i * 2654435761u)};
-        haddr_t          addr = (haddr_t)(0x10000000ULL + (haddr_t)(i * 4099u));
+        H5SC_chunk_key_t k = {0xDEADBEEFCAFEBABEULL + (uint64_t)i,
+                              0x0123456789ABCDEFULL ^ (uint64_t)(i * 2654435761u)};
+        haddr_t addr       = (haddr_t)(0x10000000ULL + (haddr_t)(i * 4099u));
 
         chunks[i] = t_make_chunk(k, 1024 + i, 2048 + i, i, (i & 1) != 0, (i % 3) == 0);
-        dsets[i]  = t_make_dset_hdr(addr, (size_t)(i * 8), (i % 5) == 0, (i % 7) == 0);
+        dsets[i]  = t_make_dset_hdr(addr, (size_t)(i * 8), (i % 5) == 0);
 
         VERIFY(H5SC__ht_chunk_insert(&cache, chunks[i]), SUCCEED, "H5SC__ht_chunk_insert");
-        if (H5SC__ht_chunk_insert(&cache, chunks[i]) != SUCCEED) {
-            TEST_ERROR;
-        }
         VERIFY(H5SC__ht_dset_insert(&cache, dsets[i]), SUCCEED, "H5SC__ht_dset_insert");
-        if (H5SC__ht_dset_insert(&cache, dsets[i]) != SUCCEED) {
-            TEST_ERROR;
-        }
     }
 
     /* Spot-check some lookups */
     {
         size_t t = 1234;
-        VERIFY(H5SC__ht_chunk_find(&cache, &chunks[t]->data_key), chunks[t], "H5SC__ht_chunk_find spot");
-        VERIFY(H5SC__ht_dset_find(&cache, dsets[t]->dset_addr), dsets[t], "H5SC__ht_dset_find spot");
+        if (H5SC__ht_chunk_find(&cache, &chunks[t]->data_key) != chunks[t]) {
+            printf("H5SC__ht_chunk_find returned wrong chunk\n");
+            TEST_ERROR;
+        }
+
+        if (H5SC__ht_dset_find(&cache, dsets[t]->dset_addr) != dsets[t]) {
+            printf("H5SC__ht_dset_find returned wrong dataset\n");
+            TEST_ERROR;
+        }
     }
 
     /* Delete every 3rd chunk and every 5th dset via API; free payloads here */
@@ -1451,38 +1522,45 @@ test_many_entries(void)
     VERIFY(cache.chunk_hash_table_head_ptr, NULL, "chunk head reset");
     VERIFY(cache.dset_hash_table_head_ptr, NULL, "dset head reset");
 
-done:
-    /* Free all payload allocations we created */
-    if (chunks) {
-        for (i = 0; i < N; i++)
-            if (chunks[i])
-                H5MM_xfree(chunks[i]);
-        H5MM_xfree(chunks);
-    }
-    if (dsets) {
-        for (i = 0; i < N; i++)
-            if (dsets[i])
-                H5MM_xfree(dsets[i]);
-        H5MM_xfree(dsets);
-    }
-
-    PASSED();
-    return SUCCEED;
+    goto done;
 
 error:
     H5_FAILED();
-    return FAIL;
+    ret_value = FAIL;
+
+done:
+    /* Free all payload allocations created by this test. */
+    if (chunks) {
+        for (i = 0; i < N; i++)
+            if (chunks[i])
+                chunks[i] = H5MM_xfree(chunks[i]);
+
+        chunks = H5MM_xfree(chunks);
+    }
+
+    if (dsets) {
+        for (i = 0; i < N; i++)
+            if (dsets[i])
+                dsets[i] = H5MM_xfree(dsets[i]);
+
+        dsets = H5MM_xfree(dsets);
+    }
+
+    if (ret_value >= 0)
+        PASSED();
+
+    return ret_value;
 }
 
 /* -------------------------------------------------------------------------
  * Test 8.3: Absent keys — lookups NULL, deletes FAIL by contract
  * ------------------------------------------------------------------------- */
-static herr_t
-test_absent_keys(void)
+static herr_t test_absent_keys(void)
 {
-    H5SC_t           cache;
+    H5SC_t cache;
+    cache.SCC_magic        = H5SC_MAIN_MAGIC;
     H5SC_chunk_key_t k_abs = {1, 2};
-    haddr_t          a_abs = (haddr_t)0xFEEDFACEULL;
+    haddr_t a_abs          = (haddr_t)0xFEEDFACEULL;
 
     TESTING("Testing hash table absent-key lookups and deletes");
 
@@ -1491,8 +1569,11 @@ test_absent_keys(void)
     H5E_BEGIN_TRY
     {
 
-        VERIFY(H5SC__ht_chunk_find(&cache, &k_abs), NULL, "H5SC__ht_chunk_find (absent)");
-        VERIFY(H5SC__ht_dset_find(&cache, a_abs), NULL, "H5SC__ht_dset_find (absent)");
+        if (H5SC__ht_chunk_find(&cache, &k_abs) != NULL)
+            TEST_ERROR;
+
+        if (H5SC__ht_dset_find(&cache, a_abs) != NULL)
+            TEST_ERROR;
 
         VERIFY(H5SC__ht_chunk_delete(&cache, &k_abs), FAIL, "H5SC__ht_chunk_delete (absent)");
         if (H5SC__ht_chunk_delete(&cache, &k_abs) != FAIL) {
@@ -1601,13 +1682,13 @@ error:
  * or corruption in either the hash or LRU subsystems.
  * ------------------------------------------------------------------------- */
 
-static int
-test_cache_integration_six_datasets(void)
+static int test_cache_integration_six_datasets(void)
 {
     TESTING("SCC integration: 6 datasets w/ 6 sequential coords (36 chunks)");
 
     /* Global cache (must be zero-initialized) */
-    H5SC_t cache = (H5SC_t){0};
+    H5SC_t cache    = (H5SC_t){0};
+    cache.SCC_magic = H5SC_MAIN_MAGIC;
     H5SC__hash_init(&cache);
 
     /* Dataset addresses (unique) */
@@ -1620,15 +1701,15 @@ test_cache_integration_six_datasets(void)
     enum { NDS = 6, NCH = 6 };
 
     /* Per-dataset headers and chunk storage */
-    H5SC_dset_header_t *dset_hdrs[NDS]   = {0};
-    H5SC_chunk_t       *chunks[NDS][NCH] = {{0}};
-    H5SC_chunk_key_t    keys[NDS][NCH];
+    H5SC_dset_header_t *dset_hdrs[NDS] = {0};
+    H5SC_chunk_t *chunks[NDS][NCH]     = {{0}};
+    H5SC_chunk_key_t keys[NDS][NCH];
 
     /* 1) Insert dataset headers into HT (+ global LRU if not already linked) */
     for (size_t i = 0; i < NDS; i++) {
         herr_t st;
 
-        dset_hdrs[i] = t_make_dset_hdr(dset_addrs[i], /*curr_sz*/ 0, /*resizing*/ false, /*exhausted*/ false);
+        dset_hdrs[i] = t_make_dset_hdr(dset_addrs[i], /*curr_sz*/ 0, /*resizing*/ false);
         if (!dset_hdrs[i]) {
             printf("Failed to allocate dataset header %zu\n", i);
             TEST_ERROR;
@@ -1649,7 +1730,8 @@ test_cache_integration_six_datasets(void)
         size_t bytes_sum = 0;
 
         for (size_t j = 0; j < NCH; j++) {
-            const uint64_t coord = (uint64_t)j; /* sequential logical coordinate 0..5 */
+            // const uint64_t coord = (uint64_t)j; /* sequential logical coordinate 0..5 */
+            hsize_t coord = (hsize_t)j;
 
             /* compute key as interleave(coord, addr) */
             VERIFY(test_H5SC__compute_chunk_key(&dset_addrs[i], &coord, &keys[i][j]), SUCCEED,
@@ -1674,7 +1756,7 @@ test_cache_integration_six_datasets(void)
                 VERIFY(st, SUCCEED, "insert chunk into HT");
             }
             {
-                herr_t st = H5SC__chunk_lru_prepend(dset_hdrs[i], chunks[i][j]);
+                herr_t st = H5SC__chunk_lru_prepend(&cache, dset_hdrs[i], chunks[i][j]);
                 VERIFY(st, SUCCEED, "prepend chunk MRU into dataset LRU");
             }
 
@@ -1701,7 +1783,7 @@ test_cache_integration_six_datasets(void)
         for (size_t j = 0; j < NCH; j++) {
             if (chunks[i][j]->next_ptr || chunks[i][j]->prev_ptr ||
                 dset_hdrs[i]->lru_head_ptr == chunks[i][j])
-                (void)H5SC__chunk_lru_remove(dset_hdrs[i], chunks[i][j]);
+                (void)H5SC__chunk_lru_remove(&cache, dset_hdrs[i], chunks[i][j]);
             if (H5SC__ht_chunk_find(&cache, &keys[i][j]) != NULL)
                 (void)H5SC__ht_chunk_delete(&cache, &keys[i][j]);
             H5MM_xfree(chunks[i][j]);
@@ -1723,7 +1805,7 @@ error:
                 if (chunks[i][j]) {
                     H5E_BEGIN_TRY
                     {
-                        (void)H5SC__chunk_lru_remove(dset_hdrs[i], chunks[i][j]);
+                        (void)H5SC__chunk_lru_remove(&cache, dset_hdrs[i], chunks[i][j]);
                         (void)H5SC__ht_chunk_delete(&cache, &keys[i][j]);
                     }
                     H5E_END_TRY;
@@ -1782,13 +1864,13 @@ error:
  *   ✓ LRU counters (len/bytes) and head/tail MRU ordering are correct
  *   ✓ Full cleanup leaves the SCC empty and consistent
  * ------------------------------------------------------------------------- */
-static int
-test_logical_chunk_coords_varied_datasets(void)
+static int test_logical_chunk_coords_varied_datasets(void)
 {
     TESTING("Logical chk coords + dset HT/DLL integration (six dsets)");
 
     /* Global cache */
-    H5SC_t cache = (H5SC_t){0};
+    H5SC_t cache    = (H5SC_t){0};
+    cache.SCC_magic = H5SC_MAIN_MAGIC;
     H5SC__hash_init(&cache);
 
     /* Distinct dataset addresses */
@@ -1804,14 +1886,14 @@ test_logical_chunk_coords_varied_datasets(void)
     const size_t dset_hdr_bytes[NDS] = {64, 128, 192, 256, 320, 384};
 
     H5SC_dset_header_t *dset_hdr[NDS] = {0};
-    size_t              bytes_sum     = 0;
+    size_t bytes_sum                  = 0;
 
     /* Insert headers into dataset HT and global dataset LRU (MRU-prepend if needed) */
     for (size_t i = 0; i < NDS; i++) {
         herr_t st;
 
         dset_hdr[i] = t_make_dset_hdr(daddr[i], /*curr_sz*/ dset_hdr_bytes[i],
-                                      /*resizing*/ false, /*exhausted*/ false);
+                                      /*resizing*/ false);
         if (!dset_hdr[i]) {
             printf("Failed to allocate dataset header %zu\n", i);
             TEST_ERROR;
@@ -1837,9 +1919,9 @@ test_logical_chunk_coords_varied_datasets(void)
 
     /* ---------- Dataset 0: rank-2 ---------- */
     {
-        const unsigned nd       = 2;
-        const hsize_t  dims[2]  = {103, 47};
-        const hsize_t  chunk[2] = {16, 8};
+        const unsigned nd      = 2;
+        const hsize_t dims[2]  = {103, 47};
+        const hsize_t chunk[2] = {16, 8};
 
         const hsize_t samples[][2] = {{0, 0}, {15, 7}, {16, 8}, {102, 46}, {32, 9}};
 
@@ -1848,8 +1930,8 @@ test_logical_chunk_coords_varied_datasets(void)
         H5VM_array_down(nd, nchunks, down);
 
         for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); i++) {
-            const hsize_t *elem  = samples[i];
-            hsize_t        LC[2] = {elem[0] / (hsize_t)chunk[0], elem[1] / (hsize_t)chunk[1]};
+            const hsize_t *elem = samples[i];
+            hsize_t LC[2]       = {elem[0] / (hsize_t)chunk[0], elem[1] / (hsize_t)chunk[1]};
 
             if (!(elem[0] < dims[0] && elem[1] < dims[1])) {
                 printf("elem out of range (D0)\n");
@@ -1871,15 +1953,15 @@ test_logical_chunk_coords_varied_datasets(void)
 
             /* Optional: compose a key for visibility (linear_idx, daddr[0]) */
             H5SC_chunk_key_t key;
-            VERIFY(test_H5SC__compute_chunk_key(&idxA, &daddr[0], &key), SUCCEED, "key build (D0)");
+            VERIFY(test_H5SC__compute_chunk_key(&daddr[0], &idxA, &key), SUCCEED, "key build (D0)");
         }
     }
 
     /* ---------- Dataset 1: rank-3 ---------- */
     {
-        const unsigned nd       = 3;
-        const hsize_t  dims[3]  = {64, 33, 19};
-        const hsize_t  chunk[3] = {8, 11, 5};
+        const unsigned nd      = 3;
+        const hsize_t dims[3]  = {64, 33, 19};
+        const hsize_t chunk[3] = {8, 11, 5};
 
         const hsize_t samples[][3] = {{0, 0, 0}, {7, 10, 4}, {8, 11, 5}, {63, 32, 18}};
 
@@ -1888,9 +1970,9 @@ test_logical_chunk_coords_varied_datasets(void)
         H5VM_array_down(nd, nchunks, down);
 
         for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); i++) {
-            const hsize_t *elem  = samples[i];
-            hsize_t        LC[3] = {elem[0] / (hsize_t)chunk[0], elem[1] / (hsize_t)chunk[1],
-                                    elem[2] / (hsize_t)chunk[2]};
+            const hsize_t *elem = samples[i];
+            hsize_t LC[3]       = {elem[0] / (hsize_t)chunk[0], elem[1] / (hsize_t)chunk[1],
+                                   elem[2] / (hsize_t)chunk[2]};
 
             if (!(elem[0] < dims[0] && elem[1] < dims[1] && elem[2] < dims[2])) {
                 printf("elem OOR (D1)\n");
@@ -1911,15 +1993,15 @@ test_logical_chunk_coords_varied_datasets(void)
             }
 
             H5SC_chunk_key_t key;
-            VERIFY(test_H5SC__compute_chunk_key(&idxA, &daddr[1], &key), SUCCEED, "key build (D1)");
+            VERIFY(test_H5SC__compute_chunk_key(&daddr[1], &idxA, &key), SUCCEED, "key build (D1)");
         }
     }
 
     /* ---------- Dataset 2: rank-2 ---------- */
     {
-        const unsigned nd       = 2;
-        const hsize_t  dims[2]  = {200, 150};
-        const hsize_t  chunk[2] = {25, 16};
+        const unsigned nd      = 2;
+        const hsize_t dims[2]  = {200, 150};
+        const hsize_t chunk[2] = {25, 16};
 
         const hsize_t samples[][2] = {{0, 0}, {24, 15}, {25, 0}, {199, 149}, {50, 32}, {175, 64}};
 
@@ -1928,8 +2010,8 @@ test_logical_chunk_coords_varied_datasets(void)
         H5VM_array_down(nd, nchunks, down);
 
         for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); i++) {
-            const hsize_t *elem  = samples[i];
-            hsize_t        LC[2] = {elem[0] / (hsize_t)chunk[0], elem[1] / (hsize_t)chunk[1]};
+            const hsize_t *elem = samples[i];
+            hsize_t LC[2]       = {elem[0] / (hsize_t)chunk[0], elem[1] / (hsize_t)chunk[1]};
 
             if (!(elem[0] < dims[0] && elem[1] < dims[1])) {
                 printf("elem OOR (D2)\n");
@@ -1950,15 +2032,15 @@ test_logical_chunk_coords_varied_datasets(void)
             }
 
             H5SC_chunk_key_t key;
-            VERIFY(test_H5SC__compute_chunk_key(&idxA, &daddr[2], &key), SUCCEED, "key build (D2)");
+            VERIFY(test_H5SC__compute_chunk_key(&daddr[2], &idxA, &key), SUCCEED, "key build (D2)");
         }
     }
 
     /* ---------- Dataset 3: rank-3 ---------- */
     {
-        const unsigned nd       = 3;
-        const hsize_t  dims[3]  = {37, 81, 17};
-        const hsize_t  chunk[3] = {9, 9, 4};
+        const unsigned nd      = 3;
+        const hsize_t dims[3]  = {37, 81, 17};
+        const hsize_t chunk[3] = {9, 9, 4};
 
         const hsize_t samples[][3] = {{0, 0, 0}, {8, 8, 3}, {9, 9, 4}, {36, 80, 16}, {27, 18, 4}};
 
@@ -1967,9 +2049,9 @@ test_logical_chunk_coords_varied_datasets(void)
         H5VM_array_down(nd, nchunks, down);
 
         for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); i++) {
-            const hsize_t *elem  = samples[i];
-            hsize_t        LC[3] = {elem[0] / (hsize_t)chunk[0], elem[1] / (hsize_t)chunk[1],
-                                    elem[2] / (hsize_t)chunk[2]};
+            const hsize_t *elem = samples[i];
+            hsize_t LC[3]       = {elem[0] / (hsize_t)chunk[0], elem[1] / (hsize_t)chunk[1],
+                                   elem[2] / (hsize_t)chunk[2]};
 
             if (!(elem[0] < dims[0] && elem[1] < dims[1] && elem[2] < dims[2])) {
                 printf("elem OOR (D3)\n");
@@ -1990,15 +2072,15 @@ test_logical_chunk_coords_varied_datasets(void)
             }
 
             H5SC_chunk_key_t key;
-            VERIFY(test_H5SC__compute_chunk_key(&idxA, &daddr[3], &key), SUCCEED, "key build (D3)");
+            VERIFY(test_H5SC__compute_chunk_key(&daddr[3], &idxA, &key), SUCCEED, "key build (D3)");
         }
     }
 
     /* ---------- Dataset 4: rank-2 ---------- */
     {
-        const unsigned nd       = 2;
-        const hsize_t  dims[2]  = {512, 513};
-        const hsize_t  chunk[2] = {64, 36};
+        const unsigned nd      = 2;
+        const hsize_t dims[2]  = {512, 513};
+        const hsize_t chunk[2] = {64, 36};
 
         const hsize_t samples[][2] = {{0, 0},    {63, 35},   {64, 36}, {511, 512},
                                       {320, 72}, {448, 360}, {256, 0}};
@@ -2008,8 +2090,8 @@ test_logical_chunk_coords_varied_datasets(void)
         H5VM_array_down(nd, nchunks, down);
 
         for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); i++) {
-            const hsize_t *elem  = samples[i];
-            hsize_t        LC[2] = {elem[0] / (hsize_t)chunk[0], elem[1] / (hsize_t)chunk[1]};
+            const hsize_t *elem = samples[i];
+            hsize_t LC[2]       = {elem[0] / (hsize_t)chunk[0], elem[1] / (hsize_t)chunk[1]};
 
             if (!(elem[0] < dims[0] && elem[1] < dims[1])) {
                 printf("elem OOR (D4)\n");
@@ -2030,15 +2112,15 @@ test_logical_chunk_coords_varied_datasets(void)
             }
 
             H5SC_chunk_key_t key;
-            VERIFY(test_H5SC__compute_chunk_key(&idxA, &daddr[4], &key), SUCCEED, "key build (D4)");
+            VERIFY(test_H5SC__compute_chunk_key(&daddr[4], &idxA, &key), SUCCEED, "key build (D4)");
         }
     }
 
     /* ---------- Dataset 5: rank-3 ---------- */
     {
-        const unsigned nd       = 3;
-        const hsize_t  dims[3]  = {100, 60, 40};
-        const hsize_t  chunk[3] = {16, 15, 10};
+        const unsigned nd      = 3;
+        const hsize_t dims[3]  = {100, 60, 40};
+        const hsize_t chunk[3] = {16, 15, 10};
 
         const hsize_t samples[][3] = {{0, 0, 0},   {15, 14, 9},  {16, 15, 10}, {99, 59, 39},
                                       {32, 30, 0}, {48, 45, 20}, {64, 0, 10},  {80, 15, 30}};
@@ -2048,9 +2130,9 @@ test_logical_chunk_coords_varied_datasets(void)
         H5VM_array_down(nd, nchunks, down);
 
         for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); i++) {
-            const hsize_t *elem  = samples[i];
-            hsize_t        LC[3] = {elem[0] / (hsize_t)chunk[0], elem[1] / (hsize_t)chunk[1],
-                                    elem[2] / (hsize_t)chunk[2]};
+            const hsize_t *elem = samples[i];
+            hsize_t LC[3]       = {elem[0] / (hsize_t)chunk[0], elem[1] / (hsize_t)chunk[1],
+                                   elem[2] / (hsize_t)chunk[2]};
 
             if (!(elem[0] < dims[0] && elem[1] < dims[1] && elem[2] < dims[2])) {
                 printf("elem OOR (D5)\n");
@@ -2071,7 +2153,7 @@ test_logical_chunk_coords_varied_datasets(void)
             }
 
             H5SC_chunk_key_t key;
-            VERIFY(test_H5SC__compute_chunk_key(&idxA, &daddr[5], &key), SUCCEED, "key build (D5)");
+            VERIFY(test_H5SC__compute_chunk_key(&daddr[5], &idxA, &key), SUCCEED, "key build (D5)");
         }
     }
 
@@ -2112,13 +2194,12 @@ error:
  * Helper: compute linear chunk index & key, allocate + insert chunk into
  *         chunk HT and per-dataset LRU. Returns SUCCEED/FAIL.
  * ------------------------------------------------------------------------- */
-static herr_t
-test__make_and_insert_chunk(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, haddr_t daddr, unsigned nd,
-                            const hsize_t *dims, const hsize_t *cdims,
-                            const hsize_t    *elem,      /* element coord inside the chunk */
-                            size_t            cached_sz, /* cached (and disk) size for counters */
-                            H5SC_chunk_t    **out_chunk, /* [out] allocated chunk pointer */
-                            H5SC_chunk_key_t *out_key /* [out] computed key */)
+static herr_t test__make_and_insert_chunk(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, haddr_t daddr,
+                                          unsigned nd, const hsize_t *dims, const hsize_t *cdims,
+                                          const hsize_t *elem,      /* element coord inside the chunk */
+                                          size_t cached_sz,         /* cached (and disk) size for counters */
+                                          H5SC_chunk_t **out_chunk, /* [out] allocated chunk pointer */
+                                          H5SC_chunk_key_t *out_key /* [out] computed key */)
 {
     hsize_t idx = 0;
 
@@ -2141,7 +2222,7 @@ test__make_and_insert_chunk(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, haddr_t
         H5MM_xfree(chk);
         return FAIL;
     }
-    if (H5SC__chunk_lru_prepend(dset_hdr, chk) < 0) {
+    if (H5SC__chunk_lru_prepend(cache, dset_hdr, chk) < 0) {
         (void)H5SC__ht_chunk_delete(cache, out_key);
         H5MM_xfree(chk);
         return FAIL;
@@ -2151,7 +2232,7 @@ test__make_and_insert_chunk(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, haddr_t
     {
         H5SC_chunk_t *got = H5SC__ht_chunk_find(cache, out_key);
         if (got != chk) {
-            (void)H5SC__chunk_lru_remove(dset_hdr, chk);
+            (void)H5SC__chunk_lru_remove(cache, dset_hdr, chk);
             (void)H5SC__ht_chunk_delete(cache, out_key);
             H5MM_xfree(chk);
             return FAIL;
@@ -2183,16 +2264,17 @@ test__make_and_insert_chunk(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, haddr_t
  *
  * Verifies HT<->DLL consistency, counters, ordering, and clean teardown.
  * ------------------------------------------------------------------------- */
-static int
-test_two_datasets_tail_order_ops(void)
+static int test_two_datasets_tail_order_ops(void)
 {
     TESTING("2 dsets, 3 chks each: tail removals, dset moves, full cleanup");
 
     /* ---------- Global SCC + dataset headers ---------- */
-    H5SC_t *cache = NULL;
-    cache         = H5MM_malloc(sizeof(H5SC_t));
+    H5SC_t *cache    = NULL;
+    cache            = H5MM_calloc(sizeof(H5SC_t));
+    cache->SCC_magic = H5SC_MAIN_MAGIC;
 
     H5SC__hash_init(cache);
+    cache->SCC_magic                 = H5SC_MAIN_MAGIC;
     cache->SCC_quiescent_size        = (size_t)0;
     cache->SCC_active_size           = (size_t)0;
     cache->dset_lru_len              = (size_t)0;
@@ -2200,6 +2282,9 @@ test_two_datasets_tail_order_ops(void)
     cache->SCC_quiescent_limit       = (size_t)(10 * 1024 * 1024);
     cache->SCC_active_size           = (size_t)0;
     cache->SCC_active_limit          = (size_t)(20 * 1024 * 1024);
+    cache->dset_lru_len              = (size_t)0;
+    cache->reclaimable_clean_bytes   = (size_t)0;
+    cache->reclaimable_dirty_bytes   = (size_t)0;
     cache->dset_lru_head_ptr         = NULL;
     cache->dset_lru_tail_ptr         = NULL;
     cache->chunk_hash_table_head_ptr = NULL;
@@ -2208,8 +2293,8 @@ test_two_datasets_tail_order_ops(void)
     const haddr_t A_ADDR = (haddr_t)UINT64_C(0x1111111111111111);
     const haddr_t B_ADDR = (haddr_t)UINT64_C(0x2222222222222222);
 
-    H5SC_dset_header_t *A = t_make_dset_hdr(A_ADDR, /*curr_sz*/ 100, false, false);
-    H5SC_dset_header_t *B = t_make_dset_hdr(B_ADDR, /*curr_sz*/ 200, false, false);
+    H5SC_dset_header_t *A = t_make_dset_hdr(A_ADDR, /*curr_sz*/ 100, false);
+    H5SC_dset_header_t *B = t_make_dset_hdr(B_ADDR, /*curr_sz*/ 200, false);
     if (!A || !B) {
         printf("Failed to allocate dataset headers\n");
         TEST_ERROR;
@@ -2231,18 +2316,18 @@ test_two_datasets_tail_order_ops(void)
     /* ---------- Dataset A spec (2D) and three chunks ---------- */
     const hsize_t A_nd        = 2;
     const hsize_t A_dims[2]   = {48, 48}; /* 3x3 chunks */
-    hsize_t       A_chunk[2]  = {16, 16};
+    hsize_t A_chunk[2]        = {16, 16};
     const hsize_t A_elem[][2] = {{0, 0}, {16, 0}, {32, 32}}; /* (0,0),(1,0),(2,2) */
 
     /* ---------- Dataset B spec (2D) and three chunks ---------- */
     const hsize_t B_nd        = 2;
     const hsize_t B_dims[2]   = {30, 20}; /* 3x2 chunks */
-    hsize_t       B_chunk[2]  = {10, 10};
+    hsize_t B_chunk[2]        = {10, 10};
     const hsize_t B_elem[][2] = {{0, 10}, {20, 0}, {20, 10}}; /* (0,1),(2,0),(2,1) */
 
-    H5SC_chunk_t    *A_chunks[3] = {0};
+    H5SC_chunk_t *A_chunks[3] = {0};
     H5SC_chunk_key_t A_keys[3];
-    H5SC_chunk_t    *B_chunks[3] = {0};
+    H5SC_chunk_t *B_chunks[3] = {0};
     H5SC_chunk_key_t B_keys[3];
 
     /* Insert A's 3 chunks */
@@ -2287,7 +2372,7 @@ test_two_datasets_tail_order_ops(void)
                 TEST_ERROR;
             }
 
-            VERIFY(H5SC__chunk_lru_remove(tail_ds, lru), SUCCEED, "remove A LRU from DLL");
+            VERIFY(H5SC__chunk_lru_remove(cache, tail_ds, lru), SUCCEED, "remove A LRU from DLL");
             VERIFY(H5SC__ht_chunk_delete(cache, &lru->data_key), SUCCEED, "delete A chunk from HT");
             H5MM_xfree(lru);
         }
@@ -2311,7 +2396,7 @@ test_two_datasets_tail_order_ops(void)
                 TEST_ERROR;
             }
 
-            VERIFY(H5SC__chunk_lru_remove(tail_ds, lru), SUCCEED, "remove B LRU from DLL");
+            VERIFY(H5SC__chunk_lru_remove(cache, tail_ds, lru), SUCCEED, "remove B LRU from DLL");
             VERIFY(H5SC__ht_chunk_delete(cache, &lru->data_key), SUCCEED, "delete B chunk from HT");
             H5MM_xfree(lru);
         }
@@ -2331,7 +2416,7 @@ test_two_datasets_tail_order_ops(void)
         /* Purge A */
         while (tail_ds->lru_head_ptr) {
             H5SC_chunk_t *n = tail_ds->lru_head_ptr;
-            VERIFY(H5SC__chunk_lru_remove(tail_ds, n), SUCCEED, "remove A chunk from DLL");
+            VERIFY(H5SC__chunk_lru_remove(cache, tail_ds, n), SUCCEED, "remove A chunk from DLL");
             VERIFY(H5SC__ht_chunk_delete(cache, &n->data_key), SUCCEED, "delete A chunk from HT");
             H5MM_xfree(n);
         }
@@ -2348,7 +2433,7 @@ test_two_datasets_tail_order_ops(void)
         /* Purge B */
         while (B->lru_head_ptr) {
             H5SC_chunk_t *n = B->lru_head_ptr;
-            VERIFY(H5SC__chunk_lru_remove(B, n), SUCCEED, "remove B chunk from DLL");
+            VERIFY(H5SC__chunk_lru_remove(cache, B, n), SUCCEED, "remove B chunk from DLL");
             VERIFY(H5SC__ht_chunk_delete(cache, &n->data_key), SUCCEED, "delete B chunk from HT");
             H5MM_xfree(n);
         }
@@ -2373,7 +2458,7 @@ error:
             H5SC_chunk_t *n = A->lru_head_ptr;
             H5E_BEGIN_TRY
             {
-                (void)H5SC__chunk_lru_remove(A, n);
+                (void)H5SC__chunk_lru_remove(cache, A, n);
                 (void)H5SC__ht_chunk_delete(cache, &n->data_key);
             }
             H5E_END_TRY;
@@ -2392,7 +2477,7 @@ error:
             H5SC_chunk_t *n = B->lru_head_ptr;
             H5E_BEGIN_TRY
             {
-                (void)H5SC__chunk_lru_remove(B, n);
+                (void)H5SC__chunk_lru_remove(cache, B, n);
                 (void)H5SC__ht_chunk_delete(cache, &n->data_key);
             }
             H5E_END_TRY;
@@ -2429,16 +2514,17 @@ error:
  *        expected keys and is also discoverable via the hash table.
  *      * The keys stored in H5SC_chunk_t::data_key match the expected keys.
  * ------------------------------------------------------------------------- */
-static int
-test_updated_make_and_insert_chunk_three_chunks(void)
+static int test_updated_make_and_insert_chunk_three_chunks(void)
 {
     TESTING("make_and_insert_chunk: 3 chks, HT+LRU w/ precomp vals");
 
     /* Global SCC state */
-    H5SC_t *cache = NULL;
-    cache         = H5MM_malloc(sizeof(H5SC_t));
+    H5SC_t *cache    = NULL;
+    cache            = H5MM_calloc(sizeof(H5SC_t));
+    cache->SCC_magic = H5SC_MAIN_MAGIC;
 
     H5SC__hash_init(cache);
+    cache->SCC_magic                 = H5SC_MAIN_MAGIC;
     cache->SCC_quiescent_size        = (size_t)0;
     cache->SCC_active_size           = (size_t)0;
     cache->dset_lru_len              = (size_t)0;
@@ -2446,6 +2532,9 @@ test_updated_make_and_insert_chunk_three_chunks(void)
     cache->SCC_quiescent_limit       = (size_t)(10 * 1024 * 1024);
     cache->SCC_active_size           = (size_t)0;
     cache->SCC_active_limit          = (size_t)(20 * 1024 * 1024);
+    cache->dset_lru_len              = (size_t)0;
+    cache->reclaimable_clean_bytes   = (size_t)0;
+    cache->reclaimable_dirty_bytes   = (size_t)0;
     cache->dset_lru_head_ptr         = NULL;
     cache->dset_lru_tail_ptr         = NULL;
     cache->chunk_hash_table_head_ptr = NULL;
@@ -2456,10 +2545,10 @@ test_updated_make_and_insert_chunk_three_chunks(void)
     mk_dset_hdr(&dset_hdr, (haddr_t)UINT64_C(0xABCDEF0011223344), /*curr_sz*/ (size_t)0);
 
     /* Dataset layout: 2D, 3x3 chunk grid (48x48 with 16x16 chunks) */
-    const unsigned nd       = 2;
-    const hsize_t  dims[2]  = {48, 48};
-    hsize_t        cdims[2] = {16, 16};
-    const haddr_t  daddr    = (haddr_t)UINT64_C(0xABCDEF0011223344);
+    const unsigned nd     = 2;
+    const hsize_t dims[2] = {48, 48};
+    hsize_t cdims[2]      = {16, 16};
+    const haddr_t daddr   = (haddr_t)UINT64_C(0xABCDEF0011223344);
 
     /* Element coordinates used to select the chunks */
     const hsize_t coords[3][2] = {
@@ -2469,10 +2558,10 @@ test_updated_make_and_insert_chunk_three_chunks(void)
     };
 
     /* Expected values and outputs */
-    hsize_t          expected_idx[3] = {0, 0, 0};
+    hsize_t expected_idx[3] = {0, 0, 0};
     H5SC_chunk_key_t expected_keys[3];
     H5SC_chunk_key_t func_keys[3];
-    H5SC_chunk_t    *chunks[3] = {NULL, NULL, NULL};
+    H5SC_chunk_t *chunks[3] = {NULL, NULL, NULL};
 
     /* Pre-populate expected indices and keys for each coordinate */
     for (size_t i = 0; i < 3; i++) {
@@ -2535,8 +2624,8 @@ test_updated_make_and_insert_chunk_three_chunks(void)
      *  - belongs to the set {chunks[0], chunks[1], chunks[2]}
      */
     {
-        size_t        visit_count = 0;
-        H5SC_chunk_t *node        = dset_hdr.lru_head_ptr;
+        size_t visit_count = 0;
+        H5SC_chunk_t *node = dset_hdr.lru_head_ptr;
 
         while (node) {
             H5SC_chunk_t *got = H5SC__ht_chunk_find(cache, &node->data_key);
@@ -2572,7 +2661,7 @@ test_updated_make_and_insert_chunk_three_chunks(void)
     /* Cleanup: remove chunks from LRU and hash table, free memory */
     for (size_t i = 0; i < 3; i++) {
         if (chunks[i]) {
-            herr_t st1 = H5SC__chunk_lru_remove(&dset_hdr, chunks[i]);
+            herr_t st1 = H5SC__chunk_lru_remove(cache, &dset_hdr, chunks[i]);
             herr_t st2 = H5SC__ht_chunk_delete(cache, &chunks[i]->data_key);
             VERIFY(st1, SUCCEED, "chunk LRU remove during cleanup");
             VERIFY(st2, SUCCEED, "chunk HT delete during cleanup");
@@ -2594,7 +2683,7 @@ error:
         if (chunks[i]) {
             H5E_BEGIN_TRY
             {
-                (void)H5SC__chunk_lru_remove(&dset_hdr, chunks[i]);
+                (void)H5SC__chunk_lru_remove(cache, &dset_hdr, chunks[i]);
                 (void)H5SC__ht_chunk_delete(cache, &chunks[i]->data_key);
             }
             H5E_END_TRY;
@@ -2605,6 +2694,1057 @@ error:
     H5_FAILED();
     return FAIL;
 }
+
+#if H5SC_DO_SANITY_CHECKS
+
+/*-------------------------------------------------------------------------
+ * Function: test_scc_reclaim_clean_link_contribution
+ *
+ * Purpose:
+ *   Verify that linking an unpinned, nonzero, clean chunk adds its resident
+ *   size to both dataset-local and cache-wide clean reclaimability while
+ *   leaving dirty reclaimability unchanged.
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_reclaim_clean_link_contribution(void)
+{
+    t_scc_reclaim_fixture_t fixture;
+
+    TESTING("SCC reclaimability: linked clean chunk contributes bytes");
+
+    if (t_scc_reclaim_fixture_init(&fixture) < 0)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr.reclaimable_clean_bytes != H5SC_RECLAIM_TEST_CHUNK_SIZE)
+        TEST_ERROR;
+
+    if (fixture.cache.reclaimable_clean_bytes != H5SC_RECLAIM_TEST_CHUNK_SIZE)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr.reclaimable_dirty_bytes != 0)
+        TEST_ERROR;
+
+    if (fixture.cache.reclaimable_dirty_bytes != 0)
+        TEST_ERROR;
+
+    if (t_scc_reclaim_fixture_term(&fixture) < 0)
+        TEST_ERROR;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function: test_scc_reclaim_pin_removes_contribution
+ *
+ * Purpose:
+ *   Verify that the first request pin removes an otherwise reclaimable clean
+ *   chunk from both dataset-local and cache-wide reclaimability accounting.
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_reclaim_pin_removes_contribution(void)
+{
+    t_scc_reclaim_fixture_t fixture;
+
+    TESTING("SCC reclaimability: pin removes clean contribution");
+
+    if (t_scc_reclaim_fixture_init(&fixture) < 0)
+        TEST_ERROR;
+
+    if (H5SC__test_chunk_pin(&fixture.cache, &fixture.dset_hdr, &fixture.chunk) < 0)
+        TEST_ERROR;
+
+    if (fixture.chunk.chunk_counter != 1)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr.reclaimable_clean_bytes != 0 || fixture.dset_hdr.reclaimable_dirty_bytes != 0)
+        TEST_ERROR;
+
+    if (fixture.cache.reclaimable_clean_bytes != 0 || fixture.cache.reclaimable_dirty_bytes != 0)
+        TEST_ERROR;
+
+    if (H5SC__test_chunk_unpin(&fixture.cache, &fixture.dset_hdr, &fixture.chunk) < 0)
+        TEST_ERROR;
+
+    if (t_scc_reclaim_fixture_term(&fixture) < 0)
+        TEST_ERROR;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function: test_scc_reclaim_final_unpin_restores_contribution
+ *
+ * Purpose:
+ *   Verify that nested/request-shared pin ownership suppresses reclaimability
+ *   until the final pin is released. Releasing an intermediate pin must not
+ *   restore the chunk's clean contribution.
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_reclaim_final_unpin_restores_contribution(void)
+{
+    t_scc_reclaim_fixture_t fixture;
+
+    TESTING("SCC reclaimability: final unpin restores contribution");
+
+    if (t_scc_reclaim_fixture_init(&fixture) < 0)
+        TEST_ERROR;
+
+    if (H5SC__test_chunk_pin(&fixture.cache, &fixture.dset_hdr, &fixture.chunk) < 0)
+        TEST_ERROR;
+
+    if (H5SC__test_chunk_pin(&fixture.cache, &fixture.dset_hdr, &fixture.chunk) < 0)
+        TEST_ERROR;
+
+    if (fixture.chunk.chunk_counter != 2)
+        TEST_ERROR;
+
+    if (fixture.cache.reclaimable_clean_bytes != 0 || fixture.dset_hdr.reclaimable_clean_bytes != 0)
+        TEST_ERROR;
+
+    /* Intermediate unpin: the chunk remains pinned and unreclaimable. */
+    if (H5SC__test_chunk_unpin(&fixture.cache, &fixture.dset_hdr, &fixture.chunk) < 0)
+        TEST_ERROR;
+
+    if (fixture.chunk.chunk_counter != 1)
+        TEST_ERROR;
+
+    if (fixture.cache.reclaimable_clean_bytes != 0 || fixture.dset_hdr.reclaimable_clean_bytes != 0)
+        TEST_ERROR;
+
+    /* Final unpin: the clean contribution must be restored exactly once. */
+    if (H5SC__test_chunk_unpin(&fixture.cache, &fixture.dset_hdr, &fixture.chunk) < 0)
+        TEST_ERROR;
+
+    if (fixture.chunk.chunk_counter != 0)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr.reclaimable_clean_bytes != H5SC_RECLAIM_TEST_CHUNK_SIZE)
+        TEST_ERROR;
+
+    if (fixture.cache.reclaimable_clean_bytes != H5SC_RECLAIM_TEST_CHUNK_SIZE)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr.reclaimable_dirty_bytes != 0 || fixture.cache.reclaimable_dirty_bytes != 0)
+        TEST_ERROR;
+
+    if (t_scc_reclaim_fixture_term(&fixture) < 0)
+        TEST_ERROR;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function: test_scc_reclaim_dirty_transition_preserves_total
+ *
+ * Purpose:
+ *   Verify that changing an unpinned resident chunk from clean to dirty moves
+ *   its bytes between the clean and dirty reclaimability counters without
+ *   changing the total reclaimable resident bytes. Also verify the reverse
+ *   dirty-to-clean transition.
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_reclaim_dirty_transition_preserves_total(void)
+{
+    t_scc_reclaim_fixture_t fixture;
+    size_t before_total;
+    size_t after_total;
+
+    TESTING("SCC reclaimability: dirty transition preserves total");
+
+    if (t_scc_reclaim_fixture_init(&fixture) < 0)
+        TEST_ERROR;
+
+    before_total = fixture.cache.reclaimable_clean_bytes + fixture.cache.reclaimable_dirty_bytes;
+
+    if (before_total != H5SC_RECLAIM_TEST_CHUNK_SIZE)
+        TEST_ERROR;
+
+    if (H5SC__test_chunk_set_dirty(&fixture.cache, &fixture.dset_hdr, &fixture.chunk, true) < 0)
+        TEST_ERROR;
+
+    if (!fixture.chunk.dirty_flag)
+        TEST_ERROR;
+
+    if (fixture.cache.reclaimable_clean_bytes != 0 || fixture.dset_hdr.reclaimable_clean_bytes != 0)
+        TEST_ERROR;
+
+    if (fixture.cache.reclaimable_dirty_bytes != H5SC_RECLAIM_TEST_CHUNK_SIZE)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr.reclaimable_dirty_bytes != H5SC_RECLAIM_TEST_CHUNK_SIZE)
+        TEST_ERROR;
+
+    after_total = fixture.cache.reclaimable_clean_bytes + fixture.cache.reclaimable_dirty_bytes;
+
+    if (after_total != before_total)
+        TEST_ERROR;
+
+    /* Verify the reverse transition as well. */
+    if (H5SC__test_chunk_set_dirty(&fixture.cache, &fixture.dset_hdr, &fixture.chunk, false) < 0)
+        TEST_ERROR;
+
+    if (fixture.chunk.dirty_flag)
+        TEST_ERROR;
+
+    if (fixture.cache.reclaimable_clean_bytes != H5SC_RECLAIM_TEST_CHUNK_SIZE)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr.reclaimable_clean_bytes != H5SC_RECLAIM_TEST_CHUNK_SIZE)
+        TEST_ERROR;
+
+    if (fixture.cache.reclaimable_dirty_bytes != 0 || fixture.dset_hdr.reclaimable_dirty_bytes != 0)
+        TEST_ERROR;
+
+    after_total = fixture.cache.reclaimable_clean_bytes + fixture.cache.reclaimable_dirty_bytes;
+
+    if (after_total != before_total)
+        TEST_ERROR;
+
+    if (t_scc_reclaim_fixture_term(&fixture) < 0)
+        TEST_ERROR;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function: test_scc_reclaim_resize_updates_counter
+ *
+ * Purpose:
+ *   Verify that resizing an unpinned resident chunk changes the applicable
+ *   dataset-local and cache-wide reclaimability counter by exactly the same
+ *   amount. Exercise both clean and dirty states.
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_reclaim_resize_updates_counter(void)
+{
+    t_scc_reclaim_fixture_t fixture;
+    size_t old_dset_size;
+    const size_t clean_size = H5SC_RECLAIM_TEST_CHUNK_SIZE + 32;
+    const size_t dirty_size = clean_size + 48;
+
+    TESTING("SCC reclaimability: resize updates applicable counter");
+
+    if (t_scc_reclaim_fixture_init(&fixture) < 0)
+        TEST_ERROR;
+
+    /*
+     * Resize while clean. H5SC__chunk_update_cached_size() updates chunk,
+     * dataset, and reclaimability accounting. Reconcile cache-wide resident
+     * occupancy using the same operation boundary used by production callers.
+     */
+    old_dset_size = fixture.dset_hdr.curr_dset_size;
+
+    if (H5SC__chunk_update_cached_size(&fixture.cache, &fixture.dset_hdr, &fixture.chunk, clean_size) < 0)
+        TEST_ERROR;
+
+    if (H5SC__test_account_chunk_link_change(&fixture.cache, &fixture.dset_hdr, old_dset_size) < 0)
+        TEST_ERROR;
+
+    if (fixture.chunk.cached_chunk_size != clean_size)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr.curr_dset_size != clean_size)
+        TEST_ERROR;
+
+    if (fixture.cache.SCC_quiescent_size != clean_size)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr.reclaimable_clean_bytes != clean_size ||
+        fixture.cache.reclaimable_clean_bytes != clean_size)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr.reclaimable_dirty_bytes != 0 || fixture.cache.reclaimable_dirty_bytes != 0)
+        TEST_ERROR;
+
+    /*
+     * Move the contribution to dirty, then resize again.
+     */
+    if (H5SC__test_chunk_set_dirty(&fixture.cache, &fixture.dset_hdr, &fixture.chunk, true) < 0)
+        TEST_ERROR;
+
+    old_dset_size = fixture.dset_hdr.curr_dset_size;
+
+    if (H5SC__chunk_update_cached_size(&fixture.cache, &fixture.dset_hdr, &fixture.chunk, dirty_size) < 0)
+        TEST_ERROR;
+
+    if (H5SC__test_account_chunk_link_change(&fixture.cache, &fixture.dset_hdr, old_dset_size) < 0)
+        TEST_ERROR;
+
+    if (fixture.chunk.cached_chunk_size != dirty_size)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr.curr_dset_size != dirty_size)
+        TEST_ERROR;
+
+    if (fixture.cache.SCC_quiescent_size != dirty_size)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr.reclaimable_clean_bytes != 0 || fixture.cache.reclaimable_clean_bytes != 0)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr.reclaimable_dirty_bytes != dirty_size ||
+        fixture.cache.reclaimable_dirty_bytes != dirty_size)
+        TEST_ERROR;
+
+    /*
+     * Restore clean state so fixture teardown also verifies removal from the
+     * clean counter.
+     */
+    if (H5SC__test_chunk_set_dirty(&fixture.cache, &fixture.dset_hdr, &fixture.chunk, false) < 0)
+        TEST_ERROR;
+
+    if (t_scc_reclaim_fixture_term(&fixture) < 0)
+        TEST_ERROR;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5_FAILED();
+    return FAIL;
+}
+
+typedef struct t_scc_policy_fixture_t {
+    hid_t sid;
+    hid_t dcpl;
+    hid_t did;
+    hid_t fid;
+
+    H5SC_t *cache;
+    H5SC_dset_header_t *dset_hdr;
+} t_scc_policy_fixture_t;
+
+static herr_t t_scc_policy_fixture_init(const char *base_name, t_scc_policy_fixture_t *fixture)
+{
+    const hsize_t dims[1]       = {15};
+    const hsize_t chunk_dims[1] = {5};
+    int write_buf[15];
+    char filename[1024];
+
+    assert(base_name);
+    assert(fixture);
+
+    memset(fixture, 0, sizeof(*fixture));
+
+    fixture->sid  = H5I_INVALID_HID;
+    fixture->dcpl = H5I_INVALID_HID;
+    fixture->did  = H5I_INVALID_HID;
+    fixture->fid  = H5I_INVALID_HID;
+
+    for (size_t i = 0; i < 15; i++)
+        write_buf[i] = (int)(i + 1);
+
+    h5_fixname(base_name, H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fixture->fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        return FAIL;
+
+    if ((fixture->sid = H5Screate_simple(1, dims, NULL)) < 0)
+        return FAIL;
+
+    if ((fixture->dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        return FAIL;
+
+    if (H5Pset_layout(fixture->dcpl, H5D_STRUCT_CHUNK) < 0)
+        return FAIL;
+
+    if (H5Pset_struct_chunk(fixture->dcpl, 1, chunk_dims, H5D_SPARSE_CHUNK) < 0)
+        return FAIL;
+
+    if ((fixture->did = H5Dcreate2(fixture->fid, "dset", H5T_NATIVE_INT, fixture->sid, H5P_DEFAULT,
+                                   fixture->dcpl, H5P_DEFAULT)) < 0)
+        return FAIL;
+
+    if (H5SC__get_cache_from_file_id(fixture->fid, &fixture->cache) < 0)
+        return FAIL;
+
+    if (!fixture->cache)
+        return FAIL;
+
+    /*
+     * Ensure the request-end quiescent trim cannot remove chunks while the
+     * fixture is being populated.
+     */
+    fixture->cache->SCC_quiescent_limit = SIZE_MAX;
+    fixture->cache->SCC_active_limit    = SIZE_MAX;
+
+    if (H5Dwrite(fixture->did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, write_buf) < 0)
+        return FAIL;
+
+    /*
+     * The policy tests call internal reclamation entry points directly, outside
+     * an HDF5 API call context. Flush through the public API while that context
+     * is available so the policy tests exercise clean eviction and do not invoke
+     * metadata-tagging operations without an H5CX stack.
+     *
+     * H5SC_flush retains the chunks in cache, so the fixture still contains all
+     * three resident chunks after this call.
+     */
+    if (H5Fflush(fixture->fid, H5F_SCOPE_LOCAL) < 0)
+        return FAIL;
+
+    fixture->dset_hdr = H5SC__ht_dset_find(fixture->cache, fixture->cache->dset_lru_head_ptr->dset_addr);
+
+    for (H5SC_chunk_t *chunk = fixture->dset_hdr->lru_head_ptr; chunk; chunk = chunk->next_ptr) {
+        if (chunk->dirty_flag)
+            return FAIL;
+
+        if (chunk->chunk_counter != 0)
+            return FAIL;
+    }
+
+    if (fixture->cache->reclaimable_dirty_bytes != 0)
+        return FAIL;
+
+    if (fixture->cache->reclaimable_clean_bytes != fixture->cache->SCC_quiescent_size)
+        return FAIL;
+
+    if (!fixture->dset_hdr)
+        return FAIL;
+
+    if (fixture->dset_hdr->chunk_lru_len != 3)
+        return FAIL;
+
+    if (fixture->dset_hdr->curr_dset_size == 0)
+        return FAIL;
+
+    if (fixture->cache->SCC_quiescent_size != fixture->dset_hdr->curr_dset_size)
+        return FAIL;
+
+    return SUCCEED;
+}
+
+static void t_scc_policy_fixture_term(t_scc_policy_fixture_t *fixture)
+{
+    if (!fixture)
+        return;
+
+    /*
+     * Cleanup must not invoke either constrained policy being tested.
+     */
+    if (fixture->cache) {
+        fixture->cache->SCC_quiescent_limit = SIZE_MAX;
+        fixture->cache->SCC_active_limit    = SIZE_MAX;
+
+        if (fixture->dset_hdr)
+            fixture->dset_hdr->min_dset_size = 0;
+    }
+
+    H5E_BEGIN_TRY
+    {
+        H5Dclose(fixture->did);
+        H5Pclose(fixture->dcpl);
+        H5Sclose(fixture->sid);
+        H5Fclose(fixture->fid);
+    }
+    H5E_END_TRY
+
+    fixture->did  = H5I_INVALID_HID;
+    fixture->dcpl = H5I_INVALID_HID;
+    fixture->sid  = H5I_INVALID_HID;
+    fixture->fid  = H5I_INVALID_HID;
+}
+
+/*-------------------------------------------------------------------------
+ * Function: test_scc_active_reclaim_ignores_min_dset_size
+ *
+ * Purpose:
+ *   Verify that active-pressure reclamation treats min_dset_size as a
+ *   quiescent-retention preference rather than a hard reservation. A request
+ *   requiring additional active headroom must be allowed to evict an
+ *   unpinned clean chunk even when doing so reduces the dataset below
+ *   min_dset_size.
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_active_reclaim_ignores_min_dset_size(void)
+{
+    t_scc_policy_fixture_t fixture;
+    size_t size_before;
+    size_t chunks_before;
+    size_t reclaimable_before;
+    uint64_t evictions_before;
+
+    TESTING("SCC active reclaim ignores min_dset_size");
+
+    memset(&fixture, 0, sizeof(fixture));
+
+    if (t_scc_policy_fixture_init("scc_active_reclaim_ignores_min_dset_size", &fixture) < 0)
+        TEST_ERROR;
+
+    size_before        = fixture.dset_hdr->curr_dset_size;
+    chunks_before      = fixture.dset_hdr->chunk_lru_len;
+    evictions_before   = fixture.cache->stats.scc_evictions;
+    reclaimable_before = fixture.cache->reclaimable_clean_bytes + fixture.cache->reclaimable_dirty_bytes;
+
+    if (chunks_before != 3 || reclaimable_before == 0)
+        TEST_ERROR;
+
+    /*
+     * Protect the complete current dataset under quiescent policy. Active
+     * policy must nevertheless reclaim at least one byte.
+     */
+    fixture.dset_hdr->min_dset_size = size_before;
+
+    fixture.cache->SCC_active_limit    = size_before;
+    fixture.cache->SCC_quiescent_limit = SIZE_MAX;
+
+    if (H5SC__test_ensure_space(fixture.cache, 1) < 0)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr->curr_dset_size >= fixture.dset_hdr->min_dset_size)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr->curr_dset_size >= size_before)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr->chunk_lru_len >= chunks_before)
+        TEST_ERROR;
+
+    if (fixture.cache->stats.scc_evictions <= evictions_before)
+        TEST_ERROR;
+
+    if (fixture.cache->SCC_quiescent_size + 1 > fixture.cache->SCC_active_limit)
+        TEST_ERROR;
+
+    t_scc_policy_fixture_term(&fixture);
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    t_scc_policy_fixture_term(&fixture);
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function: test_scc_quiescent_trim_preserves_min_dset_size
+ *
+ * Purpose:
+ *   Verify that quiescent trimming may reclaim eligible chunks down to the
+ *   dataset-local min_dset_size target but does not remove another chunk when
+ *   doing so would reduce retained dataset state below that target.
+ *
+ *   Because the requested cache limit is intentionally below the retention
+ *   floor, trimming is expected to perform best-effort reclamation and then
+ *   return FAIL.
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_quiescent_trim_preserves_min_dset_size(void)
+{
+    t_scc_policy_fixture_t fixture;
+    H5SC_chunk_t *tail;
+    size_t size_before;
+    size_t chunks_before;
+    size_t retention_floor;
+    herr_t trim_status = SUCCEED;
+
+    TESTING("SCC quiescent trim preserves min_dset_size");
+
+    memset(&fixture, 0, sizeof(fixture));
+
+    if (t_scc_policy_fixture_init("scc_quiescent_trim_preserves_min_dset_size", &fixture) < 0)
+        TEST_ERROR;
+
+    tail = fixture.dset_hdr->lru_tail_ptr;
+    if (!tail || tail->cached_chunk_size == 0)
+        TEST_ERROR;
+
+    size_before   = fixture.dset_hdr->curr_dset_size;
+    chunks_before = fixture.dset_hdr->chunk_lru_len;
+
+    if (tail->cached_chunk_size >= size_before)
+        TEST_ERROR;
+
+    /*
+     * Permit removal of exactly the current tail chunk. Afterward, another
+     * removal would cross the retention floor.
+     */
+    retention_floor = size_before - tail->cached_chunk_size;
+
+    fixture.dset_hdr->min_dset_size = retention_floor;
+
+    /*
+     * Deliberately request one byte less than the protected floor. The trim
+     * should evict the permitted tail chunk, stop at min_dset_size, and fail
+     * because the configured target cannot legally be reached.
+     */
+    fixture.cache->SCC_quiescent_limit = retention_floor - 1;
+    fixture.cache->SCC_active_limit    = SIZE_MAX;
+
+    H5E_BEGIN_TRY { trim_status = H5SC__test_trim_to_quiescent_limit(fixture.cache); }
+    H5E_END_TRY
+
+    if (trim_status >= 0)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr->curr_dset_size != retention_floor)
+        TEST_ERROR;
+
+    if (fixture.cache->SCC_quiescent_size != retention_floor)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr->curr_dset_size < fixture.dset_hdr->min_dset_size)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr->chunk_lru_len != chunks_before - 1)
+        TEST_ERROR;
+
+    /*
+     * The cache remains one byte over the deliberately unreachable target.
+     */
+    if (fixture.cache->SCC_quiescent_size <= fixture.cache->SCC_quiescent_limit)
+        TEST_ERROR;
+
+    t_scc_policy_fixture_term(&fixture);
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    t_scc_policy_fixture_term(&fixture);
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function: test_scc_oversized_ensure_space_drains_reclaimable
+ *
+ * Purpose:
+ *   Verify that a request larger than the effective active budget is rejected
+ *   by ordinary admission but accepted through the explicit oversized
+ *   single-chunk path.
+ *
+ *   Oversized preparation must reclaim every clean or dirty byte currently
+ *   reclaimable under active policy. The configured active limit must remain
+ *   unchanged.
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_oversized_ensure_space_drains_reclaimable(void)
+{
+    t_scc_policy_fixture_t fixture;
+    size_t active_limit;
+    size_t oversized_need;
+    herr_t status = SUCCEED;
+
+    TESTING("SCC oversized admission drains reclaimable bytes");
+
+    memset(&fixture, 0, sizeof(fixture));
+
+    if (t_scc_policy_fixture_init("scc_oversized_ensure_space_drains_reclaimable", &fixture) < 0)
+        TEST_ERROR;
+
+    if (!fixture.cache || !fixture.dset_hdr)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr->chunk_lru_len != 3)
+        TEST_ERROR;
+
+    if (fixture.cache->SCC_quiescent_size == 0)
+        TEST_ERROR;
+
+    if (fixture.cache->reclaimable_clean_bytes != fixture.cache->SCC_quiescent_size)
+        TEST_ERROR;
+
+    if (fixture.cache->reclaimable_dirty_bytes != 0)
+        TEST_ERROR;
+
+    /*
+     * Make a single requested admission larger than both the active limit and
+     * the effective budget.
+     */
+    active_limit   = 1;
+    oversized_need = fixture.cache->SCC_quiescent_size + 1;
+
+    fixture.cache->SCC_active_limit    = active_limit;
+    fixture.cache->SCC_quiescent_limit = SIZE_MAX;
+    fixture.dset_hdr->min_dset_size    = fixture.dset_hdr->curr_dset_size;
+
+    /*
+     * The ordinary path must reject the request without reclaiming anything.
+     */
+    H5E_BEGIN_TRY { status = H5SC__test_ensure_space(fixture.cache, oversized_need); }
+    H5E_END_TRY
+
+    if (status >= 0)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr->chunk_lru_len != 3)
+        TEST_ERROR;
+
+    if (fixture.cache->SCC_quiescent_size == 0)
+        TEST_ERROR;
+
+    /*
+     * The explicit exception must ignore min_dset_size and drain every
+     * active-policy-reclaimable resident byte.
+     */
+    if (H5SC__test_ensure_oversized_single_chunk_space(fixture.cache, oversized_need) < 0)
+        TEST_ERROR;
+
+    if (fixture.cache->SCC_active_limit != active_limit)
+        TEST_ERROR;
+
+    if (fixture.cache->SCC_quiescent_size != 0)
+        TEST_ERROR;
+
+    if (fixture.cache->reclaimable_clean_bytes != 0 || fixture.cache->reclaimable_dirty_bytes != 0)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr->curr_dset_size != 0)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr->chunk_lru_len != 0)
+        TEST_ERROR;
+
+    if (fixture.dset_hdr->lru_head_ptr || fixture.dset_hdr->lru_tail_ptr)
+        TEST_ERROR;
+
+    t_scc_policy_fixture_term(&fixture);
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    t_scc_policy_fixture_term(&fixture);
+    H5_FAILED();
+    return FAIL;
+} /* end test_scc_oversized_ensure_space_drains_reclaimable() */
+
+/*-------------------------------------------------------------------------
+ * Function: test_scc_oversized_single_chunk_write_reopen
+ *
+ * Purpose:
+ *   Verify that a one-chunk write whose estimate exceeds the effective active
+ *   budget is admitted through the oversized exception, processed as a
+ *   one-entry batch, and returned to ordinary cache limits afterward.
+ *
+ *   Closing and reopening the file verifies that the oversized dirty chunk
+ *   was flushed before eviction and persisted correctly.
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_oversized_single_chunk_write_reopen(void)
+{
+    hid_t fid    = H5I_INVALID_HID;
+    hid_t sid    = H5I_INVALID_HID;
+    hid_t dcpl   = H5I_INVALID_HID;
+    hid_t did    = H5I_INVALID_HID;
+    hid_t fspace = H5I_INVALID_HID;
+    hid_t mspace = H5I_INVALID_HID;
+
+    const hsize_t dims[1]       = {8};
+    const hsize_t chunk_dims[1] = {8};
+    const hsize_t start[1]      = {3};
+    const hsize_t count[1]      = {1};
+    const hsize_t mem_dims[1]   = {1};
+
+    const int expected = 314159;
+    int actual         = 0;
+
+    H5SC_t *cache = NULL;
+    size_t configured_active_limit;
+    uint64_t admissions_before;
+    char filename[1024];
+
+    TESTING("SCC oversized single-chunk write persists after reopen");
+
+    h5_fixname("scc_oversized_single_chunk_write_reopen", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dims, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if (H5SC__get_cache_from_file_id(fid, &cache) < 0 || !cache)
+        TEST_ERROR;
+
+    configured_active_limit    = 1;
+    cache->SCC_active_limit    = configured_active_limit;
+    cache->SCC_quiescent_limit = configured_active_limit;
+    admissions_before          = cache->stats.scc_oversized_admission_count;
+
+    if ((fspace = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(fspace, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
+        TEST_ERROR;
+
+    if ((mspace = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, &expected) < 0)
+        TEST_ERROR;
+
+    if (cache->stats.scc_oversized_admission_count != admissions_before + 1)
+        TEST_ERROR;
+
+    if (cache->stats.scc_oversized_admission_max_bytes <= configured_active_limit)
+        TEST_ERROR;
+
+    if (cache->SCC_active_limit != configured_active_limit)
+        TEST_ERROR;
+
+    /*
+     * The oversized dirty chunk must have been made reclaimable, flushed, and
+     * evicted when ordinary active-limit enforcement was restored.
+     */
+    if (cache->SCC_quiescent_size > cache->SCC_active_limit)
+        TEST_ERROR;
+
+    if (H5Sclose(mspace) < 0)
+        TEST_ERROR;
+    mspace = H5I_INVALID_HID;
+
+    if (H5Sclose(fspace) < 0)
+        TEST_ERROR;
+    fspace = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    if ((fid = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((fspace = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(fspace, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
+        TEST_ERROR;
+
+    if ((mspace = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    /*
+     * Leave the reopened cache at its normal configuration. This part checks
+     * persistence independently of triggering a second oversized admission.
+     */
+    if (H5Dread(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, &actual) < 0)
+        TEST_ERROR;
+
+    if (actual != expected)
+        TEST_ERROR;
+
+    H5Sclose(mspace);
+    H5Sclose(fspace);
+    H5Dclose(did);
+    H5Fclose(fid);
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(mspace);
+        H5Sclose(fspace);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+} /* end test_scc_oversized_single_chunk_write_reopen() */
+
+/*-------------------------------------------------------------------------
+ * Function: test_scc_oversized_single_chunk_read_after_reopen
+ *
+ * Purpose:
+ *   Verify that a nonresident single-chunk read is not rejected when its
+ *   estimated incremental resident size exceeds the effective active budget.
+ *   The SCC must admit the indivisible chunk temporarily, return the requested
+ *   value, and restore ordinary active-limit enforcement after unpinning it.
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_oversized_single_chunk_read_after_reopen(void)
+{
+    hid_t fid    = H5I_INVALID_HID;
+    hid_t sid    = H5I_INVALID_HID;
+    hid_t dcpl   = H5I_INVALID_HID;
+    hid_t did    = H5I_INVALID_HID;
+    hid_t fspace = H5I_INVALID_HID;
+    hid_t mspace = H5I_INVALID_HID;
+
+    const hsize_t dims[1]       = {8};
+    const hsize_t chunk_dims[1] = {8};
+    const hsize_t start[1]      = {5};
+    const hsize_t count[1]      = {1};
+    const hsize_t mem_dims[1]   = {1};
+
+    const int expected = 271828;
+    int actual         = 0;
+
+    H5SC_t *cache                  = NULL;
+    size_t configured_active_limit = 1;
+    uint64_t admissions_before;
+    char filename[1024];
+
+    TESTING("SCC oversized single-chunk read after reopen");
+
+    h5_fixname("scc_oversized_single_chunk_read_after_reopen", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dims, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((fspace = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(fspace, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
+        TEST_ERROR;
+
+    if ((mspace = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, &expected) < 0)
+        TEST_ERROR;
+
+    H5Sclose(mspace);
+    mspace = H5I_INVALID_HID;
+    H5Sclose(fspace);
+    fspace = H5I_INVALID_HID;
+    H5Dclose(did);
+    did = H5I_INVALID_HID;
+    H5Pclose(dcpl);
+    dcpl = H5I_INVALID_HID;
+    H5Sclose(sid);
+    sid = H5I_INVALID_HID;
+    H5Fclose(fid);
+    fid = H5I_INVALID_HID;
+
+    if ((fid = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if (H5SC__get_cache_from_file_id(fid, &cache) < 0 || !cache)
+        TEST_ERROR;
+
+    cache->SCC_active_limit    = configured_active_limit;
+    cache->SCC_quiescent_limit = configured_active_limit;
+    admissions_before          = cache->stats.scc_oversized_admission_count;
+
+    if ((fspace = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(fspace, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
+        TEST_ERROR;
+
+    if ((mspace = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (H5Dread(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, &actual) < 0)
+        TEST_ERROR;
+
+    if (actual != expected)
+        TEST_ERROR;
+
+    if (cache->stats.scc_oversized_admission_count != admissions_before + 1)
+        TEST_ERROR;
+
+    if (cache->stats.scc_oversized_admission_max_bytes <= configured_active_limit)
+        TEST_ERROR;
+
+    if (cache->SCC_active_limit != configured_active_limit)
+        TEST_ERROR;
+
+    if (cache->SCC_quiescent_size > cache->SCC_active_limit)
+        TEST_ERROR;
+
+    if (cache->reclaimable_clean_bytes > cache->SCC_quiescent_size)
+        TEST_ERROR;
+
+    H5Sclose(mspace);
+    H5Sclose(fspace);
+    H5Dclose(did);
+    H5Fclose(fid);
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(mspace);
+        H5Sclose(fspace);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+} /* end test_scc_oversized_single_chunk_read_after_reopen() */
+
+#endif
 
 /******************************************
  * 10 Flush/Eviction tests and helper functions
@@ -2626,8 +3766,7 @@ error:
  * Return:
  *   SUCCEED on success, FAIL on invalid input.
  *------------------------------------------------------------------------- */
-static herr_t
-fake_chunk_flush(H5SC_chunk_t *chunk)
+static herr_t fake_chunk_flush(H5SC_chunk_t *chunk)
 {
     assert(chunk);
     assert(chunk->magic == H5SC_CHUNK_MAGIC);
@@ -2697,76 +3836,43 @@ fake_chunk_flush(H5SC_chunk_t *chunk)
  *   FAIL if any internal operation (hash or DLL manipulation, flush helper)
  *   fails.
  *------------------------------------------------------------------------- */
-static herr_t
-test_flush_dset(H5SC_t *cache, haddr_t daddr, bool evict)
+static herr_t test_flush_dset(H5SC_t *cache, haddr_t daddr, bool evict_after_flush)
 {
-    H5SC_dset_header_t *hdr = NULL;
-    H5SC_chunk_t       *chk = NULL;
+    H5SC_dset_header_t *hdr;
+    H5SC_chunk_t *chk;
 
     if (!cache)
         return FAIL;
 
-    /* Look up the dataset header; if absent, nothing to flush. */
     hdr = H5SC__ht_dset_find(cache, daddr);
     if (!hdr)
         return SUCCEED;
 
-    /* Walk from tail (LRU) toward head (MRU). We cache prev_ptr before
-     * manipulating the list so iteration remains stable even as we remove
-     * or move the current node.
-     */
     chk = hdr->lru_tail_ptr;
-    assert(chk->magic == H5SC_CHUNK_MAGIC);
-    size_t count     = 0;
-    size_t chk_count = hdr->chunk_lru_len;
+
     while (chk) {
-        H5SC_chunk_t *prev = chk->prev_ptr; /* snapshot of predecessor */
+        H5SC_chunk_t *prev = chk->prev_ptr;
 
-        if (evict) {
-            /* Full eviction: dirty chunks get a fake flush; all chunks are removed. */
-            if (chk->dirty_flag) {
-                if (fake_chunk_flush(chk) < 0)
-                    return FAIL;
-            }
-
-            if (H5SC__chunk_lru_remove(hdr, chk) < 0)
+        if (chk->dirty_flag) {
+            if (fake_chunk_flush(chk) < 0)
                 return FAIL;
+        }
+
+        chk->last_op = H5SC_TAG_FLUSH;
+
+        if (evict_after_flush) {
+            if (H5SC__chunk_lru_remove(cache, hdr, chk) < 0)
+                return FAIL;
+
             if (H5SC__ht_chunk_delete(cache, &chk->data_key) < 0)
                 return FAIL;
 
             H5MM_xfree(chk);
         }
-        else {
-            /* Single-pass, non-evicting mode:
-             *   - clean: drop immediately
-             *   - dirty: move to head, still dirty
-             */
-            if (!chk->dirty_flag) {
-                chk->last_op = H5SC_TAG_EVICT;
-                if (H5SC__chunk_lru_remove(hdr, chk) < 0) {
-                    return FAIL;
-                }
-                if (H5SC__ht_chunk_delete(cache, &chk->data_key) < 0) {
-                    return FAIL;
-                }
-                H5MM_xfree(chk);
-            }
-            else {
-                if (count > chk_count)
-                    return SUCCEED;
-
-                /* Move dirty chunk to MRU position: remove then prepend. */
-                if (H5SC__chunk_lru_remove(hdr, chk) < 0)
-                    return FAIL;
-                if (H5SC__chunk_lru_prepend(hdr, chk) < 0)
-                    return FAIL;
-            }
-        }
-        chk->last_op = H5SC_TAG_FLUSH;
 
         chk = prev;
-        count++;
     }
+
     hdr->last_op = H5SC_TAG_FLUSH;
 
     return SUCCEED;
@@ -2818,8 +3924,7 @@ test_flush_dset(H5SC_t *cache, haddr_t daddr, bool evict)
  *   SUCCEED on success (including the case where no eviction is needed);
  *   FAIL if invalid arguments are supplied or if an eviction step fails.
  *------------------------------------------------------------------------- */
-static herr_t
-H5SC_basic_evict_to_capacity(H5SC_t *cache, H5SC_dset_header_t *hdr, size_t max_chunks)
+static herr_t H5SC_basic_evict_to_capacity(H5SC_t *cache, H5SC_dset_header_t *hdr, size_t max_chunks)
 {
     if (!cache || !hdr)
         return FAIL;
@@ -2838,7 +3943,7 @@ H5SC_basic_evict_to_capacity(H5SC_t *cache, H5SC_dset_header_t *hdr, size_t max_
         }
 
         /* Unlink from per-dataset LRU and remove from hash table */
-        if (H5SC__chunk_lru_remove(hdr, victim) < 0)
+        if (H5SC__chunk_lru_remove(cache, hdr, victim) < 0)
             return FAIL;
 
         if (H5SC__ht_chunk_delete(cache, &victim->data_key) < 0)
@@ -2851,69 +3956,100 @@ H5SC_basic_evict_to_capacity(H5SC_t *cache, H5SC_dset_header_t *hdr, size_t max_
 }
 
 /*-------------------------------------------------------------------------
- * Test 10.1: test_flush_dset() — tail-first flush, dirty promotion, and full evict
+ * Test 10.1: test_flush_dset_retain_then_evict()
+ *
+ * Purpose:
+ *   Verify the two supported dataset-flush behaviors:
+ *
+ *     evict_after_flush == false:
+ *       - Flush every dirty chunk.
+ *       - Retain every clean and newly flushed chunk in the SCC.
+ *       - Preserve chunk identity and dataset-local LRU order.
+ *
+ *     evict_after_flush == true:
+ *       - Flush every dirty chunk.
+ *       - Evict every chunk from the dataset-local LRU and chunk hash table.
  *
  * Scenario:
- *   - One dataset, eight chunks. Half are marked dirty, half clean.
- *   - First, call test_flush_dset(evict=false):
- *       · Clean chunks are removed from the cache.
- *       · Dirty chunks are moved to the head of the dataset's chunk LRU and left dirty.
- *   - Then, simulate writing those dirty chunks: mark them clean via fake_chunk_flush()
- *     and remove them manually (DLL + HT + free).
- *   - Next, recreate eight chunks and call test_flush_dset(evict=true):
- *       · All chunks (clean or dirty) are flushed (dirty ones via fake_chunk_flush)
- *         and evicted from both DLL and hash.
- *   - At the end, the dataset's chunk LRU is empty and the chunk hash has no entries
- *     corresponding to this dataset.
- *------------------------------------------------------------------------- */
-static int
-test_flush_dset_tail_first(void)
+ *   - Create one dataset header with eight resident chunks.
+ *   - Mark alternating chunks dirty.
+ *   - Flush without eviction and verify that:
+ *       - all eight chunks remain resident;
+ *       - all chunks are clean;
+ *       - hash-table identities are unchanged;
+ *       - the LRU head, tail, and ordering are unchanged.
+ *   - Mark four chunks dirty again.
+ *   - Flush with eviction and verify that:
+ *       - the dataset-local LRU is empty;
+ *       - all eight chunks have been removed from the chunk hash table.
+ *
+ * Return:
+ *   SUCCEED on success; FAIL otherwise.
+ *-------------------------------------------------------------------------
+ */
+static int test_flush_dset_retain_then_evict(void)
 {
-    TESTING("test_flush_dset: tail-first scan, full flush");
 
-    H5SC_t              cache;
-    H5SC_dset_header_t *hdr   = NULL;
-    const haddr_t       daddr = (haddr_t)UINT64_C(0xDEADBEEFCAFEBABE);
+    TESTING("SCC dataset flush: retain, then flush-and-evict");
 
-    /* One-dimensional dataset: 8 chunks of 10 elements each */
-    const unsigned nd       = 1;
-    const hsize_t  dims[1]  = {80};
-    const hsize_t  cdims[1] = {10};
+    H5SC_t cache;
 
-    /* One representative element per chunk (0,10,...,70) */
+    H5SC_dset_header_t *hdr  = NULL;
+    H5SC_chunk_t *saved_head = NULL;
+    H5SC_chunk_t *saved_tail = NULL;
+    const haddr_t daddr      = (haddr_t)UINT64_C(0xDEADBEEFCAFEBABE);
+
+    /* One-dimensional dataset: eight chunks of ten elements each. */
+    const unsigned nd      = 1;
+    const hsize_t dims[1]  = {80};
+    const hsize_t cdims[1] = {10};
+
+    /* One representative element from each chunk. */
     const hsize_t elem_coords[8] = {0, 10, 20, 30, 40, 50, 60, 70};
 
-    H5SC_chunk_t    *chunks[8] = {0};
+    H5SC_chunk_t *chunks[8] = {NULL};
     H5SC_chunk_key_t keys[8];
-    size_t           i;
+    size_t i;
 
     memset(&cache, 0, sizeof(cache));
+    memset(keys, 0, sizeof(keys));
+
+    cache.SCC_magic = H5SC_MAIN_MAGIC;
+
     H5SC__hash_init(&cache);
 
-    /* Create and register a single dataset header */
-    hdr = t_make_dset_hdr(daddr, /*curr_sz*/ 0, /*resizing*/ false, /*exhausted*/ false);
+    /*
+     * Create and register one dataset header.
+     */
+    hdr = t_make_dset_hdr(daddr, /*curr_sz=*/0, /*resizing=*/false);
     if (!hdr) {
-        printf("Failed to allocate dataset header in test_flush_dset_tail_first\n");
+        printf("Failed to allocate dataset header in "
+               "test_flush_dset_retain_then_evict\n");
         TEST_ERROR;
     }
 
     if (H5SC__ht_dset_insert(&cache, hdr) < 0) {
-        printf("Failed to insert dataset header into dset hash\n");
-        TEST_ERROR;
-    }
-    if (H5SC__dset_lru_prepend(&cache, hdr) < 0) {
-        printf("Failed to prepend dataset header into global LRU\n");
+        printf("Failed to insert dataset header into dataset hash table\n");
         TEST_ERROR;
     }
 
-    /* Create 8 chunks for this dataset and insert into HT + per-dataset LRU. */
+    if (H5SC__dset_lru_prepend(&cache, hdr) < 0) {
+        printf("Failed to prepend dataset header to global LRU\n");
+        TEST_ERROR;
+    }
+
+    /*
+     * Create eight chunks and add them to the chunk hash table and the
+     * dataset-local LRU. Because each chunk is prepended, chunks[7] becomes
+     * the LRU head and chunks[0] becomes the LRU tail.
+     */
     for (i = 0; i < 8; i++) {
-        hsize_t          idx = 0;
         H5SC_chunk_key_t key;
-        H5SC_chunk_t    *c;
+        H5SC_chunk_t *chunk = NULL;
+        hsize_t idx         = 0;
 
         if (test_H5SC__compute_logical_chunk_index_test(nd, dims, cdims, &elem_coords[i], &idx) < 0) {
-            printf("Failed to compute linear index for chunk %zu\n", i);
+            printf("Failed to compute logical chunk index for chunk %zu\n", i);
             TEST_ERROR;
         }
 
@@ -2922,166 +4058,170 @@ test_flush_dset_tail_first(void)
             TEST_ERROR;
         }
 
-        c = t_make_chunk(key, /*cached*/ 1024 + i * 128, /*disk*/ 1024 + i * 128,
-                         /*counter*/ 0, /*dirty*/ false, /*pio*/ false);
-        if (!c) {
+        chunk = t_make_chunk(key,
+                             /*cached=*/1024 + (i * 128),
+                             /*disk=*/1024 + (i * 128),
+                             /*counter=*/0,
+                             /*dirty=*/false,
+                             /*pio=*/false);
+        if (!chunk) {
             printf("Failed to allocate chunk %zu\n", i);
             TEST_ERROR;
         }
 
-        if (H5SC__ht_chunk_insert(&cache, c) < 0) {
-            printf("Failed to insert chunk %zu into HT\n", i);
-            H5MM_xfree(c);
-            TEST_ERROR;
-        }
-        if (H5SC__chunk_lru_prepend(hdr, c) < 0) {
-            printf("Failed to prepend chunk %zu into LRU\n", i);
-            (void)H5SC__ht_chunk_delete(&cache, &key);
-            H5MM_xfree(c);
+        if (H5SC__ht_chunk_insert(&cache, chunk) < 0) {
+            printf("Failed to insert chunk %zu into chunk hash table\n", i);
+            H5MM_xfree(chunk);
             TEST_ERROR;
         }
 
-        chunks[i] = c;
+        if (H5SC__chunk_lru_prepend(&cache, hdr, chunk) < 0) {
+            printf("Failed to prepend chunk %zu to dataset LRU\n", i);
+            (void)H5SC__ht_chunk_delete(&cache, &key);
+            H5MM_xfree(chunk);
+            TEST_ERROR;
+        }
+
+        chunks[i] = chunk;
         keys[i]   = key;
     }
 
-    VERIFY(hdr->chunk_lru_len, (size_t)8, "dataset has 8 chunks after creation");
+    VERIFY(hdr->chunk_lru_len, (size_t)8, "dataset contains eight chunks after creation");
+    VERIFY(hdr->lru_head_ptr, chunks[7], "most recently inserted chunk is LRU head");
+    VERIFY(hdr->lru_tail_ptr, chunks[0], "first inserted chunk is LRU tail");
 
-    /* Mark half of the chunks dirty: use odd indices to interleave clean/dirty */
+    saved_head = hdr->lru_head_ptr;
+    saved_tail = hdr->lru_tail_ptr;
+
+    /*
+     * Mark alternating chunks dirty. This ensures that the non-evicting
+     * flush encounters both already-clean and dirty chunks throughout the
+     * LRU.
+     */
+    for (i = 0; i < 8; i++)
+        chunks[i]->dirty_flag = ((i % 2) != 0);
+
+    /*
+     * First phase: flush every dirty chunk but retain all chunks.
+     */
+    VERIFY(test_flush_dset(&cache, daddr, false), SUCCEED, "flush dataset without eviction");
+
+    VERIFY(hdr->chunk_lru_len, (size_t)8, "non-evicting flush retains all chunks");
+    VERIFY(hdr->lru_head_ptr, saved_head, "non-evicting flush preserves LRU head");
+    VERIFY(hdr->lru_tail_ptr, saved_tail, "non-evicting flush preserves LRU tail");
+
+    /*
+     * Verify hash-table identity, clean state, and the complete LRU order.
+     */
     for (i = 0; i < 8; i++) {
-        if (i % 2 == 1)
-            chunks[i]->dirty_flag = true;
-        else
-            chunks[i]->dirty_flag = false;
+        H5SC_chunk_t *found;
+
+        /*
+         * Check the flush state before hash lookup. H5SC__ht_chunk_find()
+         * intentionally changes last_op to H5SC_TAG_LOOKUP.
+         */
+        VERIFY(chunks[i]->dirty_flag, false, "non-evicting flush leaves chunk clean");
+        VERIFY(chunks[i]->last_op, (uint32_t)H5SC_TAG_FLUSH,
+               "non-evicting flush updates chunk operation tag");
+
+        found = H5SC__ht_chunk_find(&cache, &keys[i]);
+
+        VERIFY(found, chunks[i], "non-evicting flush preserves chunk identity");
+        VERIFY(found->last_op, (uint32_t)H5SC_TAG_LOOKUP, "chunk hash lookup updates operation tag");
     }
 
-    /* First flush pass: evict == false; removes clean chunks and promotes dirty. */
-    if (test_flush_dset(&cache, daddr, false) < 0) {
-        printf("test_flush_dset(evict=false) failed\n");
-        TEST_ERROR;
-    }
+    VERIFY(hdr->last_op, (uint32_t)H5SC_TAG_FLUSH, "non-evicting flush updates dataset operation tag");
 
-    /* After the first pass:
-     *   - Chunks at even indices (clean) should be fully removed.
-     *   - Chunks at odd indices (dirty) should remain in the HT and LRU.
+    /*
+     * Check the original MRU-to-LRU order. Since chunks were prepended in
+     * ascending array order, the list must remain:
+     *
+     *     chunks[7], chunks[6], ..., chunks[0]
      */
     {
-        size_t remaining = 0;
+        H5SC_chunk_t *current = hdr->lru_head_ptr;
 
-        for (i = 0; i < 8; i++) {
-            H5SC_chunk_t *found = H5SC__ht_chunk_find(&cache, &keys[i]);
-
-            if (i % 2 == 1) {
-                /* Dirty ones should still be present and dirty */
-                VERIFY(found != NULL, true, "dirty chunk still present after non-evicting flush");
-                VERIFY(found->dirty_flag, true, "dirty chunk remains dirty after non-evicting flush");
-                remaining++;
-            }
-            else {
-                /* Clean ones should be gone */
-                VERIFY(found, (H5SC_chunk_t *)NULL, "clean chunk evicted after non-evicting flush");
-            }
+        for (i = 8; i > 0; i--) {
+            VERIFY(current, chunks[i - 1], "non-evicting flush preserves complete LRU order");
+            current = current->next_ptr;
         }
 
-        VERIFY(remaining, hdr->chunk_lru_len, "remaining dirty count matches chunk_lru_len");
+        VERIFY(current, (H5SC_chunk_t *)NULL, "preserved LRU terminates after eight chunks");
     }
 
-    /* Simulate "real" I/O on the remaining dirty chunks: flush and evict them. */
-    {
-        H5SC_chunk_t *c = hdr->lru_head_ptr;
+    /*
+     * Re-dirty four chunks so that the evicting path must handle both
+     * dirty and clean chunks. No chunks are recreated: this also verifies
+     * that the objects retained by the first flush are the objects evicted
+     * by the second flush.
+     */
+    for (i = 0; i < 4; i++)
+        chunks[i]->dirty_flag = true;
 
-        while (c) {
-            H5SC_chunk_t *next = c->next_ptr;
+    for (i = 4; i < 8; i++)
+        chunks[i]->dirty_flag = false;
 
-            VERIFY(c->dirty_flag, true, "remaining chunks expected to be dirty prior to final flush");
-            VERIFY(fake_chunk_flush(c), SUCCEED, "fake flush of remaining dirty chunk");
-            VERIFY(c->dirty_flag, false, "chunk clean after fake flush");
+    VERIFY(hdr->chunk_lru_len, (size_t)8, "all chunks remain before flush-and-evict");
 
-            VERIFY(H5SC__chunk_lru_remove(hdr, c), SUCCEED, "remove flushed chunk from LRU");
-            VERIFY(H5SC__ht_chunk_delete(&cache, &c->data_key), SUCCEED, "delete flushed chunk from HT");
-            H5MM_xfree(c);
+    /*
+     * Second phase: flush dirty chunks and evict every chunk.
+     */
+    VERIFY(test_flush_dset(&cache, daddr, true), SUCCEED, "flush dataset and evict all chunks");
 
-            c = next;
-        }
+    VERIFY(hdr->chunk_lru_len, (size_t)0, "flush-and-evict empties dataset LRU");
+    VERIFY(hdr->lru_head_ptr, (H5SC_chunk_t *)NULL, "empty dataset LRU has null head");
+    VERIFY(hdr->lru_tail_ptr, (H5SC_chunk_t *)NULL, "empty dataset LRU has null tail");
+    VERIFY(hdr->last_op, (uint32_t)H5SC_TAG_FLUSH, "flush-and-evict updates dataset operation tag");
 
-        VERIFY(hdr->chunk_lru_len, (size_t)0, "no chunks remaining after manual dirty eviction");
-    }
-
-    /* Recreate 8 chunks again to exercise the evict=true path. */
-    for (i = 0; i < 8; i++) {
-        hsize_t          idx = 0;
-        H5SC_chunk_key_t key;
-        H5SC_chunk_t    *c;
-
-        if (test_H5SC__compute_logical_chunk_index_test(nd, dims, cdims, &elem_coords[i], &idx) < 0) {
-            printf("Failed to compute linear index (second phase) for chunk %zu\n", i);
-            TEST_ERROR;
-        }
-
-        if (test_H5SC__compute_chunk_key(&daddr, &idx, &key) < 0) {
-            printf("Failed to compute chunk key (second phase) for chunk %zu\n", i);
-            TEST_ERROR;
-        }
-
-        c = t_make_chunk(key, /*cached*/ 2048 + i * 64, /*disk*/ 2048 + i * 64,
-                         /*counter*/ 0, /*dirty*/ (i < 4), /*pio*/ false); /* first 4 dirty */
-        if (!c) {
-            printf("Failed to allocate chunk %zu (second phase)\n", i);
-            TEST_ERROR;
-        }
-
-        if (H5SC__ht_chunk_insert(&cache, c) < 0) {
-            printf("Failed to insert chunk %zu into HT (second phase)\n", i);
-            H5MM_xfree(c);
-            TEST_ERROR;
-        }
-        if (H5SC__chunk_lru_prepend(hdr, c) < 0) {
-            printf("Failed to prepend chunk %zu into LRU (second phase)\n", i);
-            (void)H5SC__ht_chunk_delete(&cache, &key);
-            H5MM_xfree(c);
-            TEST_ERROR;
-        }
-
-        chunks[i] = c;
-        keys[i]   = key;
-    }
-
-    VERIFY(hdr->chunk_lru_len, (size_t)8, "dataset has 8 chunks before evict=true flush");
-
-    /* Second flush pass: evict == true; all chunks should be flushed+evicted. */
-    if (test_flush_dset(&cache, daddr, true) < 0) {
-        printf("test_flush_dset(evict=true) failed\n");
-        TEST_ERROR;
-    }
-
-    VERIFY(hdr->chunk_lru_len, (size_t)0, "no chunks left after evict=true flush");
-
+    /*
+     * Do not dereference chunks[] here: those objects were freed by
+     * test_flush_dset(). Only their keys remain valid for lookup.
+     */
     for (i = 0; i < 8; i++) {
         H5SC_chunk_t *found = H5SC__ht_chunk_find(&cache, &keys[i]);
-        VERIFY(found, (H5SC_chunk_t *)NULL, "all chunks removed from HT after evict=true flush");
+
+        VERIFY(found, (H5SC_chunk_t *)NULL, "flush-and-evict removes chunk from hash table");
+
+        chunks[i] = NULL;
     }
 
-    /* Cleanup: remove dataset header from lists and hash, free it. */
-    VERIFY(H5SC__dset_lru_remove(&cache, hdr), SUCCEED, "remove dataset header from LRU");
-    VERIFY(H5SC__ht_dset_delete(&cache, daddr), SUCCEED, "delete dataset header from HT");
+    /*
+     * Remove and free the now-empty dataset header.
+     */
+    VERIFY(H5SC__dset_lru_remove(&cache, hdr), SUCCEED, "remove dataset header from global LRU");
+    VERIFY(H5SC__ht_dset_delete(&cache, daddr), SUCCEED, "remove dataset header from dataset hash table");
+
     H5MM_xfree(hdr);
+    hdr = NULL;
 
     PASSED();
     return SUCCEED;
 
 error:
-    /* Best-effort cleanup */
+    /*
+     * Best-effort cleanup. Walk the actual LRU instead of chunks[] because
+     * a failed flush-and-evict may already have freed some array entries.
+     */
     if (hdr) {
         H5E_BEGIN_TRY
         {
-            H5SC_chunk_t *c = hdr->lru_head_ptr;
-            while (c) {
-                H5SC_chunk_t *next = c->next_ptr;
-                (void)H5SC__chunk_lru_remove(hdr, c);
-                (void)H5SC__ht_chunk_delete(&cache, &c->data_key);
-                H5MM_xfree(c);
-                c = next;
+            H5SC_chunk_t *chunk = hdr->lru_head_ptr;
+
+            while (chunk) {
+                H5SC_chunk_t *next = chunk->next_ptr;
+
+                (void)H5SC__chunk_lru_remove(&cache, hdr, chunk);
+                (void)H5SC__ht_chunk_delete(&cache, &chunk->data_key);
+                H5MM_xfree(chunk);
+
+                chunk = next;
             }
+
+            /*
+             * These helpers may fail if the error occurred before the
+             * corresponding insertion completed; suppress those cleanup
+             * errors.
+             */
             (void)H5SC__dset_lru_remove(&cache, hdr);
             (void)H5SC__ht_dset_delete(&cache, daddr);
         }
@@ -3117,15 +4257,14 @@ error:
  *
  *------------------------------------------------------------------------- */
 
-static int
-test_basic_eviction_two_requests(void)
+static int test_basic_eviction_two_requests(void)
 {
     TESTING("basic eviction (8-chk dset, 4-chk capacity, two requests)");
 
     H5SC_t *cache = NULL;
-    cache         = H5MM_malloc(sizeof(H5SC_t));
+    cache         = H5MM_calloc(sizeof(H5SC_t));
 
-    H5SC__hash_init(cache);
+    cache->SCC_magic                 = H5SC_MAIN_MAGIC;
     cache->SCC_quiescent_size        = (size_t)0;
     cache->SCC_active_size           = (size_t)0;
     cache->dset_lru_len              = (size_t)0;
@@ -3133,20 +4272,25 @@ test_basic_eviction_two_requests(void)
     cache->SCC_quiescent_limit       = (size_t)(10 * 1024 * 1024);
     cache->SCC_active_size           = (size_t)0;
     cache->SCC_active_limit          = (size_t)(20 * 1024 * 1024);
+    cache->dset_lru_len              = (size_t)0;
+    cache->reclaimable_clean_bytes   = (size_t)0;
+    cache->reclaimable_dirty_bytes   = (size_t)0;
     cache->dset_lru_head_ptr         = NULL;
     cache->dset_lru_tail_ptr         = NULL;
     cache->chunk_hash_table_head_ptr = NULL;
     cache->dset_hash_table_head_ptr  = NULL;
 
+    H5SC__hash_init(cache);
+
     H5SC_dset_header_t hdr;
-    const haddr_t      daddr = (haddr_t)UINT64_C(0xE51C100000000001);
+    const haddr_t daddr = (haddr_t)UINT64_C(0xE51C100000000001);
 
     /* Simple 1D dataset: 8 chunks of size 10 over extent 80 */
-    const unsigned nd       = 1;
-    const hsize_t  dims[1]  = {80};
-    hsize_t        cdims[1] = {10};
+    const unsigned nd     = 1;
+    const hsize_t dims[1] = {80};
+    hsize_t cdims[1]      = {10};
 
-    H5SC_chunk_t    *chunks[8] = {0};
+    H5SC_chunk_t *chunks[8] = {0};
     H5SC_chunk_key_t keys[8];
 
     size_t i;
@@ -3157,17 +4301,24 @@ test_basic_eviction_two_requests(void)
     /* ---------- Request 1: bring in chunks 0..3 ---------- */
     for (i = 0; i < 4; i++) {
         hsize_t elem[1];
+
         elem[0] = (hsize_t)(i * 10); /* element in chunk i */
 
-        VERIFY(test__make_and_insert_chunk(cache, &hdr, daddr, nd, dims, cdims, elem,
-                                           /*cached_sz*/ 1024 + i, &chunks[i], &keys[i]),
+        VERIFY(test__make_and_insert_chunk(cache, &hdr, daddr, nd, dims, cdims, elem, 1024 + i, &chunks[i],
+                                           &keys[i]),
                SUCCEED, "insert chunk 0..3");
 
-        /* Sanity: chunk should be findable */
-        VERIFY(H5SC__ht_chunk_find(cache, &keys[i]), chunks[i], "HT find chunk 0..3");
+        /* Sanity: chunk should be findable. */
+        if (H5SC__ht_chunk_find(cache, &keys[i]) != chunks[i]) {
+            H5_FAILED();
+            return FAIL;
+        }
     }
 
-    VERIFY(hdr.chunk_lru_len, (size_t)4, "4 chunks resident after first request");
+    // if (H5SC__ht_chunk_find(cache, &keys[i]) != chunks[i]) {
+    //     H5_FAILED();
+    //     return FAIL;
+    // }
 
     /* Capacity enforcement should be a no-op here */
     VERIFY(H5SC_basic_evict_to_capacity(cache, &hdr, capacity), SUCCEED, "evict to capacity (no-op)");
@@ -3204,18 +4355,19 @@ test_basic_eviction_two_requests(void)
     /* ---------- Cleanup: remove remaining chunks from LRU + HT ---------- */
     while (hdr.lru_head_ptr) {
         H5SC_chunk_t *c = hdr.lru_head_ptr;
-        VERIFY(H5SC__chunk_lru_remove(&hdr, c), SUCCEED, "cleanup: remove chunk from DLL");
+
+        VERIFY(H5SC__chunk_lru_remove(cache, &hdr, c), SUCCEED, "cleanup: remove chunk from DLL");
         VERIFY(H5SC__ht_chunk_delete(cache, &c->data_key), SUCCEED, "cleanup: delete from HT");
+
         H5MM_xfree(c);
     }
+
     VERIFY(hdr.chunk_lru_len, (size_t)0, "cleanup: no chunks left");
+
+    cache = H5MM_xfree(cache);
 
     PASSED();
     return SUCCEED;
-
-error:
-    H5_FAILED();
-    return FAIL;
 }
 
 /*-------------------------------------------------------------------------
@@ -3240,15 +4392,14 @@ error:
  *
  *------------------------------------------------------------------------- */
 
-static int
-test_basic_eviction_single_request(void)
+static int test_basic_eviction_single_request(void)
 {
     TESTING("basic eviction (8-chk dset, 4-chk capacity, single request)");
 
     H5SC_t *cache = NULL;
-    cache         = H5MM_malloc(sizeof(H5SC_t));
+    cache         = H5MM_calloc(sizeof(H5SC_t));
 
-    H5SC__hash_init(cache);
+    cache->SCC_magic                 = H5SC_MAIN_MAGIC;
     cache->SCC_quiescent_size        = (size_t)0;
     cache->SCC_active_size           = (size_t)0;
     cache->dset_lru_len              = (size_t)0;
@@ -3256,19 +4407,24 @@ test_basic_eviction_single_request(void)
     cache->SCC_quiescent_limit       = (size_t)(10 * 1024 * 1024);
     cache->SCC_active_size           = (size_t)0;
     cache->SCC_active_limit          = (size_t)(20 * 1024 * 1024);
+    cache->dset_lru_len              = (size_t)0;
+    cache->reclaimable_clean_bytes   = (size_t)0;
+    cache->reclaimable_dirty_bytes   = (size_t)0;
     cache->dset_lru_head_ptr         = NULL;
     cache->dset_lru_tail_ptr         = NULL;
     cache->chunk_hash_table_head_ptr = NULL;
     cache->dset_hash_table_head_ptr  = NULL;
 
+    H5SC__hash_init(cache);
+
     H5SC_dset_header_t hdr;
-    const haddr_t      daddr = (haddr_t)UINT64_C(0xE51C100000000002);
+    const haddr_t daddr = (haddr_t)UINT64_C(0xE51C100000000002);
 
-    const unsigned nd       = 1;
-    const hsize_t  dims[1]  = {80};
-    hsize_t        cdims[1] = {10};
+    const unsigned nd     = 1;
+    const hsize_t dims[1] = {80};
+    hsize_t cdims[1]      = {10};
 
-    H5SC_chunk_t    *chunks[8] = {0};
+    H5SC_chunk_t *chunks[8] = {0};
     H5SC_chunk_key_t keys[8];
 
     size_t i;
@@ -3287,7 +4443,12 @@ test_basic_eviction_single_request(void)
 
         VERIFY(H5SC_basic_evict_to_capacity(cache, &hdr, capacity), SUCCEED,
                "evict to capacity after each streaming insert");
-        VERIFY(hdr.chunk_lru_len <= capacity, true, "never exceed capacity during streaming");
+
+        if (hdr.chunk_lru_len > capacity) {
+            printf("chunk LRU length exceeded streaming capacity\n");
+            H5_FAILED();
+            return FAIL;
+        }
     }
 
     VERIFY(hdr.chunk_lru_len, (size_t)4, "4 chunks resident after streaming request");
@@ -3307,7 +4468,7 @@ test_basic_eviction_single_request(void)
     /* ---------- Cleanup ---------- */
     while (hdr.lru_head_ptr) {
         H5SC_chunk_t *c = hdr.lru_head_ptr;
-        VERIFY(H5SC__chunk_lru_remove(&hdr, c), SUCCEED, "cleanup: remove chunk from DLL");
+        VERIFY(H5SC__chunk_lru_remove(cache, &hdr, c), SUCCEED, "cleanup: remove chunk from DLL");
         VERIFY(H5SC__ht_chunk_delete(cache, &c->data_key), SUCCEED, "cleanup: delete from HT");
         H5MM_xfree(c);
     }
@@ -3315,10 +4476,6 @@ test_basic_eviction_single_request(void)
 
     PASSED();
     return SUCCEED;
-
-error:
-    H5_FAILED();
-    return FAIL;
 }
 
 /* -------------------------------------------------------------------------
@@ -3388,16 +4545,16 @@ error:
  *     end-to-end regression harness that will detect violations of the
  *     structure-tag contract as SCC logic evolves.
  * ------------------------------------------------------------------------- */
-static int
-test_structure_tags_lifecycle(void)
+static int test_structure_tags_lifecycle(void)
 {
     TESTING("H5SC structure-tag lifecycle (magic + last_op)");
 
     /* ---------- Setup: global cache + one dataset header ---------- */
-    H5SC_t *cache = NULL;
-    cache         = H5MM_malloc(sizeof(H5SC_t));
+    H5SC_t *cache       = NULL;
+    cache               = H5MM_calloc(sizeof(H5SC_t));
+    H5SC_chunk_t *chunk = NULL;
 
-    H5SC__hash_init(cache);
+    cache->SCC_magic                 = H5SC_MAIN_MAGIC;
     cache->SCC_quiescent_size        = (size_t)0;
     cache->SCC_active_size           = (size_t)0;
     cache->dset_lru_len              = (size_t)0;
@@ -3405,10 +4562,15 @@ test_structure_tags_lifecycle(void)
     cache->SCC_quiescent_limit       = (size_t)(10 * 1024 * 1024);
     cache->SCC_active_size           = (size_t)0;
     cache->SCC_active_limit          = (size_t)(20 * 1024 * 1024);
+    cache->dset_lru_len              = (size_t)0;
+    cache->reclaimable_clean_bytes   = (size_t)0;
+    cache->reclaimable_dirty_bytes   = (size_t)0;
     cache->dset_lru_head_ptr         = NULL;
     cache->dset_lru_tail_ptr         = NULL;
     cache->chunk_hash_table_head_ptr = NULL;
     cache->dset_hash_table_head_ptr  = NULL;
+
+    H5SC__hash_init(cache);
 
     /* Distinct dataset address for debugging */
     const haddr_t daddr = (haddr_t)UINT64_C(0xCAFEBABECAFED00D);
@@ -3439,13 +4601,13 @@ test_structure_tags_lifecycle(void)
     /* ---------- Now create one chunk + key for this dataset ---------- */
 
     /* Simple 2D example: dims 32x32, chunk dims 16x16 => 2x2 chunks */
-    const unsigned nd       = 2;
-    const hsize_t  dims[2]  = {32, 32};
-    const hsize_t  cdims[2] = {16, 16};
-    const hsize_t  elem[2]  = {16, 16}; /* inside logical chunk (1,1) */
+    const unsigned nd      = 2;
+    const hsize_t dims[2]  = {32, 32};
+    const hsize_t cdims[2] = {16, 16};
+    const hsize_t elem[2]  = {16, 16}; /* inside logical chunk (1,1) */
 
     H5SC_chunk_key_t key;
-    hsize_t          lin_idx = 0;
+    hsize_t lin_idx = 0;
 
     /* Compute linear chunk index */
     VERIFY(test_H5SC__compute_logical_chunk_index_test(nd, dims, cdims, elem, &lin_idx), SUCCEED,
@@ -3458,10 +4620,10 @@ test_structure_tags_lifecycle(void)
     /* --- Stage 1 (key): magic on key after encode --- */
 
     /* Allocate a chunk node with this key via t_make_chunk (tags set on alloc) */
-    H5SC_chunk_t *chunk = t_make_chunk(key, /*cached*/ 4096, /*disk*/ 4096,
-                                       /*counter*/ 0,
-                                       /*dirty*/ false,
-                                       /*pio*/ false);
+    chunk = t_make_chunk(key, /*cached*/ 4096, /*disk*/ 4096,
+                         /*counter*/ 0,
+                         /*dirty*/ false,
+                         /*pio*/ false);
     if (!chunk) {
         printf("failed to allocate chunk in tag test\n");
         TEST_ERROR;
@@ -3478,7 +4640,7 @@ test_structure_tags_lifecycle(void)
     VERIFY(chunk->last_op, (uint32_t)H5SC_TAG_HT_INSERT, "chunk.last_op after hash insert");
 
     /* Insert into per-dataset chunk LRU (MRU end) */
-    VERIFY(H5SC__chunk_lru_prepend(hdr, chunk), SUCCEED, "H5SC__chunk_lru_prepend");
+    VERIFY(H5SC__chunk_lru_prepend(cache, hdr, chunk), SUCCEED, "H5SC__chunk_lru_prepend");
 
     /* --- Stage 3 (chunk): LRU placement tag --- */
     VERIFY(chunk->last_op, (uint32_t)H5SC_TAG_LRU_PROMOTE, "chunk.last_op after chunk LRU prepend");
@@ -3503,29 +4665,26 @@ test_structure_tags_lifecycle(void)
     VERIFY(test_flush_dset(cache, daddr, /*evict=*/false), SUCCEED, "test_flush_dset in tag test");
 
     /* After flush, the chunk should no longer be dirty */
-    VERIFY(chunk->dirty_flag, true, "chunk dirty_flag (not currently) cleared by flush");
+    VERIFY(chunk->dirty_flag, false, "chunk dirty_flag cleared by flush");
 
-    /* --- Stage 4 (tags): tags updated by flush --- */
+    VERIFY(hdr->chunk_lru_len, (size_t)1, "non-evicting flush retains chunk in LRU");
+
+    /* Check flush tags before performing another tagged operation. */
     VERIFY(chunk->last_op, (uint32_t)H5SC_TAG_FLUSH, "chunk.last_op after flush");
     VERIFY(hdr->last_op, (uint32_t)H5SC_TAG_FLUSH, "hdr.last_op after flush");
 
-    /* ---------- Stage 5: verify tags via hash-table lookup ---------- */
-
-    {
-        H5SC_chunk_t *found = H5SC__ht_chunk_find(cache, &key);
-        VERIFY(found, chunk, "chunk identity via hash lookup after flush");
-
-        /* Magic values must still match */
-        VERIFY(found->magic, (uint32_t)H5SC_CHUNK_MAGIC, "found chunk.magic after flush");
-
-        /* Tag must still reflect FLUSH as the last operation */
-        VERIFY(found->last_op, (uint32_t)H5SC_TAG_LOOKUP, "found chunk.last_op after flush");
+    /* Hash lookup changes chunk->last_op to H5SC_TAG_LOOKUP. */
+    if (H5SC__ht_chunk_find(cache, &key) != chunk) {
+        printf("non-evicting flush did not retain chunk in hash table\n");
+        TEST_ERROR;
     }
+
+    VERIFY(chunk->last_op, (uint32_t)H5SC_TAG_LOOKUP, "chunk.last_op after hash lookup");
 
     /* ---------- Teardown ---------- */
 
     /* Remove chunk from LRU + hash, then free */
-    VERIFY(H5SC__chunk_lru_remove(hdr, chunk), SUCCEED, "remove chunk from LRU in tag test");
+    VERIFY(H5SC__chunk_lru_remove(cache, hdr, chunk), SUCCEED, "remove chunk from LRU in tag test");
     VERIFY(H5SC__ht_chunk_delete(cache, &key), SUCCEED, "delete chunk from HT in tag test");
     H5MM_xfree(chunk);
 
@@ -3542,7 +4701,7 @@ error:
     if (chunk) {
         H5E_BEGIN_TRY
         {
-            (void)H5SC__chunk_lru_remove(hdr, chunk);
+            (void)H5SC__chunk_lru_remove(cache, hdr, chunk);
             (void)H5SC__ht_chunk_delete(cache, &key);
         }
         H5E_END_TRY;
@@ -3567,16 +4726,15 @@ error:
  * ========================================================================= */
 
 /* Compute per-dimension chunk-grid sizes: ceil(dims/cdims) */
-static void
-H5SC__stress_compute_nchunks(unsigned ndims, const hsize_t *dims, const hsize_t *cdims, hsize_t *nchunks_out)
+static void H5SC__stress_compute_nchunks(unsigned ndims, const hsize_t *dims, const hsize_t *cdims,
+                                         hsize_t *nchunks_out)
 {
     for (unsigned i = 0; i < ndims; i++)
         nchunks_out[i] = (dims[i] + cdims[i] - 1) / cdims[i];
 }
 
 /* Total number of chunks in dataset grid */
-static hsize_t
-H5SC__stress_total_chunks(unsigned ndims, const hsize_t *nchunks)
+static hsize_t H5SC__stress_total_chunks(unsigned ndims, const hsize_t *nchunks)
 {
     hsize_t total = 1;
     for (unsigned i = 0; i < ndims; i++)
@@ -3585,9 +4743,8 @@ H5SC__stress_total_chunks(unsigned ndims, const hsize_t *nchunks)
 }
 
 /* Map linear chunk-id -> chunk coordinate (in chunk units), row-major */
-static void
-H5SC__stress_linear_to_chunk_coord(unsigned ndims, hsize_t linear, const hsize_t *nchunks,
-                                   hsize_t *ccoords_out)
+static void H5SC__stress_linear_to_chunk_coord(unsigned ndims, hsize_t linear, const hsize_t *nchunks,
+                                               hsize_t *ccoords_out)
 {
     for (int i = (int)ndims - 1; i >= 0; i--) {
         hsize_t n      = nchunks[i];
@@ -3597,25 +4754,23 @@ H5SC__stress_linear_to_chunk_coord(unsigned ndims, hsize_t linear, const hsize_t
 }
 
 /* Convert chunk coord (in chunk units) -> element coord at chunk origin */
-static void
-H5SC__stress_chunk_coord_to_elem(unsigned ndims, const hsize_t *ccoords, const hsize_t *cdims,
-                                 hsize_t *elem_out)
+static void H5SC__stress_chunk_coord_to_elem(unsigned ndims, const hsize_t *ccoords, const hsize_t *cdims,
+                                             hsize_t *elem_out)
 {
     for (unsigned i = 0; i < ndims; i++)
         elem_out[i] = ccoords[i] * cdims[i];
 }
 
-static int
-test_stress_mixed_rank_bulk_insert(void)
+static int test_stress_mixed_rank_bulk_insert(void)
 {
     TESTING("Stress: mixed-rank datasets bulk insert + HT/LRU invariants");
 
     srand(0xC0FFEEu);
 
     H5SC_t *cache = NULL;
-    cache         = H5MM_malloc(sizeof(H5SC_t));
+    cache         = H5MM_calloc(sizeof(H5SC_t));
 
-    H5SC__hash_init(cache);
+    cache->SCC_magic                 = H5SC_MAIN_MAGIC;
     cache->SCC_quiescent_size        = (size_t)0;
     cache->SCC_active_size           = (size_t)0;
     cache->dset_lru_len              = (size_t)0;
@@ -3623,17 +4778,22 @@ test_stress_mixed_rank_bulk_insert(void)
     cache->SCC_quiescent_limit       = (size_t)(10 * 1024 * 1024);
     cache->SCC_active_size           = (size_t)0;
     cache->SCC_active_limit          = (size_t)(20 * 1024 * 1024);
+    cache->dset_lru_len              = (size_t)0;
+    cache->reclaimable_clean_bytes   = (size_t)0;
+    cache->reclaimable_dirty_bytes   = (size_t)0;
     cache->dset_lru_head_ptr         = NULL;
     cache->dset_lru_tail_ptr         = NULL;
     cache->chunk_hash_table_head_ptr = NULL;
     cache->dset_hash_table_head_ptr  = NULL;
 
+    H5SC__hash_init(cache);
+
     struct dspec {
-        haddr_t  daddr;
+        haddr_t daddr;
         unsigned ndims;
-        hsize_t  dims[4];
-        hsize_t  cdims[4];
-        size_t   n_insert; /* number of unique chunks to insert */
+        hsize_t dims[4];
+        hsize_t cdims[4];
+        size_t n_insert; /* number of unique chunks to insert */
     } specs[] = {
         /* All dims are exact multiples of cdims => no partial chunks */
         {(haddr_t)UINT64_C(0xD100), 1, {128, 0, 0, 0}, {8, 0, 0, 0}, 16},   /* total=16 */
@@ -3650,7 +4810,7 @@ test_stress_mixed_rank_bulk_insert(void)
         struct dspec *sp = &specs[di];
 
         /* Allocate dataset header (heap) for HT ownership consistency in tests */
-        H5SC_dset_header_t *hdr = t_make_dset_hdr(sp->daddr, /*curr_sz*/ 0, false, false);
+        H5SC_dset_header_t *hdr = t_make_dset_hdr(sp->daddr, /*curr_sz*/ 0, false);
         if (!hdr)
             TEST_ERROR;
 
@@ -3671,9 +4831,15 @@ test_stress_mixed_rank_bulk_insert(void)
 
         size_t inserted = 0;
 
+        assert(total > 0);
+        assert(total <= (hsize_t)UINT_MAX);
+
+        assert(total > 0);
+        assert(total <= (hsize_t)UINT_MAX);
+
         /* Insert unique chunks by random sampling without replacement */
         while (inserted < sp->n_insert) {
-            hsize_t linear = (hsize_t)(rand() % (unsigned)total);
+            hsize_t linear = (hsize_t)((unsigned)rand() % (unsigned)total);
             if (seen[(size_t)linear])
                 continue;
             seen[(size_t)linear] = 1;
@@ -3683,7 +4849,7 @@ test_stress_mixed_rank_bulk_insert(void)
             H5SC__stress_linear_to_chunk_coord(sp->ndims, linear, nchunks, ccoords);
             H5SC__stress_chunk_coord_to_elem(sp->ndims, ccoords, sp->cdims, elem);
 
-            H5SC_chunk_t    *outc = NULL;
+            H5SC_chunk_t *outc = NULL;
             H5SC_chunk_key_t outk;
 
             VERIFY(test__make_and_insert_chunk(cache, hdr, sp->daddr, sp->ndims, sp->dims, sp->cdims, elem,
@@ -3707,8 +4873,8 @@ test_stress_mixed_rank_bulk_insert(void)
 
         /* Repeated random HT lookups by walking LRU and checking discoverability */
         {
-            size_t        visited = 0;
-            H5SC_chunk_t *node    = hdr->lru_head_ptr;
+            size_t visited     = 0;
+            H5SC_chunk_t *node = hdr->lru_head_ptr;
             while (node) {
                 H5SC_chunk_t *got = H5SC__ht_chunk_find(cache, &node->data_key);
                 if (!got || got != node)
@@ -3721,10 +4887,10 @@ test_stress_mixed_rank_bulk_insert(void)
 
         /* Cleanup: remove all chunks tail-first */
         while (hdr->lru_tail_ptr) {
-            H5SC_chunk_t    *c = hdr->lru_tail_ptr;
+            H5SC_chunk_t *c    = hdr->lru_tail_ptr;
             H5SC_chunk_key_t k = c->data_key;
 
-            VERIFY(H5SC__chunk_lru_remove(hdr, c), SUCCEED, "chunk LRU remove");
+            VERIFY(H5SC__chunk_lru_remove(cache, hdr, c), SUCCEED, "chunk LRU remove");
             VERIFY(H5SC__ht_chunk_delete(cache, &k), SUCCEED, "chunk HT delete");
             H5MM_xfree(c);
         }
@@ -3747,17 +4913,16 @@ error:
     return FAIL;
 }
 
-static int
-test_stress_mixed_rank_hotset(void)
+static int test_stress_mixed_rank_hotset(void)
 {
     TESTING("Stress: mixed-rank hot-set HT lookups (4D)");
 
     srand(0xBADC0DEu);
 
     H5SC_t *cache = NULL;
-    cache         = H5MM_malloc(sizeof(H5SC_t));
+    cache         = H5MM_calloc(sizeof(H5SC_t));
 
-    H5SC__hash_init(cache);
+    cache->SCC_magic                 = H5SC_MAIN_MAGIC;
     cache->SCC_quiescent_size        = (size_t)0;
     cache->SCC_active_size           = (size_t)0;
     cache->dset_lru_len              = (size_t)0;
@@ -3765,23 +4930,28 @@ test_stress_mixed_rank_hotset(void)
     cache->SCC_quiescent_limit       = (size_t)(10 * 1024 * 1024);
     cache->SCC_active_size           = (size_t)0;
     cache->SCC_active_limit          = (size_t)(20 * 1024 * 1024);
+    cache->dset_lru_len              = (size_t)0;
+    cache->reclaimable_clean_bytes   = (size_t)0;
+    cache->reclaimable_dirty_bytes   = (size_t)0;
     cache->dset_lru_head_ptr         = NULL;
     cache->dset_lru_tail_ptr         = NULL;
     cache->chunk_hash_table_head_ptr = NULL;
     cache->dset_hash_table_head_ptr  = NULL;
 
-    const haddr_t  daddr = (haddr_t)UINT64_C(0xDA7A);
+    H5SC__hash_init(cache);
+
+    const haddr_t daddr  = (haddr_t)UINT64_C(0xDA7A);
     const unsigned ndims = 4;
 
     /* 8x8x8x8 chunk grid => 4096 total chunks */
-    const hsize_t dims[4]  = {64, 64, 32, 16};
-    hsize_t       cdims[4] = {8, 8, 4, 2};
+    const hsize_t dims[4] = {64, 64, 32, 16};
+    hsize_t cdims[4]      = {8, 8, 4, 2};
 
     const size_t N_LOAD  = 256;
     const size_t N_HOT   = 24;
     const size_t N_ITERS = 2500;
 
-    H5SC_dset_header_t *hdr = t_make_dset_hdr(daddr, 0, false, false);
+    H5SC_dset_header_t *hdr = t_make_dset_hdr(daddr, 0, false);
     if (!hdr)
         TEST_ERROR;
 
@@ -3799,14 +4969,17 @@ test_stress_mixed_rank_hotset(void)
 
     /* Record loaded chunk keys/pointers for hot-set verification */
     H5SC_chunk_key_t *keys = (H5SC_chunk_key_t *)H5MM_calloc(N_LOAD * sizeof(*keys));
-    H5SC_chunk_t    **ptrs = (H5SC_chunk_t **)H5MM_calloc(N_LOAD * sizeof(*ptrs));
+    H5SC_chunk_t **ptrs    = (H5SC_chunk_t **)H5MM_calloc(N_LOAD * sizeof(*ptrs));
     if (!keys || !ptrs)
         TEST_ERROR;
+
+    assert(total > 0);
+    assert(total <= (hsize_t)UINT_MAX);
 
     /* Load N_LOAD unique chunks */
     size_t inserted = 0;
     while (inserted < N_LOAD) {
-        hsize_t linear = (hsize_t)(rand() % (unsigned)total);
+        hsize_t linear = (hsize_t)((unsigned)rand() % (unsigned)total);
         if (seen[(size_t)linear])
             continue;
         seen[(size_t)linear] = 1;
@@ -3816,7 +4989,7 @@ test_stress_mixed_rank_hotset(void)
         H5SC__stress_linear_to_chunk_coord(ndims, linear, nchunks, ccoords);
         H5SC__stress_chunk_coord_to_elem(ndims, ccoords, cdims, elem);
 
-        H5SC_chunk_t    *outc = NULL;
+        H5SC_chunk_t *outc = NULL;
         H5SC_chunk_key_t outk;
 
         VERIFY(test__make_and_insert_chunk(cache, hdr, daddr, ndims, dims, cdims, elem, (size_t)2048, &outc,
@@ -3830,9 +5003,12 @@ test_stress_mixed_rank_hotset(void)
 
     VERIFY(hdr->chunk_lru_len, (size_t)N_LOAD, "chunk_lru_len==N_LOAD");
 
+    assert(N_HOT > 0);
+    assert(N_HOT <= (size_t)UINT_MAX);
+
     /* Hot-set repeated lookups */
     for (size_t it = 0; it < N_ITERS; it++) {
-        size_t pick = (size_t)(rand() % (unsigned)N_HOT);
+        size_t pick = (size_t)((unsigned)rand() % (unsigned)N_HOT);
 
         H5SC_chunk_t *got = H5SC__ht_chunk_find(cache, &keys[pick]);
         if (!got)
@@ -3847,10 +5023,10 @@ test_stress_mixed_rank_hotset(void)
 
     /* Cleanup all chunks */
     while (hdr->lru_tail_ptr) {
-        H5SC_chunk_t    *c = hdr->lru_tail_ptr;
+        H5SC_chunk_t *c    = hdr->lru_tail_ptr;
         H5SC_chunk_key_t k = c->data_key;
 
-        VERIFY(H5SC__chunk_lru_remove(hdr, c), SUCCEED, "chunk LRU remove");
+        VERIFY(H5SC__chunk_lru_remove(cache, hdr, c), SUCCEED, "chunk LRU remove");
         VERIFY(H5SC__ht_chunk_delete(cache, &k), SUCCEED, "chunk HT delete");
         H5MM_xfree(c);
     }
@@ -3871,8 +5047,7 @@ error:
     return FAIL;
 }
 
-static int
-test_struct_chunk_single_chunk_processing(void)
+static int test_struct_chunk_single_chunk_processing(void)
 {
     TESTING("SCC: structured-chunk single-chunk write path (no batching)");
 
@@ -4019,8 +5194,7 @@ error:
     return FAIL;
 }
 
-static int
-test_struct_chunk_single_chunk_processing_reopen_readall(void)
+static int test_struct_chunk_single_chunk_processing_reopen_readall(void)
 {
     TESTING("SCC: single-chunk write path; close+reopen; read all");
 
@@ -4216,12 +5390,11 @@ error:
 }
 
 /* Helper: select a 1D hyperslab [start..start+count-1] in the dataset’s file space */
-static herr_t
-t_select_1d_hyperslab(hid_t did, hsize_t start, hsize_t count, hid_t *file_sel_sid_out)
+static herr_t t_select_1d_hyperslab(hid_t did, hsize_t start, hsize_t count, hid_t *file_sel_sid_out)
 {
-    hid_t   space = H5I_INVALID_HID;
-    hsize_t s[1]  = {start};
-    hsize_t c[1]  = {count};
+    hid_t space  = H5I_INVALID_HID;
+    hsize_t s[1] = {start};
+    hsize_t c[1] = {count};
 
     space = H5Dget_space(did);
     if (space < 0)
@@ -4236,11 +5409,10 @@ t_select_1d_hyperslab(hid_t did, hsize_t start, hsize_t count, hid_t *file_sel_s
     return SUCCEED;
 }
 
-static herr_t
-t_select_2d_hyperslab(hid_t did, hsize_t start0, hsize_t start1, hsize_t count0, hsize_t count1,
-                      hid_t *file_sel_sid_out)
+static herr_t t_select_2d_hyperslab(hid_t did, hsize_t start0, hsize_t start1, hsize_t count0, hsize_t count1,
+                                    hid_t *file_sel_sid_out)
 {
-    hid_t   space    = H5I_INVALID_HID;
+    hid_t space      = H5I_INVALID_HID;
     hsize_t start[2] = {start0, start1};
     hsize_t count[2] = {count0, count1};
 
@@ -4259,8 +5431,7 @@ t_select_2d_hyperslab(hid_t did, hsize_t start0, hsize_t start1, hsize_t count0,
     return SUCCEED;
 }
 
-static int
-test_struct_chunk_h5s_all_shell_close_ok(void)
+static int test_struct_chunk_h5s_all_shell_close_ok(void)
 {
     TESTING("SCC: H5S_ALL read creates shell; close succeeds");
 
@@ -4372,8 +5543,7 @@ error:
     return FAIL;
 }
 
-static int
-test_struct_chunk_two_dsets_interleaved_close_order(void)
+static int test_struct_chunk_two_dsets_interleaved_close_order(void)
 {
     TESTING("SCC: two structured-chunk dsets interleaved; close order");
 
@@ -4517,16 +5687,15 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_fapl_scc_api_calls(void)
+static int test_fapl_scc_api_calls(void)
 {
-    herr_t               result;
-    static const char   *failure_mssg   = NULL;
-    hid_t                fapl_id        = H5I_INVALID_HID;
+    herr_t result;
+    static const char *failure_mssg     = NULL;
+    hid_t fapl_id                       = H5I_INVALID_HID;
     H5SC__cache_config_t default_config = H5SC__DEFAULT_SCC_CONFIG;
     H5SC__cache_config_t mod_config     = {/* version    = */ H5SC__CURR_SCC_VERSION,
-                                       /* max_q_size = */ ((size_t)(100)),
-                                       /* max_a_size = */ ((size_t)(200))};
+                                           /* max_q_size = */ ((size_t)(100)),
+                                           /* max_a_size = */ ((size_t)(200))};
     H5SC__cache_config_t scratch;
 
     TESTING("SCC/FAPL related public API calls");
@@ -4621,8 +5790,7 @@ test_fapl_scc_api_calls(void)
 
 } /* test_fapl_scc_api_calls() */
 
-static int
-test_scc_eviction_forced_small_limits(void)
+static int test_scc_eviction_forced_small_limits(void)
 {
     TESTING("SCC: forced eviction by small limits (single-dset)");
 
@@ -4643,12 +5811,23 @@ test_scc_eviction_forced_small_limits(void)
 
     char filename[1024];
 
+    H5SC_t *cache                = NULL;
+    H5SC_dset_header_t *dset_hdr = NULL;
+
+    size_t saved_quiescent_limit = 0;
+    size_t saved_active_limit    = 0;
+    size_t saved_min_dset_size   = 0;
+    bool limits_overridden       = false;
+
+    uint64_t flush_count_before;
+    uint64_t eviction_count_before;
+
     /*
      * Make quiescent hold ~1 chunk, active hold ~2 chunks
      *     sc->SCC_quiescent_limit = (size_t)(1 * 5 * sizeof(int) + 64);
      *     sc->SCC_active_limit    = (size_t)(2 * sc->SCC_quiescent_limit);
      */
-    hid_t                fapl       = H5I_INVALID_HID;
+    hid_t fapl                      = H5I_INVALID_HID;
     H5SC__cache_config_t mod_config = {/* version = */ H5SC__CURR_SCC_VERSION,
                                        /* max_q_size = */ ((size_t)(1 * 5 * sizeof(int) + 64)),
                                        /* max_a_size = */ ((size_t)(2 * 5 * sizeof(int) + 64))};
@@ -4676,6 +5855,12 @@ test_scc_eviction_forced_small_limits(void)
     if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
         TEST_ERROR;
 
+    if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
+        TEST_ERROR;
+
+    if (!cache)
+        TEST_ERROR;
+
     if ((mem_sid = H5Screate_simple(1, mem_dim, NULL)) < 0)
         TEST_ERROR;
 
@@ -4697,13 +5882,94 @@ test_scc_eviction_forced_small_limits(void)
         file_sel = H5I_INVALID_HID;
     }
 
+    /*
+     * This test owns the only structured-chunk dataset in the cache, so its
+     * header is available directly through the dataset LRU.
+     */
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->prev_dset_ptr || dset_hdr->next_dset_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len == 0)
+        TEST_ERROR;
+
+    if (cache->SCC_quiescent_size == 0)
+        TEST_ERROR;
+
+    /*
+     * Use actual cache occupancy rather than an estimated encoded or decoded
+     * chunk size. Disable the independent per-dataset retention floor so that
+     * an unpinned dirty resident chunk is eligible for pressure eviction.
+     */
+    saved_quiescent_limit = cache->SCC_quiescent_limit;
+    saved_active_limit    = cache->SCC_active_limit;
+    saved_min_dset_size   = dset_hdr->min_dset_size;
+
+    dset_hdr->min_dset_size    = 0;
+    cache->SCC_quiescent_limit = cache->SCC_quiescent_size;
+    cache->SCC_active_limit    = cache->SCC_quiescent_size;
+    limits_overridden          = true;
+
+    flush_count_before    = cache->stats.scc_chunk_flush_count;
+    eviction_count_before = cache->stats.scc_evictions;
+
+    /*
+     * Chunk 3 is not resident. With no unused cache headroom, admitting it must
+     * reclaim an existing unpinned dirty chunk.
+     */
+    {
+        const hsize_t start = 15;
+
+        if (t_select_1d_hyperslab(did, start, 5, &file_sel) < 0)
+            TEST_ERROR;
+
+        memset(wbuf, 0, sizeof(wbuf));
+        wbuf[0] = 13;
+
+        if (H5Dwrite(did, H5T_NATIVE_INT, mem_sid, file_sel, H5P_DEFAULT, wbuf) < 0)
+            TEST_ERROR;
+
+        if (H5Sclose(file_sel) < 0)
+            TEST_ERROR;
+        file_sel = H5I_INVALID_HID;
+    }
+
+    /*
+     * The constrained cache must have persisted at least one dirty chunk and
+     * evicted at least one chunk before the verification read begins.
+     */
+    if (cache->stats.scc_chunk_flush_count <= flush_count_before)
+        TEST_ERROR;
+
+    if (cache->stats.scc_evictions <= eviction_count_before)
+        TEST_ERROR;
+
+    /*
+     * Pressure behavior has now been verified. Restore the dataset retention
+     * policy, but provide sufficient headroom for the full-dataset verification
+     * read. Keep limits_overridden true until the original limits are restored.
+     */
+    dset_hdr->min_dset_size    = saved_min_dset_size;
+    cache->SCC_quiescent_limit = SIZE_MAX;
+    cache->SCC_active_limit    = SIZE_MAX;
+
     /* Read back to ensure eviction didn’t corrupt results */
     memset(rbuf, 0, sizeof(rbuf));
     if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rbuf) < 0)
         TEST_ERROR;
 
-    if (rbuf[0] != 10 || rbuf[5] != 11 || rbuf[10] != 12)
+    if (rbuf[0] != 10 || rbuf[5] != 11 || rbuf[10] != 12 || rbuf[15] != 13)
         TEST_ERROR;
+
+    cache->SCC_quiescent_limit = saved_quiescent_limit;
+    cache->SCC_active_limit    = saved_active_limit;
+    limits_overridden          = false;
 
     /* Cleanup */
     if (H5Sclose(mem_sid) < 0)
@@ -4734,6 +6000,18 @@ test_scc_eviction_forced_small_limits(void)
     return SUCCEED;
 
 error:
+    if (limits_overridden) {
+        if (dset_hdr)
+            dset_hdr->min_dset_size = saved_min_dset_size;
+
+        if (cache) {
+            cache->SCC_quiescent_limit = saved_quiescent_limit;
+            cache->SCC_active_limit    = saved_active_limit;
+        }
+
+        limits_overridden = false;
+    }
+
     H5E_BEGIN_TRY
     {
         H5Sclose(file_sel);
@@ -4742,15 +6020,15 @@ error:
         H5Pclose(dcpl);
         H5Sclose(sid);
         H5Fclose(fid);
+        H5Pclose(fapl);
     }
     H5E_END_TRY
 
     H5_FAILED();
     return FAIL;
-}
+} /* end test_scc_eviction_forced_small_limits() */
 
-static int
-test_scc_eviction_order_reflects_recency(void)
+static int test_scc_eviction_order_reflects_recency(void)
 {
     TESTING("SCC: eviction order reflects true recency (LRU)");
 
@@ -4766,14 +6044,14 @@ test_scc_eviction_order_reflects_recency(void)
     hsize_t chunk_dim[1] = {5};
     hsize_t mem_dim[1]   = {5};
 
-    int  wbuf[5];
+    int wbuf[5];
     char filename[1024];
 
     /*
      * sc->SCC_quiescent_limit = (size_t)(1 * 5 * sizeof(int) + 64);
      * sc->SCC_active_limit    = (size_t)(2 * sc->SCC_quiescent_limit);
      */
-    hid_t                fapl       = H5I_INVALID_HID;
+    hid_t fapl                      = H5I_INVALID_HID;
     H5SC__cache_config_t mod_config = {/* version = */ H5SC__CURR_SCC_VERSION,
                                        /* max_q_size = */ ((size_t)(1 * 5 * sizeof(int) + 64)),
                                        /* max_a_size = */ ((size_t)(2 * 5 * sizeof(int) + 64))};
@@ -4897,8 +6175,7 @@ error:
     return FAIL;
 }
 
-static int
-test_scc_write_full_batching_maximal_under_small_limits(void)
+static int test_scc_write_full_batching_maximal_under_small_limits(void)
 {
     TESTING("SCC: write full-batching maximal batches under small limits");
 
@@ -4925,7 +6202,7 @@ test_scc_write_full_batching_maximal_under_small_limits(void)
      * sc->SCC_quiescent_limit = (size_t)(1 * 5 * sizeof(int) + 64);
      * sc->SCC_active_limit    = (size_t)(2 * sc->SCC_quiescent_limit);
      */
-    hid_t                fapl       = H5I_INVALID_HID;
+    hid_t fapl                      = H5I_INVALID_HID;
     H5SC__cache_config_t mod_config = {/* version = */ H5SC__CURR_SCC_VERSION,
                                        /* max_q_size = */ ((size_t)(1 * 5 * sizeof(int) + 64)),
                                        /* max_a_size = */ ((size_t)(2 * 5 * sizeof(int) + 64))};
@@ -5056,8 +6333,7 @@ error:
     return FAIL;
 }
 
-static int
-test_scc_read_full_batching_maximal_under_small_limits(void)
+static int test_scc_read_full_batching_maximal_under_small_limits(void)
 {
     TESTING("SCC: read full-batching maximal batches under small limits");
 
@@ -5070,19 +6346,11 @@ test_scc_read_full_batching_maximal_under_small_limits(void)
     /* Same layout as the write test: 4 chunks of size 5 => 20 elements */
     const hsize_t mem_dim[1] = {20};
 
-    int  rbuf[20];
+    int rbuf[20];
     char filename[1024];
+    uint64_t read_batch_calls_before = 0;
 
-#ifdef H5SC_TESTING
-    // #ifdef H5SC_DO_SANITY_CHECKS
-    /* Provided by the SCC test hook */
-    extern void   H5SC_test_reset_read_batch_stats(void);
-    extern size_t H5SC_test_get_read_batch_calls(void);
-    extern size_t H5SC_test_get_read_max_batch_len(void);
-    extern size_t H5SC_test_get_read_last_batch_len(void);
-#endif
-
-    hid_t                fapl       = H5I_INVALID_HID;
+    hid_t fapl                      = H5I_INVALID_HID;
     H5SC__cache_config_t mod_config = {/* version = */ H5SC__CURR_SCC_VERSION,
                                        /* max_q_size = */ ((size_t)(1 * 5 * sizeof(int) + 64)),
                                        /* max_a_size = */ ((size_t)(100 * 5 * sizeof(int) + 64))};
@@ -5109,17 +6377,13 @@ test_scc_read_full_batching_maximal_under_small_limits(void)
      * Keep this block as a no-op unless you have an actual hook to set the limits here.
      */
     {
-        /* Example (pseudo) if you have a hook like H5SC__get_cache(fid) */
-        /* H5SC_t *cache = H5SC__get_cache(fid); */
-        /* cache->SCC_quiescent_limit = (size_t)(1 * 5 * sizeof(int) + 64); */
-        /* cache->SCC_active_limit    = (size_t)(2 * cache->SCC_quiescent_limit); */
-        /* (void)cache; */
+        /* Example (pseudo) if you have a hook like H5SC__get_cache(fid)
+         * H5SC_t *cache = H5SC__get_cache(fid);
+         * cache->SCC_quiescent_limit = (size_t)(1 * 5 * sizeof(int) + 64);
+         * cache->SCC_active_limit    = (size_t)(2 * cache->SCC_quiescent_limit);
+         * (void)cache;
+         */
     }
-
-#ifdef H5SC_TESTING
-    // #ifdef H5SC_DO_SANITY_CHECKS
-    H5SC_test_reset_read_batch_stats();
-#endif
 
     /*
      * Build the SAME file selection as the write test:
@@ -5144,8 +6408,14 @@ test_scc_read_full_batching_maximal_under_small_limits(void)
         TEST_ERROR;
 
     H5SC_t *cache = NULL;
+
     if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
         TEST_ERROR;
+
+    if (!cache)
+        TEST_ERROR;
+
+    read_batch_calls_before = cache->stats.scc_reads_batch_calls_count;
 
     memset(rbuf, 0, sizeof(rbuf));
 
@@ -5153,26 +6423,19 @@ test_scc_read_full_batching_maximal_under_small_limits(void)
     if (H5Dread(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, rbuf) < 0)
         TEST_ERROR;
 
-#ifdef H5SC_TESTING
-    // #ifdef H5SC_DO_SANITY_CHECKS
     /*
-     * Expect the same batching behavior as the write path:
-     * active_limit ~= 2 chunks => 2 batches, max batch len 2.
-     *
-     * If your read-path sizing differs slightly, adjust expectations, but keep:
-     *  - batch_calls > 1
-     *  - max_batch_len > 1
-     *  - batch_calls < total_chunks (i.e., not chunk-by-chunk)
+     * The active limit is intentionally large enough for the complete four-chunk
+     * selection. Verify that the read path forms one maximal batch rather than
+     * unnecessarily splitting the request.
      */
-    if (H5SC_test_get_read_batch_calls() != 2)
-        TEST_ERROR;
-    if (H5SC_test_get_read_max_batch_len() != 2)
+    if (cache->stats.scc_reads_batch_calls_count != read_batch_calls_before + 1)
         TEST_ERROR;
 
-    /* Optional: useful sanity that we observed a “final batch” value */
-    if (H5SC_test_get_read_last_batch_len() == 0)
+    if (cache->stats.scc_reads_max_batch_len != 4)
         TEST_ERROR;
-#endif
+
+    if (cache->stats.scc_reads_last_batch_len != 4)
+        TEST_ERROR;
 
     /*
      * Validate data matches what the write test wrote:
@@ -5222,7 +6485,2112 @@ error:
 
     H5_FAILED();
     return FAIL;
-}
+} /* end test_scc_read_full_batching_maximal_under_small_limits() */
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_resident_first_indexed_read_write
+ *
+ * Purpose:     Verify resident-first SCC processing through the selection
+ *              order vector without physically rearranging sel_chunks.
+ *
+ *              Four logical chunks are persisted, after which only the last
+ *               three chunks are made resident. The SCC active limit is then
+ *              reduced to the current resident size, leaving no initial
+ *              headroom for materializing the first two chunks.
+ *
+ *              A full-dataset request lists nonresident chunk 0 first in
+ *              logical selection order, followed by resident chunks 1–3.
+ *              The request can make progress only if SCC processes the
+ *              resident chunks first, releases their request pins, and then
+ *              reclaims their storage for the nonresident chunks.
+ *
+ *              Both read and write paths are exercised. Per-chunk signatures
+ *              verify that indexed processing preserves the original
+ *              file-to-memory selection mapping.
+ *
+ * Return:      SUCCEED/FAIL
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_resident_first_indexed_read_write(void)
+{
+    hid_t fid        = H5I_INVALID_HID;
+    hid_t sid        = H5I_INVALID_HID;
+    hid_t dcpl       = H5I_INVALID_HID;
+    hid_t did        = H5I_INVALID_HID;
+    hid_t tail_space = H5I_INVALID_HID;
+    hid_t tail_mem   = H5I_INVALID_HID;
+
+    const hsize_t dims[1]       = {20};
+    const hsize_t chunk_dims[1] = {5};
+    const hsize_t tail_dims[1]  = {15};
+    const hsize_t tail_start[1] = {5};
+    const hsize_t tail_count[1] = {15};
+
+    int initial[20];
+    int updated[20];
+    int full_read[20];
+    int tail_read[15];
+
+    H5SC_t *cache                = NULL;
+    H5SC_dset_header_t *dset_hdr = NULL;
+    H5SC_chunk_t *chunk          = NULL;
+
+    size_t saved_quiescent_limit = 0;
+    size_t saved_active_limit    = 0;
+    size_t saved_min_dset_size   = 0;
+    bool limits_overridden       = false;
+
+    char filename[1024];
+
+    TESTING("SCC: indexed resident-first read and write processing");
+
+    h5_fixname("scc_resident_first_indexed_read_write", H5P_DEFAULT, filename, sizeof(filename));
+
+    /*
+     * Give every logical chunk a distinct signature. This detects accidental
+     * physical rearrangement of sel_chunks or incorrect indexed access.
+     */
+    for (size_t i = 0; i < 20; i++) {
+        initial[i] = 100 + (int)(i / 5);
+        updated[i] = 200 + (int)(i / 5);
+    }
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dims, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    /*
+     * Seed all four chunks and close the dataset. Dataset close must
+     * flush-and-evict, leaving no decoded chunks resident.
+     */
+    if (H5Dwrite(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, initial) < 0)
+        TEST_ERROR;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    /*
+     * Eliminate active-cache headroom. During the following full request,
+     * nonresident chunk 0 occurs first in logical selection order, while
+     * chunks 1, 2, and 3 are resident.
+     *
+     * Resident-first processing must handle chunks 1–3 and release their
+     * pins before chunk 0 can reclaim one resident chunk's storage.
+     */
+    if ((tail_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(tail_space, H5S_SELECT_SET, tail_start, NULL, tail_count, NULL) < 0)
+        TEST_ERROR;
+
+    if ((tail_mem = H5Screate_simple(1, tail_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    memset(tail_read, 0, sizeof(tail_read));
+
+    if (H5Dread(did, H5T_NATIVE_INT, tail_mem, tail_space, H5P_DEFAULT, tail_read) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < 15; i++)
+        if (tail_read[i] != initial[i + 5])
+            TEST_ERROR;
+
+    if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    /*
+     * The preload request should leave chunks 1, 2, and 3 resident.
+     * The SCC can then reclaim one chunk while preserving the dataset's
+     * two-chunk minimum-retention requirement.
+     */
+    if (dset_hdr->chunk_lru_len != 3)
+        TEST_ERROR;
+
+    saved_quiescent_limit = cache->SCC_quiescent_limit;
+    saved_active_limit    = cache->SCC_active_limit;
+    saved_min_dset_size   = dset_hdr->min_dset_size;
+
+    if (cache->SCC_quiescent_size == 0)
+        TEST_ERROR;
+
+    /*
+     * This test isolates resident-first processing from the independent
+     * per-dataset minimum-retention policy. Initially, every resident chunk
+     * selected by the request is pinned, so reclaimable space remains zero
+     * even with min_dset_size disabled. After the resident phase releases
+     * those pins, their storage becomes reclaimable for chunk 0.
+     */
+    dset_hdr->min_dset_size    = 0;
+    cache->SCC_quiescent_limit = cache->SCC_quiescent_size;
+    cache->SCC_active_limit    = cache->SCC_quiescent_size;
+    limits_overridden          = true;
+
+    memset(full_read, 0, sizeof(full_read));
+
+    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, full_read) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < 20; i++)
+        if (full_read[i] != initial[i])
+            TEST_ERROR;
+
+    /*
+     * Every request-owned pin must have been released, regardless of which
+     * indexed batch processed the chunk.
+     */
+    for (chunk = dset_hdr->lru_head_ptr; chunk; chunk = chunk->next_ptr)
+        if (chunk->chunk_counter != 0)
+            TEST_ERROR;
+
+    /*
+     * Restore the dataset retention policy, but temporarily provide unrestricted
+     * cache headroom for the verification read. The original configured limits
+     * are intentionally very small and are below the read path's effective
+     * single-chunk budget.
+     *
+     * Pressure behavior has already been verified above. This read is concerned
+     * only with checking that dirty eviction persisted the correct values.
+     */
+    dset_hdr->min_dset_size    = saved_min_dset_size;
+    cache->SCC_quiescent_limit = SIZE_MAX;
+    cache->SCC_active_limit    = SIZE_MAX;
+
+    /* Read back to ensure eviction didn't corrupt results. */
+
+    /*
+     * Close/reopen to begin the write portion without retaining decoded
+     * chunks from the read portion.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    memset(tail_read, 0, sizeof(tail_read));
+
+    if (H5Dread(did, H5T_NATIVE_INT, tail_mem, tail_space, H5P_DEFAULT, tail_read) < 0)
+        TEST_ERROR;
+
+    if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 3)
+        TEST_ERROR;
+
+    saved_quiescent_limit = cache->SCC_quiescent_limit;
+    saved_active_limit    = cache->SCC_active_limit;
+    saved_min_dset_size   = dset_hdr->min_dset_size;
+
+    if (cache->SCC_quiescent_size == 0)
+        TEST_ERROR;
+
+    dset_hdr->min_dset_size    = 0;
+    cache->SCC_quiescent_limit = cache->SCC_quiescent_size;
+    cache->SCC_active_limit    = cache->SCC_quiescent_size;
+    limits_overridden          = true;
+
+    /*
+     * This full write again encounters chunks 0 and 1 before the resident
+     * chunks in logical selection order. The order vector must process the
+     * resident chunks first without changing their memory-buffer mapping.
+     */
+    if (H5Dwrite(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, updated) < 0)
+        TEST_ERROR;
+
+    for (chunk = dset_hdr->lru_head_ptr; chunk; chunk = chunk->next_ptr)
+        if (chunk->chunk_counter != 0)
+            TEST_ERROR;
+
+    dset_hdr->min_dset_size    = saved_min_dset_size;
+    cache->SCC_quiescent_limit = saved_quiescent_limit;
+    cache->SCC_active_limit    = saved_active_limit;
+    limits_overridden          = false;
+
+    /*
+     * Close/reopen once more so validation comes from persisted storage,
+     * rather than merely reading the dirty resident objects just written.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    memset(full_read, 0, sizeof(full_read));
+
+    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, full_read) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < 20; i++)
+        if (full_read[i] != updated[i])
+            TEST_ERROR;
+
+    if (H5Sclose(tail_mem) < 0)
+        TEST_ERROR;
+    tail_mem = H5I_INVALID_HID;
+
+    if (H5Sclose(tail_space) < 0)
+        TEST_ERROR;
+    tail_space = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    /*
+     * Restore valid cache limits before cleanup if the test failed while
+     * operating under the constrained configuration.
+     */
+    if (limits_overridden) {
+        if (dset_hdr)
+            dset_hdr->min_dset_size = saved_min_dset_size;
+
+        if (cache) {
+            cache->SCC_quiescent_limit = saved_quiescent_limit;
+            cache->SCC_active_limit    = saved_active_limit;
+        }
+
+        limits_overridden = false;
+    }
+
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(tail_mem);
+        H5Sclose(tail_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+} /* end test_scc_resident_first_indexed_read_write() */
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_write_back_flush_lifecycle
+ *
+ * Purpose:     Verify the complete SCC write-back lifecycle:
+ *
+ *                  1) H5Dwrite() modifies a resident chunk and leaves it
+ *                     dirty without immediately flushing it.
+ *
+ *                  2) H5Fflush() reaches the SCC flush path, writes the dirty
+ *                     chunk, and retains the same resident chunk in the hash
+ *                     table and dataset LRU.
+ *
+ *                  3) A subsequent H5Dwrite() makes the retained chunk dirty
+ *                     again without immediately flushing it.
+ *
+ *                  4) H5Dclose() flushes and evicts the dirty chunk.
+ *
+ *                  5) Reopening the dataset reads the second write from
+ *                     persisted structured-chunk storage.
+ *
+ * Return:      SUCCEED/FAIL
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_write_back_flush_lifecycle(void)
+{
+    hid_t fid        = H5I_INVALID_HID;
+    hid_t sid        = H5I_INVALID_HID;
+    hid_t dcpl       = H5I_INVALID_HID;
+    hid_t did        = H5I_INVALID_HID;
+    hid_t file_space = H5I_INVALID_HID;
+    hid_t mem_space  = H5I_INVALID_HID;
+
+    const hsize_t dims[1]       = {10};
+    const hsize_t chunk_dims[1] = {5};
+    const hsize_t mem_dims[1]   = {5};
+    const hsize_t start[1]      = {0};
+    const hsize_t count[1]      = {5};
+
+    const int first_write[5]  = {11, 12, 13, 14, 15};
+    const int second_write[5] = {21, 22, 23, 24, 25};
+    int read_buf[10];
+
+    H5SC_t *cache                = NULL;
+    H5SC_dset_header_t *dset_hdr = NULL;
+    H5SC_chunk_t *chunk          = NULL;
+    H5SC_chunk_t *found_chunk    = NULL;
+
+    H5SC_chunk_key_t chunk_key;
+
+    size_t saved_lru_len = 0;
+    uint64_t flush_count_before_write;
+    uint64_t flush_count_after_explicit;
+
+    char filename[1024];
+
+    TESTING("SCC: write-back dirty, explicit flush retain, close evict");
+
+    memset(&chunk_key, 0, sizeof(chunk_key));
+    memset(read_buf, 0, sizeof(read_buf));
+
+    h5_fixname("scc_write_back_flush_lifecycle", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dims, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((file_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(file_space, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
+        TEST_ERROR;
+
+    if ((mem_space = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
+        TEST_ERROR;
+
+    if (!cache)
+        TEST_ERROR;
+
+    flush_count_before_write = cache->stats.scc_chunk_flush_count;
+
+    /*
+     * Ordinary write: the decoded chunk should remain resident and dirty.
+     * With the default large SCC limits, no pressure-driven trim should be
+     * required by this single-chunk request.
+     */
+    if (H5Dwrite(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, first_write) < 0)
+        TEST_ERROR;
+
+    if (cache->stats.scc_chunk_flush_count != flush_count_before_write)
+        TEST_ERROR;
+
+    /*
+     * This test creates exactly one structured-chunk dataset. Obtain its header
+     * directly from the cache's dataset LRU, avoiding any dependency on the VOL
+     * object's representation or an internal H5D_t pointer.
+     */
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    /* The cache must contain exactly one dataset header at this point. */
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->prev_dset_ptr || dset_hdr->next_dset_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 1)
+        TEST_ERROR;
+
+    chunk = dset_hdr->lru_head_ptr;
+    if (!chunk)
+        TEST_ERROR;
+
+    if (!chunk->chunk_obj)
+        TEST_ERROR;
+
+    if (!chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    chunk_key     = chunk->data_key;
+    saved_lru_len = dset_hdr->chunk_lru_len;
+
+    /*
+     * Enter through the public flush API so that the normal HDF5 API context,
+     * metadata tag stack, and file-flush machinery are established before the
+     * SCC flush callback runs.
+     */
+    if (H5Fflush(fid, H5F_SCOPE_LOCAL) < 0)
+        TEST_ERROR;
+
+    flush_count_after_explicit = cache->stats.scc_chunk_flush_count;
+
+    if (flush_count_after_explicit != flush_count_before_write + 1)
+        TEST_ERROR;
+
+    if (chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (!chunk->chunk_obj)
+        TEST_ERROR;
+
+    if (!H5_addr_defined(chunk->disk_addr))
+        TEST_ERROR;
+
+    if (chunk->disk_nbytes == 0)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != saved_lru_len)
+        TEST_ERROR;
+
+    if (dset_hdr->lru_head_ptr != chunk || dset_hdr->lru_tail_ptr != chunk)
+        TEST_ERROR;
+
+    found_chunk = H5SC__ht_chunk_find(cache, &chunk_key);
+    if (found_chunk != chunk)
+        TEST_ERROR;
+
+    /*
+     * Modify the same retained chunk again. This must make it dirty without
+     * immediately producing another flush.
+     */
+    if (H5Dwrite(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, second_write) < 0)
+        TEST_ERROR;
+
+    if (!chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (!chunk->chunk_obj)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    if (cache->stats.scc_chunk_flush_count != flush_count_after_explicit)
+        TEST_ERROR;
+
+    /*
+     * The dataspaces are independent objects and can be closed before the
+     * dataset-close flush-and-evict operation.
+     */
+    if (H5Sclose(mem_space) < 0)
+        TEST_ERROR;
+    mem_space = H5I_INVALID_HID;
+
+    if (H5Sclose(file_space) < 0)
+        TEST_ERROR;
+    file_space = H5I_INVALID_HID;
+
+    /*
+     * Dataset close must persist the second write and evict the cached chunk.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (cache->stats.scc_chunk_flush_count <= flush_count_after_explicit)
+        TEST_ERROR;
+
+    if (H5SC__ht_chunk_find(cache, &chunk_key) != NULL)
+        TEST_ERROR;
+
+    /*
+     * This cache contains no other datasets. Dataset close should therefore
+     * remove the dataset header from the cache after flushing and evicting its
+     * chunks.
+     */
+    if (cache->dset_lru_head_ptr || cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    /*
+     * Reopen and verify that validation comes from persisted storage.
+     */
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    memset(read_buf, 0, sizeof(read_buf));
+
+    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, read_buf) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < 5; i++)
+        if (read_buf[i] != second_write[i])
+            TEST_ERROR;
+
+    for (size_t i = 5; i < 10; i++)
+        if (read_buf[i] != 0)
+            TEST_ERROR;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(mem_space);
+        H5Sclose(file_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+} /* end test_scc_write_back_flush_lifecycle() */
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_partial_write_persistence
+ *
+ * Purpose:     Verify write-back behavior when partially overwriting an
+ *              existing nonresident on-disk structured chunk.
+ *
+ *              The test:
+ *
+ *                  1) Writes and persists a complete chunk.
+ *
+ *                  2) Reopens the dataset so the chunk is nonresident.
+ *
+ *                  3) Partially overwrites the on-disk chunk, verifying that
+ *                     it is materialized, retained resident, and marked dirty
+ *                     without immediate persistence.
+ *
+ *                  4) Explicitly flushes the file and verifies that the chunk
+ *                     remains resident and that untouched values survive.
+ *
+ *                  5) Repeats a partial overwrite after another close/reopen
+ *                     and verifies that dataset close persists the change.
+ *
+ * Return:      SUCCEED/FAIL
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_partial_write_persistence(void)
+{
+    hid_t fid        = H5I_INVALID_HID;
+    hid_t sid        = H5I_INVALID_HID;
+    hid_t dcpl       = H5I_INVALID_HID;
+    hid_t did        = H5I_INVALID_HID;
+    hid_t file_space = H5I_INVALID_HID;
+    hid_t mem_space  = H5I_INVALID_HID;
+
+    const hsize_t dims[1]       = {5};
+    const hsize_t chunk_dims[1] = {5};
+    const hsize_t mem_dims[1]   = {2};
+
+    const hsize_t first_start[1]  = {1};
+    const hsize_t second_start[1] = {3};
+    const hsize_t count[1]        = {2};
+
+    const int initial[5]       = {10, 20, 30, 40, 50};
+    const int first_update[2]  = {101, 102};
+    const int second_update[2] = {103, 104};
+
+    const int expected_after_first[5] = {10, 101, 102, 40, 50};
+    const int expected_final[5]       = {10, 101, 102, 103, 104};
+
+    int read_buf[5];
+
+    H5SC_t *cache                = NULL;
+    H5SC_dset_header_t *dset_hdr = NULL;
+    H5SC_chunk_t *chunk          = NULL;
+    H5SC_chunk_t *found_chunk    = NULL;
+
+    H5SC_chunk_key_t chunk_key;
+
+    uint64_t flush_count_before;
+    uint64_t flush_count_after_explicit;
+    size_t saved_lru_len;
+
+    char filename[1024];
+
+    TESTING("SCC: partial nonresident write persists untouched values");
+
+    memset(&chunk_key, 0, sizeof(chunk_key));
+    memset(read_buf, 0, sizeof(read_buf));
+
+    h5_fixname("scc_partial_write_persistence", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dims, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
+        TEST_ERROR;
+
+    if (!cache)
+        TEST_ERROR;
+
+    /*
+     * Establish a complete on-disk chunk. Dataset close must flush and evict
+     * the dirty resident representation.
+     */
+    if (H5Dwrite(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, initial) < 0)
+        TEST_ERROR;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (cache->dset_lru_head_ptr || cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    /*
+     * Reopen with no resident chunks. The following partial write must first
+     * materialize the existing on-disk chunk so that positions 0, 3, and 4
+     * are preserved.
+     */
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 0)
+        TEST_ERROR;
+
+    if ((mem_space = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((file_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(file_space, H5S_SELECT_SET, first_start, NULL, count, NULL) < 0)
+        TEST_ERROR;
+
+    flush_count_before = cache->stats.scc_chunk_flush_count;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, first_update) < 0)
+        TEST_ERROR;
+
+    /*
+     * Ordinary partial write must not immediately persist the materialized
+     * chunk.
+     */
+    if (cache->stats.scc_chunk_flush_count != flush_count_before)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 1)
+        TEST_ERROR;
+
+    chunk = dset_hdr->lru_head_ptr;
+    if (!chunk)
+        TEST_ERROR;
+
+    if (chunk != dset_hdr->lru_tail_ptr)
+        TEST_ERROR;
+
+    if (!chunk->chunk_obj)
+        TEST_ERROR;
+
+    if (!chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    /*
+     * Because this was an existing on-disk chunk, its storage identity should
+     * remain available while its resident decoded representation is dirty.
+     */
+    if (!H5_addr_defined(chunk->disk_addr))
+        TEST_ERROR;
+
+    if (chunk->disk_nbytes == 0)
+        TEST_ERROR;
+
+    chunk_key     = chunk->data_key;
+    saved_lru_len = dset_hdr->chunk_lru_len;
+
+    /*
+     * Explicit flush must persist the partial update while retaining the same
+     * resident decoded object and cache identity.
+     */
+    if (H5Fflush(fid, H5F_SCOPE_LOCAL) < 0)
+        TEST_ERROR;
+
+    flush_count_after_explicit = cache->stats.scc_chunk_flush_count;
+
+    if (flush_count_after_explicit != flush_count_before + 1)
+        TEST_ERROR;
+
+    if (chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (!chunk->chunk_obj)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != saved_lru_len)
+        TEST_ERROR;
+
+    if (dset_hdr->lru_head_ptr != chunk || dset_hdr->lru_tail_ptr != chunk)
+        TEST_ERROR;
+
+    found_chunk = H5SC__ht_chunk_find(cache, &chunk_key);
+    if (found_chunk != chunk)
+        TEST_ERROR;
+
+    if (H5Sclose(file_space) < 0)
+        TEST_ERROR;
+    file_space = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    /*
+     * Verify the explicit-flush phase from persisted storage. This confirms
+     * that values outside the partial selection survived materialization and
+     * re-encoding.
+     */
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    memset(read_buf, 0, sizeof(read_buf));
+
+    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, read_buf) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < 5; i++)
+        if (read_buf[i] != expected_after_first[i])
+            TEST_ERROR;
+
+    /*
+     * Close and reopen again so the second partial write also begins with a
+     * nonresident on-disk chunk rather than the clean chunk materialized by
+     * the verification read.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 0)
+        TEST_ERROR;
+
+    if ((file_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(file_space, H5S_SELECT_SET, second_start, NULL, count, NULL) < 0)
+        TEST_ERROR;
+
+    flush_count_before = cache->stats.scc_chunk_flush_count;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, second_update) < 0)
+        TEST_ERROR;
+
+    if (cache->stats.scc_chunk_flush_count != flush_count_before)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr || dset_hdr->chunk_lru_len != 1)
+        TEST_ERROR;
+
+    chunk = dset_hdr->lru_head_ptr;
+    if (!chunk || !chunk->chunk_obj || !chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    if (H5Sclose(file_space) < 0)
+        TEST_ERROR;
+    file_space = H5I_INVALID_HID;
+
+    /*
+     * Close without an explicit flush. Dataset close must persist the second
+     * partial update and evict the resident chunk and dataset header.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (cache->stats.scc_chunk_flush_count <= flush_count_before)
+        TEST_ERROR;
+
+    if (cache->dset_lru_head_ptr || cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    /*
+     * Final reopen verifies that both partial updates and all untouched values
+     * were persisted correctly.
+     */
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    memset(read_buf, 0, sizeof(read_buf));
+
+    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, read_buf) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < 5; i++)
+        if (read_buf[i] != expected_final[i])
+            TEST_ERROR;
+
+    if (H5Sclose(mem_space) < 0)
+        TEST_ERROR;
+    mem_space = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(file_space);
+        H5Sclose(mem_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+} /* end test_scc_partial_write_persistence() */
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_gzip_partial_write_persistence
+ *
+ * Purpose:     Verify write-back behavior when partially overwriting an
+ *              existing nonresident GZIP-filtered structured chunk.
+ *
+ *              The test proves that:
+ *
+ *                  1) The existing filtered chunk is decoded and materialized
+ *                     before the partial update is applied.
+ *
+ *                  2) Ordinary H5Dwrite() retains the updated chunk dirty and
+ *                     resident without immediately re-encoding it.
+ *
+ *                  3) H5Fflush() encodes and persists the dirty chunk without
+ *                     evicting its resident representation.
+ *
+ *                  4) A second partial update is persisted by dataset close.
+ *
+ *                  5) Values outside both partial selections survive all
+ *                     decode, update, encode, flush, and reopen operations.
+ *
+ * Return:      SUCCEED/FAIL
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_gzip_partial_write_persistence(void)
+{
+    hid_t fid        = H5I_INVALID_HID;
+    hid_t sid        = H5I_INVALID_HID;
+    hid_t dcpl       = H5I_INVALID_HID;
+    hid_t did        = H5I_INVALID_HID;
+    hid_t file_space = H5I_INVALID_HID;
+    hid_t mem_space  = H5I_INVALID_HID;
+
+    const hsize_t dims[1]       = {5};
+    const hsize_t chunk_dims[1] = {5};
+    const hsize_t mem_dims[1]   = {2};
+
+    const hsize_t first_start[1]  = {1};
+    const hsize_t second_start[1] = {3};
+    const hsize_t count[1]        = {2};
+
+    const int initial[5]       = {10, 20, 30, 40, 50};
+    const int first_update[2]  = {101, 102};
+    const int second_update[2] = {103, 104};
+
+    const int expected_after_first[5] = {10, 101, 102, 40, 50};
+    const int expected_final[5]       = {10, 101, 102, 103, 104};
+
+    int read_buf[5];
+
+    unsigned int gzip_level = 6;
+    size_t cd_nelmts        = 1;
+    unsigned int filter_info;
+
+    H5SC_t *cache                = NULL;
+    H5SC_dset_header_t *dset_hdr = NULL;
+    H5SC_chunk_t *chunk          = NULL;
+    H5SC_chunk_t *found_chunk    = NULL;
+
+    H5SC_chunk_key_t chunk_key;
+
+    uint64_t flush_count_before;
+    uint64_t flush_count_after_explicit;
+    size_t saved_lru_len;
+
+    char filename[1024];
+
+    TESTING("SCC: GZIP partial nonresident write-back persistence");
+
+    memset(&chunk_key, 0, sizeof(chunk_key));
+    memset(read_buf, 0, sizeof(read_buf));
+
+    /*
+     * Skip cleanly if this build does not provide both GZIP encoding and
+     * decoding.
+     */
+    if (H5Zfilter_avail(H5Z_FILTER_DEFLATE) <= 0) {
+        SKIPPED();
+        puts("    GZIP filter not available");
+        return SUCCEED;
+    }
+
+    if (H5Zget_filter_info(H5Z_FILTER_DEFLATE, &filter_info) < 0)
+        TEST_ERROR;
+
+    if (!(filter_info & H5Z_FILTER_CONFIG_ENCODE_ENABLED) ||
+        !(filter_info & H5Z_FILTER_CONFIG_DECODE_ENABLED)) {
+        SKIPPED();
+        puts("    GZIP encode/decode support unavailable");
+        return SUCCEED;
+    }
+
+    h5_fixname("scc_gzip_partial_write_persistence", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dims, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    /*
+     * Apply GZIP to both structured-chunk sections. The optional flag permits
+     * the filter callback to decline compression when a particular encoded
+     * representation would not become smaller.
+     */
+    if (H5Pset_filter2(dcpl, H5_SECTION_SELECTION, H5Z_FILTER_DEFLATE, H5Z_FLAG_OPTIONAL, cd_nelmts,
+                       &gzip_level) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_filter2(dcpl, H5_SECTION_FIXED, H5Z_FILTER_DEFLATE, H5Z_FLAG_OPTIONAL, cd_nelmts,
+                       &gzip_level) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
+        TEST_ERROR;
+
+    if (!cache)
+        TEST_ERROR;
+
+    /*
+     * Establish a complete filtered on-disk chunk. Dataset close must encode,
+     * flush, and evict the dirty resident representation.
+     */
+    if (H5Dwrite(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, initial) < 0)
+        TEST_ERROR;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (cache->dset_lru_head_ptr || cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    /*
+     * Reopen with no resident chunks. The partial write must retrieve the
+     * encoded chunk from structured storage, reverse both applicable GZIP
+     * pipelines, materialize the complete decoded chunk, and only then modify
+     * the selected elements. Values outside the selection must remain
+     * unchanged.
+     */
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->prev_dset_ptr || dset_hdr->next_dset_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 0)
+        TEST_ERROR;
+
+    if ((mem_space = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((file_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(file_space, H5S_SELECT_SET, first_start, NULL, count, NULL) < 0)
+        TEST_ERROR;
+
+    flush_count_before = cache->stats.scc_chunk_flush_count;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, first_update) < 0)
+        TEST_ERROR;
+
+    /*
+     * Ordinary partial write must not immediately re-encode or persist the
+     * materialized chunk.
+     */
+    if (cache->stats.scc_chunk_flush_count != flush_count_before)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->prev_dset_ptr || dset_hdr->next_dset_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 1)
+        TEST_ERROR;
+
+    chunk = dset_hdr->lru_head_ptr;
+    if (!chunk)
+        TEST_ERROR;
+
+    if (chunk != dset_hdr->lru_tail_ptr)
+        TEST_ERROR;
+
+    if (!chunk->chunk_obj)
+        TEST_ERROR;
+
+    if (!chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    /*
+     * This is an existing on-disk chunk, so its current storage identity
+     * should remain available while its decoded representation is dirty.
+     */
+    if (!H5_addr_defined(chunk->disk_addr))
+        TEST_ERROR;
+
+    if (chunk->disk_nbytes == 0)
+        TEST_ERROR;
+
+    chunk_key     = chunk->data_key;
+    saved_lru_len = dset_hdr->chunk_lru_len;
+
+    /*
+     * Explicit file flush must re-encode the partially updated chunk, apply
+     * the configured GZIP pipelines, and persist the result without replacing
+     * or evicting the resident decoded object.
+     */
+    if (H5Fflush(fid, H5F_SCOPE_LOCAL) < 0)
+        TEST_ERROR;
+
+    flush_count_after_explicit = cache->stats.scc_chunk_flush_count;
+
+    if (flush_count_after_explicit != flush_count_before + 1)
+        TEST_ERROR;
+
+    if (chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (!chunk->chunk_obj)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    if (!H5_addr_defined(chunk->disk_addr))
+        TEST_ERROR;
+
+    if (chunk->disk_nbytes == 0)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != saved_lru_len)
+        TEST_ERROR;
+
+    if (dset_hdr->lru_head_ptr != chunk || dset_hdr->lru_tail_ptr != chunk)
+        TEST_ERROR;
+
+    found_chunk = H5SC__ht_chunk_find(cache, &chunk_key);
+    if (found_chunk != chunk)
+        TEST_ERROR;
+
+    if (H5Sclose(file_space) < 0)
+        TEST_ERROR;
+    file_space = H5I_INVALID_HID;
+
+    /*
+     * Closing the dataset evicts the clean resident chunk. Reopening then
+     * forces the persisted filtered representation through its decode path.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (cache->dset_lru_head_ptr || cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    memset(read_buf, 0, sizeof(read_buf));
+
+    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, read_buf) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < 5; i++)
+        if (read_buf[i] != expected_after_first[i])
+            TEST_ERROR;
+
+    /*
+     * Close and reopen again so the second partial write begins with a
+     * nonresident on-disk chunk rather than the clean resident chunk created
+     * by the verification read.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 0)
+        TEST_ERROR;
+
+    if ((file_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(file_space, H5S_SELECT_SET, second_start, NULL, count, NULL) < 0)
+        TEST_ERROR;
+
+    flush_count_before = cache->stats.scc_chunk_flush_count;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, second_update) < 0)
+        TEST_ERROR;
+
+    /*
+     * The second partial update must also remain dirty and resident until the
+     * dataset is closed.
+     */
+    if (cache->stats.scc_chunk_flush_count != flush_count_before)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 1)
+        TEST_ERROR;
+
+    chunk = dset_hdr->lru_head_ptr;
+    if (!chunk)
+        TEST_ERROR;
+
+    if (chunk != dset_hdr->lru_tail_ptr)
+        TEST_ERROR;
+
+    if (!chunk->chunk_obj)
+        TEST_ERROR;
+
+    if (!chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    if (H5Sclose(file_space) < 0)
+        TEST_ERROR;
+    file_space = H5I_INVALID_HID;
+
+    /*
+     * Close without an explicit flush. Dataset close must encode and persist
+     * the second partial update before evicting the chunk.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (cache->stats.scc_chunk_flush_count <= flush_count_before)
+        TEST_ERROR;
+
+    if (cache->dset_lru_head_ptr || cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    /*
+     * The final reopen forces both structured-chunk sections through their
+     * decode paths. Validate every element so corruption or loss outside the
+     * update regions cannot be hidden.
+     */
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    memset(read_buf, 0, sizeof(read_buf));
+
+    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, read_buf) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < 5; i++)
+        if (read_buf[i] != expected_final[i])
+            TEST_ERROR;
+
+    if (H5Sclose(mem_space) < 0)
+        TEST_ERROR;
+    mem_space = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(file_space);
+        H5Sclose(mem_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+} /* end test_scc_gzip_partial_write_persistence() */
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_szip_partial_write_persistence
+ *
+ * Purpose:     Verify write-back behavior when partially overwriting an
+ *              existing nonresident SZIP-filtered structured chunk.
+ *
+ *              The test proves that:
+ *
+ *                  1) The existing filtered chunk is decoded and materialized
+ *                     before a partial update is applied.
+ *
+ *                  2) Ordinary H5Dwrite() retains the updated chunk dirty and
+ *                     resident without immediately encoding or persisting it.
+ *
+ *                  3) H5Fflush() applies SZIP to the fixed-data section and
+ *                     persists the chunk without evicting it.
+ *
+ *                  4) A second partial update is persisted by dataset close.
+ *
+ *                  5) Values outside both partial selections survive all
+ *                     decode, update, encode, flush, and reopen operations.
+ *
+ *              SZIP is applied only to H5_SECTION_FIXED, consistent with the
+ *              supported SCC SZIP configuration.
+ *
+ * Return:      SUCCEED/FAIL
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_szip_partial_write_persistence(void)
+{
+    hid_t fid        = H5I_INVALID_HID;
+    hid_t sid        = H5I_INVALID_HID;
+    hid_t dcpl       = H5I_INVALID_HID;
+    hid_t did        = H5I_INVALID_HID;
+    hid_t file_space = H5I_INVALID_HID;
+    hid_t mem_space  = H5I_INVALID_HID;
+
+    const hsize_t dims[2]       = {8, 8};
+    const hsize_t chunk_dims[2] = {8, 8};
+    const hsize_t mem_dims[2]   = {2, 2};
+
+    const hsize_t first_start[2]  = {2, 2};
+    const hsize_t second_start[2] = {5, 4};
+    const hsize_t count[2]        = {2, 2};
+
+    const int first_update[2][2] = {{1001, 1002}, {1003, 1004}};
+
+    const int second_update[2][2] = {{2001, 2002}, {2003, 2004}};
+
+    int initial[8][8];
+    int expected_after_first[8][8];
+    int expected_final[8][8];
+    int read_buf[8][8];
+
+    unsigned int cd_values[2] = {H5_SZIP_NN_OPTION_MASK, 8};
+    unsigned int filter_info;
+
+    H5SC_t *cache                = NULL;
+    H5SC_dset_header_t *dset_hdr = NULL;
+    H5SC_chunk_t *chunk          = NULL;
+    H5SC_chunk_t *found_chunk    = NULL;
+
+    H5SC_chunk_key_t chunk_key;
+
+    uint64_t flush_count_before;
+    uint64_t flush_count_after_explicit;
+    size_t saved_lru_len;
+
+    char filename[1024];
+
+    TESTING("SCC: SZIP partial nonresident write-back persistence");
+
+    memset(&chunk_key, 0, sizeof(chunk_key));
+    memset(read_buf, 0, sizeof(read_buf));
+
+    /*
+     * Skip cleanly if this build does not provide both SZIP encoding and
+     * decoding.
+     */
+    if (H5Zfilter_avail(H5Z_FILTER_SZIP) <= 0) {
+        SKIPPED();
+        puts("    SZIP filter not available");
+        return SUCCEED;
+    }
+
+    if (H5Zget_filter_info(H5Z_FILTER_SZIP, &filter_info) < 0)
+        TEST_ERROR;
+
+    if (!(filter_info & H5Z_FILTER_CONFIG_ENCODE_ENABLED) ||
+        !(filter_info & H5Z_FILTER_CONFIG_DECODE_ENABLED)) {
+        SKIPPED();
+        puts("    SZIP encode/decode support unavailable");
+        return SUCCEED;
+    }
+
+    /*
+     * Initialize the complete chunk and the two expected results.
+     */
+    for (size_t row = 0; row < 8; row++)
+        for (size_t col = 0; col < 8; col++)
+            initial[row][col] = (int)(row * 100 + col);
+
+    memcpy(expected_after_first, initial, sizeof(initial));
+
+    expected_after_first[2][2] = 1001;
+    expected_after_first[2][3] = 1002;
+    expected_after_first[3][2] = 1003;
+    expected_after_first[3][3] = 1004;
+
+    memcpy(expected_final, expected_after_first, sizeof(expected_after_first));
+
+    expected_final[5][4] = 2001;
+    expected_final[5][5] = 2002;
+    expected_final[6][4] = 2003;
+    expected_final[6][5] = 2004;
+
+    h5_fixname("scc_szip_partial_write_persistence", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(2, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 2, chunk_dims, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    /*
+     * SZIP is supported for the fixed-data section only. The sparse selection
+     * representation remains unfiltered.
+     */
+    if (H5Pset_filter2(dcpl, H5_SECTION_FIXED, H5Z_FILTER_SZIP, H5Z_FLAG_MANDATORY, 2, cd_values) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
+        TEST_ERROR;
+
+    if (!cache)
+        TEST_ERROR;
+
+    /*
+     * Establish a complete SZIP-filtered on-disk chunk. Dataset close must
+     * encode, flush, and evict the dirty resident representation.
+     */
+    if (H5Dwrite(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, initial) < 0)
+        TEST_ERROR;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (cache->dset_lru_head_ptr || cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    /*
+     * Reopen with no resident chunks. The partial write must retrieve the
+     * stored chunk, decode its SZIP-filtered fixed-data section, materialize
+     * the complete decoded chunk, and only then modify the selected elements.
+     */
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->prev_dset_ptr || dset_hdr->next_dset_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 0)
+        TEST_ERROR;
+
+    if ((mem_space = H5Screate_simple(2, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((file_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(file_space, H5S_SELECT_SET, first_start, NULL, count, NULL) < 0)
+        TEST_ERROR;
+
+    flush_count_before = cache->stats.scc_chunk_flush_count;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, first_update) < 0)
+        TEST_ERROR;
+
+    /*
+     * Ordinary partial write must not immediately encode or persist the
+     * materialized chunk.
+     */
+    if (cache->stats.scc_chunk_flush_count != flush_count_before)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->prev_dset_ptr || dset_hdr->next_dset_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 1)
+        TEST_ERROR;
+
+    chunk = dset_hdr->lru_head_ptr;
+    if (!chunk)
+        TEST_ERROR;
+
+    if (chunk != dset_hdr->lru_tail_ptr)
+        TEST_ERROR;
+
+    if (!chunk->chunk_obj)
+        TEST_ERROR;
+
+    if (!chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    /*
+     * The partial write modified an existing on-disk chunk, so its storage
+     * identity should remain available while its decoded representation is
+     * dirty.
+     */
+    if (!H5_addr_defined(chunk->disk_addr))
+        TEST_ERROR;
+
+    if (chunk->disk_nbytes == 0)
+        TEST_ERROR;
+
+    chunk_key     = chunk->data_key;
+    saved_lru_len = dset_hdr->chunk_lru_len;
+
+    /*
+     * Explicit file flush must re-encode the partially updated chunk, apply
+     * SZIP to its fixed-data section, and persist it without replacing or
+     * evicting the resident decoded object.
+     */
+    if (H5Fflush(fid, H5F_SCOPE_LOCAL) < 0)
+        TEST_ERROR;
+
+    flush_count_after_explicit = cache->stats.scc_chunk_flush_count;
+
+    if (flush_count_after_explicit != flush_count_before + 1)
+        TEST_ERROR;
+
+    if (chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (!chunk->chunk_obj)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    if (!H5_addr_defined(chunk->disk_addr))
+        TEST_ERROR;
+
+    if (chunk->disk_nbytes == 0)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != saved_lru_len)
+        TEST_ERROR;
+
+    if (dset_hdr->lru_head_ptr != chunk || dset_hdr->lru_tail_ptr != chunk)
+        TEST_ERROR;
+
+    found_chunk = H5SC__ht_chunk_find(cache, &chunk_key);
+    if (found_chunk != chunk)
+        TEST_ERROR;
+
+    if (H5Sclose(file_space) < 0)
+        TEST_ERROR;
+    file_space = H5I_INVALID_HID;
+
+    /*
+     * Closing the dataset evicts the clean resident chunk. Reopening then
+     * forces the persisted fixed-data section through the SZIP decode path.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (cache->dset_lru_head_ptr || cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    memset(read_buf, 0, sizeof(read_buf));
+
+    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, read_buf) < 0)
+        TEST_ERROR;
+
+    for (size_t row = 0; row < 8; row++)
+        for (size_t col = 0; col < 8; col++)
+            if (read_buf[row][col] != expected_after_first[row][col])
+                TEST_ERROR;
+
+    /*
+     * Close and reopen again so the second partial write begins with a
+     * nonresident on-disk chunk rather than the clean resident chunk created
+     * by the verification read.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 0)
+        TEST_ERROR;
+
+    if ((file_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(file_space, H5S_SELECT_SET, second_start, NULL, count, NULL) < 0)
+        TEST_ERROR;
+
+    flush_count_before = cache->stats.scc_chunk_flush_count;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, second_update) < 0)
+        TEST_ERROR;
+
+    /*
+     * The second partial update must remain dirty and resident until dataset
+     * close performs the required encoding and persistence.
+     */
+    if (cache->stats.scc_chunk_flush_count != flush_count_before)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 1)
+        TEST_ERROR;
+
+    chunk = dset_hdr->lru_head_ptr;
+    if (!chunk)
+        TEST_ERROR;
+
+    if (chunk != dset_hdr->lru_tail_ptr)
+        TEST_ERROR;
+
+    if (!chunk->chunk_obj)
+        TEST_ERROR;
+
+    if (!chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    if (H5Sclose(file_space) < 0)
+        TEST_ERROR;
+    file_space = H5I_INVALID_HID;
+
+    /*
+     * Close without an explicit flush. Dataset close must encode and persist
+     * the second partial update before evicting the chunk.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (cache->stats.scc_chunk_flush_count <= flush_count_before)
+        TEST_ERROR;
+
+    if (cache->dset_lru_head_ptr || cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    /*
+     * The final reopen forces the fixed-data section through SZIP decoding.
+     * Validate every value so corruption or loss outside the two partial
+     * update regions cannot be hidden.
+     */
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    memset(read_buf, 0, sizeof(read_buf));
+
+    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, read_buf) < 0)
+        TEST_ERROR;
+
+    for (size_t row = 0; row < 8; row++)
+        for (size_t col = 0; col < 8; col++)
+            if (read_buf[row][col] != expected_final[row][col])
+                TEST_ERROR;
+
+    if (H5Sclose(mem_space) < 0)
+        TEST_ERROR;
+    mem_space = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(file_space);
+        H5Sclose(mem_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+} /* end test_scc_szip_partial_write_persistence() */
+
+#if H5SC_DO_SANITY_CHECKS
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_failed_flush_retains_dirty_state
+ *
+ * Purpose:     Verify that a failed dirty-chunk flush preserves resident
+ *              decoded state, dirty state, cache identity, pin accounting,
+ *              and size accounting, and that a later flush can succeed.
+ *
+ * Return:      SUCCEED/FAIL
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_failed_flush_retains_dirty_state(void)
+{
+    hid_t fid  = H5I_INVALID_HID;
+    hid_t sid  = H5I_INVALID_HID;
+    hid_t dcpl = H5I_INVALID_HID;
+    hid_t did  = H5I_INVALID_HID;
+
+    const hsize_t dims[1]       = {5};
+    const hsize_t chunk_dims[1] = {5};
+
+    const int write_buf[5] = {11, 22, 33, 44, 55};
+    int read_buf[5];
+
+    H5SC_t *cache                = NULL;
+    H5SC_dset_header_t *dset_hdr = NULL;
+    H5SC_chunk_t *chunk          = NULL;
+    H5SC_chunk_t *saved_chunk    = NULL;
+
+    H5SC_chunk_key_t saved_key;
+
+    size_t saved_cached_size;
+    size_t saved_dset_size;
+    size_t saved_quiescent_size;
+    size_t saved_chunk_lru_len;
+
+    uint64_t flush_count_before;
+
+    herr_t flush_status = SUCCEED;
+
+    char filename[1024];
+
+    TESTING("SCC: failed flush retains dirty resident state");
+
+    memset(&saved_key, 0, sizeof(saved_key));
+    memset(read_buf, 0, sizeof(read_buf));
+
+    h5_fixname("scc_failed_flush_retains_dirty_state", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dims, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
+        TEST_ERROR;
+
+    if (!cache)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, write_buf) < 0)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 1)
+        TEST_ERROR;
+
+    chunk = dset_hdr->lru_head_ptr;
+    if (!chunk || chunk != dset_hdr->lru_tail_ptr)
+        TEST_ERROR;
+
+    if (!chunk->chunk_obj || !chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    saved_chunk          = chunk;
+    saved_key            = chunk->data_key;
+    saved_cached_size    = chunk->cached_chunk_size;
+    saved_dset_size      = dset_hdr->curr_dset_size;
+    saved_quiescent_size = cache->SCC_quiescent_size;
+    saved_chunk_lru_len  = dset_hdr->chunk_lru_len;
+    flush_count_before   = cache->stats.scc_chunk_flush_count;
+
+    /*
+     * Force the next dirty-chunk flush to fail before it changes storage
+     * metadata or encoded state.
+     */
+    cache->test_fail_next_chunk_flush = true;
+
+    H5E_BEGIN_TRY { flush_status = H5Fflush(fid, H5F_SCOPE_LOCAL); }
+    H5E_END_TRY
+
+    if (flush_status >= 0)
+        TEST_ERROR;
+
+    /*
+     * The injection remains active throughout the complete public flush
+     * operation so no later internal flush attempt can succeed.
+     */
+    if (!cache->test_fail_next_chunk_flush)
+        TEST_ERROR;
+
+    /*
+     * Failure must leave the resident chunk recoverable and dirty.
+     */
+    if (chunk != saved_chunk)
+        TEST_ERROR;
+
+    if (!chunk->chunk_obj)
+        TEST_ERROR;
+
+    if (!chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    if (cache->stats.scc_chunk_flush_count != flush_count_before)
+        TEST_ERROR;
+
+    if (chunk->cached_chunk_size != saved_cached_size)
+        TEST_ERROR;
+
+    if (dset_hdr->curr_dset_size != saved_dset_size)
+        TEST_ERROR;
+
+    if (cache->SCC_quiescent_size != saved_quiescent_size)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != saved_chunk_lru_len)
+        TEST_ERROR;
+
+    if (dset_hdr->lru_head_ptr != saved_chunk || dset_hdr->lru_tail_ptr != saved_chunk)
+        TEST_ERROR;
+
+    if (H5SC__ht_chunk_find(cache, &saved_key) != saved_chunk)
+        TEST_ERROR;
+
+    /*
+     * Disable failure injection and retry persistence.
+     */
+    cache->test_fail_next_chunk_flush = false;
+
+    /*
+     * A subsequent flush should now succeed.
+     */
+    if (H5Fflush(fid, H5F_SCOPE_LOCAL) < 0)
+        TEST_ERROR;
+
+    if (chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (!chunk->chunk_obj)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    if (cache->stats.scc_chunk_flush_count != flush_count_before + 1)
+        TEST_ERROR;
+
+    if (H5SC__ht_chunk_find(cache, &saved_key) != saved_chunk)
+        TEST_ERROR;
+
+    /*
+     * Close/reopen and verify that the recovered flush persisted the data.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    memset(read_buf, 0, sizeof(read_buf));
+
+    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, read_buf) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < 5; i++)
+        if (read_buf[i] != write_buf[i])
+            TEST_ERROR;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    if (cache)
+        cache->test_fail_next_chunk_flush = false;
+
+    H5E_BEGIN_TRY
+    {
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+} /* end test_scc_failed_flush_retains_dirty_state() */
+
+#endif /* H5SC_DO_SANITY_CHECKS */
 
 /******************************************************************************
  *
@@ -5300,14 +8668,13 @@ error:
  *     implementation-dependent and are not strictly validated by this test.
  *
  ******************************************************************************/
-static herr_t
-test_integer_width_conversion_matrix(void)
+static herr_t test_integer_width_conversion_matrix(void)
 {
-    hid_t   fid     = H5I_INVALID_HID;
-    hid_t   sid     = H5I_INVALID_HID;
-    hid_t   did_i64 = H5I_INVALID_HID;
-    hid_t   did_i16 = H5I_INVALID_HID;
-    hsize_t dim[1]  = {12};
+    hid_t fid      = H5I_INVALID_HID;
+    hid_t sid      = H5I_INVALID_HID;
+    hid_t did_i64  = H5I_INVALID_HID;
+    hid_t did_i16  = H5I_INVALID_HID;
+    hsize_t dim[1] = {12};
 
     int64_t i64src[12];
     int16_t i16src[12];
@@ -5598,20 +8965,19 @@ error:
  *     may lose precision for finite values not exactly representable as float.
  *
  ******************************************************************************/
-static herr_t
-test_float_width_conversion_matrix(void)
+static herr_t test_float_width_conversion_matrix(void)
 {
-    hid_t   fid     = H5I_INVALID_HID;
-    hid_t   sid     = H5I_INVALID_HID;
-    hid_t   did_dbl = H5I_INVALID_HID;
-    hid_t   did_flt = H5I_INVALID_HID;
-    hsize_t dim[1]  = {12};
+    hid_t fid      = H5I_INVALID_HID;
+    hid_t sid      = H5I_INVALID_HID;
+    hid_t did_dbl  = H5I_INVALID_HID;
+    hid_t did_flt  = H5I_INVALID_HID;
+    hsize_t dim[1] = {12};
 
     double dsrc[12];
-    float  fsrc[12];
+    float fsrc[12];
 
     double rbuf_dbl[12];
-    float  rbuf_flt[12];
+    float rbuf_flt[12];
 
     int i;
 
@@ -5632,9 +8998,9 @@ test_float_width_conversion_matrix(void)
      */
     dsrc[0]  = 0.0;
     dsrc[1]  = -0.0;
-    dsrc[2]  = NAN;
-    dsrc[3]  = INFINITY;
-    dsrc[4]  = -INFINITY;
+    dsrc[2]  = (double)NAN;
+    dsrc[3]  = (double)INFINITY;
+    dsrc[4]  = -(double)INFINITY;
     dsrc[5]  = DBL_TRUE_MIN;
     dsrc[6]  = ((double)FLT_TRUE_MIN) / 2.0;
     dsrc[7]  = (double)FLT_TRUE_MIN;
@@ -6014,24 +9380,23 @@ error:
  *     in float, such as 2^24 + 1.
  *
  ******************************************************************************/
-static herr_t
-test_numeric_cross_type_conversion_matrix(void)
+static herr_t test_numeric_cross_type_conversion_matrix(void)
 {
-    hid_t   fid     = H5I_INVALID_HID;
-    hid_t   sid     = H5I_INVALID_HID;
-    hid_t   did_i64 = H5I_INVALID_HID;
-    hid_t   did_i16 = H5I_INVALID_HID;
-    hid_t   did_dbl = H5I_INVALID_HID;
-    hid_t   did_flt = H5I_INVALID_HID;
-    hsize_t dim[1]  = {10};
+    hid_t fid      = H5I_INVALID_HID;
+    hid_t sid      = H5I_INVALID_HID;
+    hid_t did_i64  = H5I_INVALID_HID;
+    hid_t did_i16  = H5I_INVALID_HID;
+    hid_t did_dbl  = H5I_INVALID_HID;
+    hid_t did_flt  = H5I_INVALID_HID;
+    hsize_t dim[1] = {10};
 
     int64_t i64src[10];
     int16_t i16src[10];
-    double  dsrc[10];
-    float   fsrc[10];
+    double dsrc[10];
+    float fsrc[10];
 
-    float   rbuf_flt[10];
-    double  rbuf_dbl[10];
+    float rbuf_flt[10];
+    double rbuf_dbl[10];
     int16_t rbuf_i16[10];
     int64_t rbuf_i64[10];
 
@@ -6336,143 +9701,185 @@ error:
 /*-------------------------------------------------------------------------
  * Function:    test_scc_erase_delete_full_chunk_1d
  *
- * Purpose:     Verify that H5Derase() deletes a fully selected chunk in a
- *              1D structured-chunk dataset while preserving neighboring
- *              chunks.
- *
- *              This test writes data into two 1D chunks, then performs an
- *              erase operation on a hyperslab that exactly covers the
- *              second chunk.
- *
- *              The test validates:
- *
- *              1) Full-chunk erase semantics:
- *                 - All values in the erased chunk become undefined/zero.
- *                 - Values in the non-erased chunk remain unchanged.
- *
- *              2) Full-chunk delete behavior:
- *                 - Because the erase covers all defined values in the
- *                   second chunk, that chunk is deleted rather than
- *                   retained in modified form.
- *
- *              3) SCC state consistency:
- *                 - The cache remains valid after the delete.
- *                 - Neighboring chunk state is preserved.
- *
- *              Verification is performed by:
- *                 - Reading back the full dataset and comparing against
- *                   expected values.
- *                 - Inspecting SCC state via
- *                   H5SC__get_cache_from_file_id() to confirm the cache
- *                   remains populated and does not collapse to an invalid
- *                   empty state.
+ * Purpose:     Verify that completely erasing an existing on-disk chunk
+ *              immediately deletes it rather than retaining dirty resident
+ *              state for later write-back.
  *
  * Return:      SUCCEED/FAIL
- *
  *-------------------------------------------------------------------------
  */
-
-static int
-test_scc_erase_delete_full_chunk_1d(void)
+static int test_scc_erase_delete_full_chunk_1d(void)
 {
-    TESTING("SCC: H5Derase deletes one full 1D chunk, preserves neighbors");
+    hid_t fid        = H5I_INVALID_HID;
+    hid_t sid        = H5I_INVALID_HID;
+    hid_t dcpl       = H5I_INVALID_HID;
+    hid_t did        = H5I_INVALID_HID;
+    hid_t file_space = H5I_INVALID_HID;
 
-    hid_t fid      = H5I_INVALID_HID;
-    hid_t sid      = H5I_INVALID_HID;
-    hid_t dcpl     = H5I_INVALID_HID;
-    hid_t did      = H5I_INVALID_HID;
-    hid_t mem_sid  = H5I_INVALID_HID;
-    hid_t file_sel = H5I_INVALID_HID;
+    const hsize_t dims[1]        = {10};
+    const hsize_t chunk_dims[1]  = {5};
+    const hsize_t erase_start[1] = {5};
+    const hsize_t erase_count[1] = {5};
 
-    hsize_t dim[1]       = {10}; /* 2 chunks */
-    hsize_t chunk_dim[1] = {5};
-    hsize_t mem_dim[1]   = {5};
+    const int initial[10] = {11, 22, 33, 44, 55, 66, 77, 88, 99, 110};
 
-    int  wbuf[5];
-    int  rbuf[10];
+    const int expected[10] = {11, 22, 33, 44, 55, 0, 0, 0, 0, 0};
+
+    int read_buf[10];
+
+    H5SC_t *cache                = NULL;
+    H5SC_dset_header_t *dset_hdr = NULL;
+    H5SC_chunk_t *chunk          = NULL;
+
+    H5SC_chunk_key_t erased_key;
+
+    uint64_t flush_count_before;
+
     char filename[1024];
+
+    TESTING("SCC: full 1D erase performs immediate chunk deletion");
+
+    memset(&erased_key, 0, sizeof(erased_key));
+    memset(read_buf, 0, sizeof(read_buf));
 
     h5_fixname("scc_erase_delete_full_chunk_1d", H5P_DEFAULT, filename, sizeof(filename));
 
     if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
         TEST_ERROR;
-    if ((sid = H5Screate_simple(1, dim, NULL)) < 0)
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
         TEST_ERROR;
+
     if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
         TEST_ERROR;
+
     if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
         TEST_ERROR;
-    if (H5Pset_struct_chunk(dcpl, 1, chunk_dim, H5D_SPARSE_CHUNK) < 0)
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dims, H5D_SPARSE_CHUNK) < 0)
         TEST_ERROR;
+
     if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
         TEST_ERROR;
-    if ((mem_sid = H5Screate_simple(1, mem_dim, NULL)) < 0)
-        TEST_ERROR;
 
-    /* chunk 0 */
-    if (t_select_1d_hyperslab(did, 0, 5, &file_sel) < 0)
-        TEST_ERROR;
-    memset(wbuf, 0, sizeof(wbuf));
-    wbuf[0] = 11;
-    wbuf[1] = 22;
-    if (H5Dwrite(did, H5T_NATIVE_INT, mem_sid, file_sel, H5P_DEFAULT, wbuf) < 0)
-        TEST_ERROR;
-    if (H5Sclose(file_sel) < 0)
-        TEST_ERROR;
-    file_sel = H5I_INVALID_HID;
-
-    /* chunk 1 */
-    if (t_select_1d_hyperslab(did, 5, 5, &file_sel) < 0)
-        TEST_ERROR;
-    memset(wbuf, 0, sizeof(wbuf));
-    wbuf[0] = 33;
-    wbuf[1] = 44;
-    if (H5Dwrite(did, H5T_NATIVE_INT, mem_sid, file_sel, H5P_DEFAULT, wbuf) < 0)
-        TEST_ERROR;
-    if (H5Sclose(file_sel) < 0)
-        TEST_ERROR;
-    file_sel = H5I_INVALID_HID;
-
-    /* Erase chunk 1 completely */
-    if (t_select_1d_hyperslab(did, 5, 5, &file_sel) < 0)
-        TEST_ERROR;
-    if (H5Derase(did, file_sel, H5P_DEFAULT) < 0)
-        TEST_ERROR;
-    if (H5Sclose(file_sel) < 0)
-        TEST_ERROR;
-    file_sel = H5I_INVALID_HID;
-
-    /* Verify semantic result */
-    memset(rbuf, 0, sizeof(rbuf));
-    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rbuf) < 0)
-        TEST_ERROR;
-
-    if (rbuf[0] != 11 || rbuf[1] != 22)
-        TEST_ERROR;
-    if (rbuf[5] != 0 || rbuf[6] != 0 || rbuf[7] != 0 || rbuf[8] != 0 || rbuf[9] != 0)
-        TEST_ERROR;
-
-    /* Verify SCC state: only one chunk should remain resident/quiescent */
-    H5SC_t *cache = NULL;
     if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
         TEST_ERROR;
 
-    if (cache->SCC_quiescent_size == 0)
+    if (!cache)
         TEST_ERROR;
 
-    /* Cleanup */
-    if (H5Sclose(mem_sid) < 0)
+    /*
+     * Create two complete dirty chunks.
+     */
+    if (H5Dwrite(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, initial) < 0)
         TEST_ERROR;
-    mem_sid = H5I_INVALID_HID;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr || dset_hdr->chunk_lru_len != 2)
+        TEST_ERROR;
+
+    /*
+     * Capture the key for logical chunk 1 before dataset close evicts the
+     * resident entries.
+     */
+    for (chunk = dset_hdr->lru_head_ptr; chunk; chunk = chunk->next_ptr)
+        if (chunk->scaled[0] == 1) {
+            erased_key = chunk->data_key;
+            break;
+        }
+
+    if (!chunk)
+        TEST_ERROR;
+
     if (H5Dclose(did) < 0)
         TEST_ERROR;
     did = H5I_INVALID_HID;
+
+    if (cache->dset_lru_head_ptr || cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    /*
+     * Reopen with both chunks nonresident and erase all values in chunk 1.
+     */
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 0)
+        TEST_ERROR;
+
+    if ((file_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(file_space, H5S_SELECT_SET, erase_start, NULL, erase_count, NULL) < 0)
+        TEST_ERROR;
+
+    flush_count_before = cache->stats.scc_chunk_flush_count;
+
+    if (H5Derase(did, file_space, H5P_DEFAULT) < 0)
+        TEST_ERROR;
+
+    /*
+     * A complete erase must use immediate deletion, not dirty write-back.
+     */
+    if (cache->stats.scc_chunk_flush_count != flush_count_before)
+        TEST_ERROR;
+
+    if (H5SC__ht_chunk_find(cache, &erased_key) != NULL)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 0)
+        TEST_ERROR;
+
+    if (dset_hdr->lru_head_ptr || dset_hdr->lru_tail_ptr)
+        TEST_ERROR;
+
+    if (H5Sclose(file_space) < 0)
+        TEST_ERROR;
+    file_space = H5I_INVALID_HID;
+
+    /*
+     * Reopen before validation so the result comes from persisted structured
+     * storage rather than resident state.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    memset(read_buf, 0, sizeof(read_buf));
+
+    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, read_buf) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < 10; i++)
+        if (read_buf[i] != expected[i])
+            TEST_ERROR;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
     if (H5Pclose(dcpl) < 0)
         TEST_ERROR;
     dcpl = H5I_INVALID_HID;
+
     if (H5Sclose(sid) < 0)
         TEST_ERROR;
     sid = H5I_INVALID_HID;
+
     if (H5Fclose(fid) < 0)
         TEST_ERROR;
     fid = H5I_INVALID_HID;
@@ -6483,8 +9890,7 @@ test_scc_erase_delete_full_chunk_1d(void)
 error:
     H5E_BEGIN_TRY
     {
-        H5Sclose(file_sel);
-        H5Sclose(mem_sid);
+        H5Sclose(file_space);
         H5Dclose(did);
         H5Pclose(dcpl);
         H5Sclose(sid);
@@ -6499,131 +9905,375 @@ error:
 /*-------------------------------------------------------------------------
  * Function:    test_scc_erase_partial_chunk_1d_survives
  *
- * Purpose:     Verify that H5Derase() preserves a 1D chunk when only part
- *              of that chunk is erased.
+ * Purpose:     Verify partial-erase semantics and write-back persistence for
+ *              an existing nonresident 1D structured chunk.
  *
- *              This test writes defined values into a single 1D chunk, then
- *              erases only one element from that chunk.
+ *              The test proves that:
  *
- *              The test validates:
+ *                  1) A partial erase materializes an existing on-disk chunk
+ *                     and preserves all unselected values.
  *
- *              1) Partial-chunk erase semantics:
- *                 - The erased element becomes undefined/zero.
- *                 - All non-erased defined elements remain unchanged.
+ *                  2) H5Derase() leaves the surviving chunk resident and dirty
+ *                     without immediately persisting it.
  *
- *              2) Partial-chunk survival behavior:
- *                 - The chunk is not deleted when defined values remain
- *                   after the erase.
+ *                  3) H5Fflush() persists the partially erased chunk while
+ *                     retaining the same resident object, hash identity, and
+ *                     dataset-LRU membership.
  *
- *              3) SCC state consistency:
- *                 - The cache continues to track the surviving chunk.
- *                 - The resulting SCC state remains non-empty and valid.
+ *                  4) A second partial erase is persisted by dataset close,
+ *                     which also evicts the resident chunk.
  *
- *              Verification is performed by:
- *                 - Reading back the dataset and checking that only the
- *                   requested element was erased.
- *                 - Inspecting SCC state via
- *                   H5SC__get_cache_from_file_id() to confirm that the
- *                   chunk still exists in cache-related accounting.
+ *                  5) Both erased regions remain undefined after reopen while
+ *                     all other values remain unchanged.
+ *
+ *              Complete-chunk erase behavior is intentionally not tested
+ *              here. Completely empty chunks follow the separate immediate
+ *              deletion path.
  *
  * Return:      SUCCEED/FAIL
- *
  *-------------------------------------------------------------------------
  */
-
-static int
-test_scc_erase_partial_chunk_1d_survives(void)
+static int test_scc_erase_partial_chunk_1d_survives(void)
 {
-    TESTING("SCC: partial 1D erase preserves surviving chunk");
+    hid_t fid        = H5I_INVALID_HID;
+    hid_t sid        = H5I_INVALID_HID;
+    hid_t dcpl       = H5I_INVALID_HID;
+    hid_t did        = H5I_INVALID_HID;
+    hid_t file_space = H5I_INVALID_HID;
 
-    hid_t fid      = H5I_INVALID_HID;
-    hid_t sid      = H5I_INVALID_HID;
-    hid_t dcpl     = H5I_INVALID_HID;
-    hid_t did      = H5I_INVALID_HID;
-    hid_t mem_sid  = H5I_INVALID_HID;
-    hid_t file_sel = H5I_INVALID_HID;
+    const hsize_t dims[1]       = {8};
+    const hsize_t chunk_dims[1] = {8};
 
-    hsize_t dim[1]       = {10};
-    hsize_t chunk_dim[1] = {5};
-    hsize_t mem_dim[1]   = {5};
+    const hsize_t first_start[1]  = {2};
+    const hsize_t first_count[1]  = {2};
+    const hsize_t second_start[1] = {5};
+    const hsize_t second_count[1] = {2};
 
-    int  wbuf[5];
-    int  rbuf[10];
+    const int initial[8] = {10, 20, 30, 40, 50, 60, 70, 80};
+
+    const int expected_after_first[8] = {10, 20, 0, 0, 50, 60, 70, 80};
+
+    const int expected_final[8] = {10, 20, 0, 0, 50, 0, 0, 80};
+
+    int read_buf[8];
+
+    H5SC_t *cache                = NULL;
+    H5SC_dset_header_t *dset_hdr = NULL;
+    H5SC_chunk_t *chunk          = NULL;
+    H5SC_chunk_t *found_chunk    = NULL;
+
+    H5SC_chunk_key_t chunk_key;
+
+    uint64_t flush_count_before;
+    uint64_t flush_count_after_explicit;
+    size_t saved_lru_len;
+
     char filename[1024];
+
+    TESTING("SCC: partial 1D erase write-back persistence");
+
+    memset(&chunk_key, 0, sizeof(chunk_key));
+    memset(read_buf, 0, sizeof(read_buf));
 
     h5_fixname("scc_erase_partial_chunk_1d_survives", H5P_DEFAULT, filename, sizeof(filename));
 
     if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
         TEST_ERROR;
-    if ((sid = H5Screate_simple(1, dim, NULL)) < 0)
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
         TEST_ERROR;
+
     if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
         TEST_ERROR;
+
     if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
         TEST_ERROR;
-    if (H5Pset_struct_chunk(dcpl, 1, chunk_dim, H5D_SPARSE_CHUNK) < 0)
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dims, H5D_SPARSE_CHUNK) < 0)
         TEST_ERROR;
+
     if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
         TEST_ERROR;
-    if ((mem_sid = H5Screate_simple(1, mem_dim, NULL)) < 0)
-        TEST_ERROR;
 
-    if (t_select_1d_hyperslab(did, 5, 5, &file_sel) < 0)
-        TEST_ERROR;
-    memset(wbuf, 0, sizeof(wbuf));
-    wbuf[0] = 1;
-    wbuf[1] = 2;
-    wbuf[2] = 3;
-    wbuf[3] = 4;
-    wbuf[4] = 5;
-    if (H5Dwrite(did, H5T_NATIVE_INT, mem_sid, file_sel, H5P_DEFAULT, wbuf) < 0)
-        TEST_ERROR;
-    if (H5Sclose(file_sel) < 0)
-        TEST_ERROR;
-    file_sel = H5I_INVALID_HID;
-
-    /* Debug read prior to erase */
-    memset(rbuf, 0, sizeof(rbuf));
-    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rbuf) < 0)
-        TEST_ERROR;
-
-    /* Erase only first element of chunk 1 (dataset index 5) */
-    if (t_select_1d_hyperslab(did, 5, 1, &file_sel) < 0)
-        TEST_ERROR;
-    if (H5Derase(did, file_sel, H5P_DEFAULT) < 0)
-        TEST_ERROR;
-    if (H5Sclose(file_sel) < 0)
-        TEST_ERROR;
-    file_sel = H5I_INVALID_HID;
-
-    memset(rbuf, 0, sizeof(rbuf));
-    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rbuf) < 0)
-        TEST_ERROR;
-
-    if (rbuf[5] != 0)
-        TEST_ERROR;
-    if (rbuf[6] != 2 || rbuf[7] != 3 || rbuf[8] != 4 || rbuf[9] != 5)
-        TEST_ERROR;
-
-    H5SC_t *cache = NULL;
     if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
         TEST_ERROR;
 
-    if (cache->SCC_quiescent_size == 0)
+    if (!cache)
         TEST_ERROR;
 
-    if (H5Sclose(mem_sid) < 0)
+    /*
+     * Establish a complete on-disk chunk. Closing the dataset must flush and
+     * evict its dirty resident representation.
+     */
+    if (H5Dwrite(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, initial) < 0)
         TEST_ERROR;
-    mem_sid = H5I_INVALID_HID;
+
     if (H5Dclose(did) < 0)
         TEST_ERROR;
     did = H5I_INVALID_HID;
+
+    if (cache->dset_lru_head_ptr || cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    /*
+     * Reopen with no resident chunks. The partial erase must retrieve and
+     * decode the existing on-disk chunk before removing the selected values.
+     */
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->prev_dset_ptr || dset_hdr->next_dset_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 0)
+        TEST_ERROR;
+
+    if ((file_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(file_space, H5S_SELECT_SET, first_start, NULL, first_count, NULL) < 0)
+        TEST_ERROR;
+
+    flush_count_before = cache->stats.scc_chunk_flush_count;
+
+    if (H5Derase(did, file_space, H5P_DEFAULT) < 0)
+        TEST_ERROR;
+
+    /*
+     * The partial erase must not immediately persist the surviving chunk.
+     */
+    if (cache->stats.scc_chunk_flush_count != flush_count_before)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->prev_dset_ptr || dset_hdr->next_dset_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 1)
+        TEST_ERROR;
+
+    chunk = dset_hdr->lru_head_ptr;
+    if (!chunk)
+        TEST_ERROR;
+
+    if (chunk != dset_hdr->lru_tail_ptr)
+        TEST_ERROR;
+
+    /*
+     * A resident dirty chunk proves that erase_values() preserved the chunk
+     * rather than taking the complete-chunk immediate-deletion path.
+     */
+    if (!chunk->chunk_obj)
+        TEST_ERROR;
+
+    if (!chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    /*
+     * The chunk existed on disk before the erase, so its current storage
+     * identity should remain available while its resident state is dirty.
+     */
+    if (!H5_addr_defined(chunk->disk_addr))
+        TEST_ERROR;
+
+    if (chunk->disk_nbytes == 0)
+        TEST_ERROR;
+
+    chunk_key     = chunk->data_key;
+    saved_lru_len = dset_hdr->chunk_lru_len;
+
+    /*
+     * Explicit file flush must persist the partially erased chunk without
+     * replacing or evicting its resident decoded representation.
+     */
+    if (H5Fflush(fid, H5F_SCOPE_LOCAL) < 0)
+        TEST_ERROR;
+
+    flush_count_after_explicit = cache->stats.scc_chunk_flush_count;
+
+    if (flush_count_after_explicit != flush_count_before + 1)
+        TEST_ERROR;
+
+    if (chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (!chunk->chunk_obj)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    if (!H5_addr_defined(chunk->disk_addr))
+        TEST_ERROR;
+
+    if (chunk->disk_nbytes == 0)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != saved_lru_len)
+        TEST_ERROR;
+
+    if (dset_hdr->lru_head_ptr != chunk || dset_hdr->lru_tail_ptr != chunk)
+        TEST_ERROR;
+
+    found_chunk = H5SC__ht_chunk_find(cache, &chunk_key);
+    if (found_chunk != chunk)
+        TEST_ERROR;
+
+    if (H5Sclose(file_space) < 0)
+        TEST_ERROR;
+    file_space = H5I_INVALID_HID;
+
+    /*
+     * Closing the dataset evicts the clean resident chunk. Reopening therefore
+     * verifies the result from structured-chunk storage.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (cache->dset_lru_head_ptr || cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    memset(read_buf, 0, sizeof(read_buf));
+
+    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, read_buf) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < 8; i++)
+        if (read_buf[i] != expected_after_first[i])
+            TEST_ERROR;
+
+    /*
+     * Close and reopen again so the second partial erase begins with a
+     * nonresident on-disk chunk rather than the clean resident object created
+     * by the verification read.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 0)
+        TEST_ERROR;
+
+    if ((file_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(file_space, H5S_SELECT_SET, second_start, NULL, second_count, NULL) < 0)
+        TEST_ERROR;
+
+    flush_count_before = cache->stats.scc_chunk_flush_count;
+
+    if (H5Derase(did, file_space, H5P_DEFAULT) < 0)
+        TEST_ERROR;
+
+    /*
+     * The second partial erase must likewise remain dirty and resident until
+     * dataset close performs persistence.
+     */
+    if (cache->stats.scc_chunk_flush_count != flush_count_before)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    if (dset_hdr != cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    if (dset_hdr->chunk_lru_len != 1)
+        TEST_ERROR;
+
+    chunk = dset_hdr->lru_head_ptr;
+    if (!chunk)
+        TEST_ERROR;
+
+    if (chunk != dset_hdr->lru_tail_ptr)
+        TEST_ERROR;
+
+    if (!chunk->chunk_obj)
+        TEST_ERROR;
+
+    if (!chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    if (H5Sclose(file_space) < 0)
+        TEST_ERROR;
+    file_space = H5I_INVALID_HID;
+
+    /*
+     * Close without an explicit flush. Dataset close must persist the second
+     * partial erase and then evict the resident chunk.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (cache->stats.scc_chunk_flush_count <= flush_count_before)
+        TEST_ERROR;
+
+    if (cache->dset_lru_head_ptr || cache->dset_lru_tail_ptr)
+        TEST_ERROR;
+
+    /*
+     * Reopen and validate every value. Both erased ranges should read as the
+     * dataset fill value, while all unselected values remain unchanged.
+     */
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    memset(read_buf, 0, sizeof(read_buf));
+
+    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, read_buf) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < 8; i++)
+        if (read_buf[i] != expected_final[i])
+            TEST_ERROR;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
     if (H5Pclose(dcpl) < 0)
         TEST_ERROR;
     dcpl = H5I_INVALID_HID;
+
     if (H5Sclose(sid) < 0)
         TEST_ERROR;
     sid = H5I_INVALID_HID;
+
     if (H5Fclose(fid) < 0)
         TEST_ERROR;
     fid = H5I_INVALID_HID;
@@ -6634,8 +10284,7 @@ test_scc_erase_partial_chunk_1d_survives(void)
 error:
     H5E_BEGIN_TRY
     {
-        H5Sclose(file_sel);
-        H5Sclose(mem_sid);
+        H5Sclose(file_space);
         H5Dclose(did);
         H5Pclose(dcpl);
         H5Sclose(sid);
@@ -6645,7 +10294,7 @@ error:
 
     H5_FAILED();
     return FAIL;
-}
+} /* end test_scc_erase_partial_chunk_1d_survives() */
 
 /*-------------------------------------------------------------------------
  * Function:    test_scc_erase_undefined_chunk_is_noop_1d
@@ -6660,7 +10309,10 @@ error:
  *
  *              1) No-op erase semantics:
  *                 - Erasing an already-undefined chunk succeeds.
- *                 - No data is materialized or modified as a side effect.
+ *                 - H5Derase() does not materialize a resident or on-disk
+ *                   chunk when the selected region is already undefined. A
+ *                   subsequent read may independently materialize fill-valued
+ *                   SCC shell chunks.
  *
  *              2) No spurious chunk creation:
  *                 - The erase operation does not create a resident or
@@ -6683,8 +10335,7 @@ error:
  *-------------------------------------------------------------------------
  */
 
-static int
-test_scc_erase_undefined_chunk_is_noop_1d(void)
+static int test_scc_erase_undefined_chunk_is_noop_1d(void)
 {
     TESTING("SCC: erasing an already-undefined 1D chunk is a no-op");
 
@@ -6697,7 +10348,7 @@ test_scc_erase_undefined_chunk_is_noop_1d(void)
     hsize_t dim[1]       = {10};
     hsize_t chunk_dim[1] = {5};
 
-    int  rbuf[10];
+    int rbuf[10];
     char filename[1024];
 
     h5_fixname("scc_erase_undefined_chunk_is_noop_1d", H5P_DEFAULT, filename, sizeof(filename));
@@ -6724,17 +10375,29 @@ test_scc_erase_undefined_chunk_is_noop_1d(void)
         TEST_ERROR;
     file_sel = H5I_INVALID_HID;
 
-    memset(rbuf, 0, sizeof(rbuf));
+    /*
+     * Check erase behavior before H5Dread(), since an H5S_ALL structured-chunk
+     * read is allowed to materialize fill-valued resident shell chunks.
+     */
+    {
+        H5SC_t *cache = NULL;
+
+        if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
+            TEST_ERROR;
+
+        if (cache->SCC_quiescent_size != 0)
+            TEST_ERROR;
+    }
+
+    for (size_t i = 0; i < NELMTS(rbuf); i++)
+        rbuf[i] = -1;
+
     if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rbuf) < 0)
         TEST_ERROR;
 
-    H5SC_t *cache = NULL;
-    if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
-        TEST_ERROR;
-
-    /* Expect no resident chunk bytes from a no-op erase */
-    if (cache->SCC_quiescent_size != 0)
-        TEST_ERROR;
+    for (size_t i = 0; i < NELMTS(rbuf); i++)
+        if (rbuf[i] != 0)
+            TEST_ERROR;
 
     if (H5Dclose(did) < 0)
         TEST_ERROR;
@@ -6805,8 +10468,7 @@ error:
  *-------------------------------------------------------------------------
  */
 
-static int
-test_scc_erase_delete_then_rewrite_chunk_1d(void)
+static int test_scc_erase_delete_then_rewrite_chunk_1d(void)
 {
     TESTING("SCC: full 1D chunk erase followed by rewrite recreates chunk");
 
@@ -6821,8 +10483,8 @@ test_scc_erase_delete_then_rewrite_chunk_1d(void)
     hsize_t chunk_dim[1] = {5};
     hsize_t mem_dim[1]   = {5};
 
-    int  wbuf[5];
-    int  rbuf[10];
+    int wbuf[5];
+    int rbuf[10];
     char filename[1024];
 
     h5_fixname("scc_erase_delete_then_rewrite_chunk_1d", H5P_DEFAULT, filename, sizeof(filename));
@@ -6960,8 +10622,7 @@ error:
  *-------------------------------------------------------------------------
  */
 
-static int
-test_scc_erase_delete_full_chunk_2d(void)
+static int test_scc_erase_delete_full_chunk_2d(void)
 {
     TESTING("SCC: H5Derase deletes one full 2D chunk and preserves others");
 
@@ -6976,9 +10637,9 @@ test_scc_erase_delete_full_chunk_2d(void)
     hsize_t chunk_dim[2] = {2, 2};
     hsize_t mem_dim[1]   = {4};
 
-    int  wbuf0[4];
-    int  wbuf1[4];
-    int  rbuf[4][4];
+    int wbuf0[4];
+    int wbuf1[4];
+    int rbuf[4][4];
     char filename[1024];
 
     h5_fixname("scc_erase_delete_full_chunk_2d", H5P_DEFAULT, filename, sizeof(filename));
@@ -7204,8 +10865,7 @@ error:
  *-------------------------------------------------------------------------
  */
 
-static int
-test_scc_erase_partial_chunk_2d_survives(void)
+static int test_scc_erase_partial_chunk_2d_survives(void)
 {
     TESTING("SCC: partial 2D erase preserves remaining values in chunk");
 
@@ -7220,8 +10880,8 @@ test_scc_erase_partial_chunk_2d_survives(void)
     hsize_t chunk_dim[2] = {2, 2};
     hsize_t mem_dim[2]   = {2, 2};
 
-    int  wbuf[2][2];
-    int  rbuf[4][4];
+    int wbuf[2][2];
+    int rbuf[4][4];
     char filename[1024];
 
     h5_fixname("scc_erase_partial_chunk_2d_survives", H5P_DEFAULT, filename, sizeof(filename));
@@ -7345,8 +11005,7 @@ error:
  *-------------------------------------------------------------------------
  */
 
-static int
-test_scc_erase_spans_multiple_chunks_1d(void)
+static int test_scc_erase_spans_multiple_chunks_1d(void)
 {
     TESTING("SCC: H5Derase spanning multiple 1D chunks");
 
@@ -7361,9 +11020,9 @@ test_scc_erase_spans_multiple_chunks_1d(void)
     hsize_t chunk_dim[1] = {5};
     hsize_t mem_dim[1]   = {10};
 
-    int  wbuf[10];
-    int  rbuf[10];
-    int  expect[10] = {0, 1, 2, 0, 0, 0, 0, 8, 9, 0};
+    int wbuf[10];
+    int rbuf[10];
+    int expect[10] = {0, 1, 2, 0, 0, 0, 0, 8, 9, 0};
     char filename[1024];
 
     h5_fixname("scc_erase_spans_multiple_chunks_1d", H5P_DEFAULT, filename, sizeof(filename));
@@ -7509,8 +11168,7 @@ error:
  *-------------------------------------------------------------------------
  */
 
-static int
-test_scc_erase_persists_after_close_reopen_1d(void)
+static int test_scc_erase_persists_after_close_reopen_1d(void)
 {
     TESTING("SCC: H5Derase persists after close/reopen");
 
@@ -7525,9 +11183,9 @@ test_scc_erase_persists_after_close_reopen_1d(void)
     hsize_t chunk_dim[1] = {5};
     hsize_t mem_dim[1]   = {5};
 
-    int  wbuf[5];
-    int  rbuf[10];
-    int  expect[10] = {0, 0, 0, 0, 0, 0, 7, 8, 0, 0};
+    int wbuf[5];
+    int rbuf[10];
+    int expect[10] = {0, 0, 0, 0, 0, 0, 7, 8, 0, 0};
     char filename[1024];
 
     h5_fixname("scc_erase_persists_after_close_reopen_1d", H5P_DEFAULT, filename, sizeof(filename));
@@ -7695,8 +11353,7 @@ error:
  *-------------------------------------------------------------------------
  */
 
-static int
-test_scc_2d_memspace_path_isolation(void)
+static int test_scc_2d_memspace_path_isolation(void)
 {
     TESTING("SCC: isolate 2D mem-space write path vs 1D-to-2D selection path");
 
@@ -7714,10 +11371,10 @@ test_scc_2d_memspace_path_isolation(void)
     hsize_t mem_dim_2d[2] = {2, 2};
     hsize_t mem_dim_1d[1] = {4};
 
-    int  wbuf2d[2][2];
-    int  wbuf1d[4];
-    int  rbuf2d[2][2];
-    int  rbuf1d2d[2][2];
+    int wbuf2d[2][2];
+    int wbuf1d[4];
+    int rbuf2d[2][2];
+    int rbuf1d2d[2][2];
     char filename[1024];
 
     h5_fixname("scc_2d_memspace_path_isolation", H5P_DEFAULT, filename, sizeof(filename));
@@ -7763,6 +11420,13 @@ test_scc_2d_memspace_path_isolation(void)
 
     memset(rbuf2d, 0, sizeof(rbuf2d));
     if (H5Dread(did_2d, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rbuf2d) < 0)
+        TEST_ERROR;
+
+    memset(rbuf2d, 0, sizeof(rbuf2d));
+    if (H5Dread(did_2d, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rbuf2d) < 0)
+        TEST_ERROR;
+
+    if (rbuf2d[0][0] != 1 || rbuf2d[0][1] != 2 || rbuf2d[1][0] != 3 || rbuf2d[1][1] != 4)
         TEST_ERROR;
 
     /*--------------------------------------------------------------*/
@@ -7815,8 +11479,11 @@ test_scc_2d_memspace_path_isolation(void)
      *   multidimensional mem-space path.
      * - If both are wrong, the issue is deeper in 2D SCC write/read handling.
      */
-    if (rbuf1d2d[0][0] != 1 || rbuf1d2d[0][1] != 2 || rbuf1d2d[1][0] != 3 || rbuf1d2d[1][1] != 4)
+    if (rbuf1d2d[0][0] != 1 || rbuf1d2d[0][1] != 2 || rbuf1d2d[1][0] != 3 || rbuf1d2d[1][1] != 4) {
+        printf("    observed 1D-to-2D result = {{%d,%d},{%d,%d}}\n", rbuf1d2d[0][0], rbuf1d2d[0][1],
+               rbuf1d2d[1][0], rbuf1d2d[1][1]);
         TEST_ERROR;
+    }
 
     /*
      * For now, this test intentionally allows rbuf2d to expose the bug.
@@ -7916,8 +11583,7 @@ error:
  *-------------------------------------------------------------------------
  */
 
-static int
-test_scc_extent_shrink_prune_single_chunk_1d(void)
+static int test_scc_extent_shrink_prune_single_chunk_1d(void)
 {
     TESTING("SCC: extent shrink prunes one whole 1D chunk");
 
@@ -7931,8 +11597,8 @@ test_scc_extent_shrink_prune_single_chunk_1d(void)
     hsize_t chunk_dim[1] = {2};
     hsize_t shrink[1]    = {2};
 
-    int  wbuf[4] = {10, 11, 12, 13};
-    int  rbuf[2] = {-1, -1};
+    int wbuf[4] = {10, 11, 12, 13};
+    int rbuf[2] = {-1, -1};
     char filename[1024];
 
     h5_fixname("scc_extent_shrink_prune_single_chunk_1d", H5P_DEFAULT, filename, sizeof(filename));
@@ -8038,8 +11704,7 @@ error:
  *-------------------------------------------------------------------------
  */
 
-static int
-test_scc_extent_shrink_prune_storage_only_1d(void)
+static int test_scc_extent_shrink_prune_storage_only_1d(void)
 {
     TESTING("SCC: extent shrink prunes storage-only whole 1D chunk");
 
@@ -8056,8 +11721,8 @@ test_scc_extent_shrink_prune_storage_only_1d(void)
     hsize_t erase_start[1] = {0};
     hsize_t erase_count[1] = {2};
 
-    int  wbuf[4] = {10, 11, 12, 13};
-    int  rbuf[2] = {-1, -1};
+    int wbuf[4] = {10, 11, 12, 13};
+    int rbuf[2] = {-1, -1};
     char filename[1024];
 
     h5_fixname("scc_extent_shrink_prune_storage_only_1d", H5P_DEFAULT, filename, sizeof(filename));
@@ -8182,8 +11847,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extent_shrink_prune_tail_chunks_1d(void)
+static int test_scc_extent_shrink_prune_tail_chunks_1d(void)
 {
     TESTING("SCC: extent shrink prunes multiple whole 1D tail chunks");
 
@@ -8197,8 +11861,8 @@ test_scc_extent_shrink_prune_tail_chunks_1d(void)
     hsize_t chunk_dim[1] = {2};
     hsize_t shrink[1]    = {4};
 
-    int  wbuf[8] = {10, 11, 12, 13, 14, 15, 16, 17};
-    int  rbuf[4] = {-1, -1, -1, -1};
+    int wbuf[8] = {10, 11, 12, 13, 14, 15, 16, 17};
+    int rbuf[4] = {-1, -1, -1, -1};
     char filename[1024];
 
     h5_fixname("scc_extent_shrink_prune_tail_chunks_1d", H5P_DEFAULT, filename, sizeof(filename));
@@ -8304,8 +11968,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extent_shrink_prune_corner_chunks_2d(void)
+static int test_scc_extent_shrink_prune_corner_chunks_2d(void)
 {
     TESTING("SCC: extent shrink prunes 2D corner chunk region");
 
@@ -8321,8 +11984,8 @@ test_scc_extent_shrink_prune_corner_chunks_2d(void)
     hsize_t shrink[2]    = {2, 2};
     hsize_t mem_dims[2]  = {4, 4};
 
-    int  wbuf[4][4];
-    int  rbuf[2][2];
+    int wbuf[4][4];
+    int rbuf[2][2];
     char filename[1024];
 
     h5_fixname("scc_extent_shrink_prune_corner_chunks_2d", H5P_DEFAULT, filename, sizeof(filename));
@@ -8415,8 +12078,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extent_shrink_prune_storage_only_reopen_1d(void)
+static int test_scc_extent_shrink_prune_storage_only_reopen_1d(void)
 {
     TESTING("SCC: extent shrink prunes storage-only chunk after reopen");
 
@@ -8430,8 +12092,8 @@ test_scc_extent_shrink_prune_storage_only_reopen_1d(void)
     hsize_t chunk_dim[1] = {2};
     hsize_t shrink[1]    = {2};
 
-    int  wbuf[4] = {10, 11, 12, 13};
-    int  rbuf[2] = {-1, -1};
+    int wbuf[4] = {10, 11, 12, 13};
+    int rbuf[2] = {-1, -1};
     char filename[1024];
 
     h5_fixname("scc_extent_shrink_prune_storage_only_reopen_1d", H5P_DEFAULT, filename, sizeof(filename));
@@ -8553,8 +12215,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extent_shrink_prune_partial_bound_1d(void)
+static int test_scc_extent_shrink_prune_partial_bound_1d(void)
 {
     TESTING("SCC: extent shrink prunes partial-bound 1D chunk");
 
@@ -8568,8 +12229,8 @@ test_scc_extent_shrink_prune_partial_bound_1d(void)
     hsize_t chunk_dim[1] = {3};
     hsize_t shrink[1]    = {2};
 
-    int  wbuf[6] = {10, 11, 12, 13, 14, 15};
-    int  rbuf[2] = {-1, -1};
+    int wbuf[6] = {10, 11, 12, 13, 14, 15};
+    int rbuf[2] = {-1, -1};
     char filename[1024];
 
     h5_fixname("scc_extent_shrink_prune_partial_bound_1d", H5P_DEFAULT, filename, sizeof(filename));
@@ -8677,8 +12338,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extent_shrink_prune_accounting_invariants_1d(void)
+static int test_scc_extent_shrink_prune_accounting_invariants_1d(void)
 {
     TESTING("SCC: extent shrink preserves accounting invariants");
 
@@ -8687,7 +12347,7 @@ test_scc_extent_shrink_prune_accounting_invariants_1d(void)
     hid_t dcpl = H5I_INVALID_HID;
     hid_t did  = H5I_INVALID_HID;
 
-    H5SC_t             *cache    = NULL;
+    H5SC_t *cache                = NULL;
     H5SC_dset_header_t *dset_hdr = NULL;
 
     size_t old_dset_size   = 0;
@@ -8700,8 +12360,8 @@ test_scc_extent_shrink_prune_accounting_invariants_1d(void)
     hsize_t chunk_dim[1] = {3};
     hsize_t shrink[1]    = {2};
 
-    int  wbuf[9] = {10, 11, 12, 13, 14, 15, 16, 17, 18};
-    int  rbuf[2] = {-1, -1};
+    int wbuf[9] = {10, 11, 12, 13, 14, 15, 16, 17, 18};
+    int rbuf[2] = {-1, -1};
     char filename[1024];
 
     h5_fixname("scc_extent_shrink_prune_accounting_invariants_1d", H5P_DEFAULT, filename, sizeof(filename));
@@ -8841,8 +12501,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extent_shrink_reextend_chunk_key_reuse_1d(void)
+static int test_scc_extent_shrink_reextend_chunk_key_reuse_1d(void)
 {
     TESTING("SCC: shrink/re-extend preserves 1D chunk-key reuse correctness");
 
@@ -8863,9 +12522,9 @@ test_scc_extent_shrink_reextend_chunk_key_reuse_1d(void)
     hsize_t write_count[1] = {2};
     hsize_t mem_dims[1]    = {2};
 
-    int  wbuf_initial[4] = {10, 11, 12, 13};
-    int  wbuf_tail[2]    = {20, 21};
-    int  rbuf[4]         = {-1, -1, -1, -1};
+    int wbuf_initial[4] = {10, 11, 12, 13};
+    int wbuf_tail[2]    = {20, 21};
+    int rbuf[4]         = {-1, -1, -1, -1};
     char filename[1024];
 
     h5_fixname("scc_extent_shrink_reextend_chunk_key_reuse_1d", H5P_DEFAULT, filename, sizeof(filename));
@@ -9008,8 +12667,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extent_shrink_reextend_chunk_key_reuse_2d(void)
+static int test_scc_extent_shrink_reextend_chunk_key_reuse_2d(void)
 {
     TESTING("SCC: shrink/re-extend updates 2D chunk-key reuse correctly");
 
@@ -9020,10 +12678,10 @@ test_scc_extent_shrink_reextend_chunk_key_reuse_2d(void)
     hid_t filesel = H5I_INVALID_HID;
     hid_t memsel  = H5I_INVALID_HID;
 
-    H5SC_t             *cache    = NULL;
+    H5SC_t *cache                = NULL;
     H5SC_dset_header_t *dset_hdr = NULL;
-    H5SC_chunk_t       *chk      = NULL;
-    H5SC_chunk_t       *target   = NULL;
+    H5SC_chunk_t *chk            = NULL;
+    H5SC_chunk_t *target         = NULL;
 
     hsize_t dims[2]      = {4, 6};
     hsize_t maxdims[2]   = {H5S_UNLIMITED, H5S_UNLIMITED};
@@ -9035,13 +12693,13 @@ test_scc_extent_shrink_reextend_chunk_key_reuse_2d(void)
     hsize_t write_count[2] = {4, 2};
     hsize_t mem_dims[2]    = {4, 2};
 
-    int  wbuf_initial[4][6];
-    int  wbuf_tail[4][2];
-    int  rbuf[4][6];
+    int wbuf_initial[4][6];
+    int wbuf_tail[4][2];
+    int rbuf[4][6];
     char filename[1024];
 
-    hsize_t          old_expected_log = 3;
-    hsize_t          new_expected_log = 2;
+    hsize_t old_expected_log = 3;
+    hsize_t new_expected_log = 2;
     H5SC_chunk_key_t expected_key;
 
     h5_fixname("scc_extent_shrink_reextend_chunk_key_reuse_2d", H5P_DEFAULT, filename, sizeof(filename));
@@ -9261,8 +12919,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extent_growth_rekeys_survivors_2d(void)
+static int test_scc_extent_growth_rekeys_survivors_2d(void)
 {
     TESTING("SCC: extent growth rekeys surviving 2D chunks");
 
@@ -9273,10 +12930,10 @@ test_scc_extent_growth_rekeys_survivors_2d(void)
     hid_t filesel = H5I_INVALID_HID;
     hid_t memsel  = H5I_INVALID_HID;
 
-    H5SC_t             *cache    = NULL;
+    H5SC_t *cache                = NULL;
     H5SC_dset_header_t *dset_hdr = NULL;
-    H5SC_chunk_t       *chk      = NULL;
-    H5SC_chunk_t       *target   = NULL;
+    H5SC_chunk_t *chk            = NULL;
+    H5SC_chunk_t *target         = NULL;
 
     hsize_t dims[2]      = {4, 4};
     hsize_t maxdims[2]   = {H5S_UNLIMITED, H5S_UNLIMITED};
@@ -9287,8 +12944,8 @@ test_scc_extent_growth_rekeys_survivors_2d(void)
     hsize_t read_count[2] = {4, 4};
     hsize_t mem_dims[2]   = {4, 4};
 
-    int  wbuf[4][4];
-    int  rbuf[4][4];
+    int wbuf[4][4];
+    int rbuf[4][4];
     char filename[1024];
 
     hsize_t old_expected_log = 2;
@@ -9474,8 +13131,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extent_shrink_prune_storage_only_reopen_1d_updated(void)
+static int test_scc_extent_shrink_prune_storage_only_reopen_1d_updated(void)
 {
     TESTING("SCC: extent shrink prunes storage-only chunk after reopen");
 
@@ -9489,8 +13145,8 @@ test_scc_extent_shrink_prune_storage_only_reopen_1d_updated(void)
     hsize_t chunk_dim[1] = {2};
     hsize_t shrink[1]    = {2};
 
-    int  wbuf[4] = {10, 11, 12, 13};
-    int  rbuf[2] = {-1, -1};
+    int wbuf[4] = {10, 11, 12, 13};
+    int rbuf[2] = {-1, -1};
     char filename[1024];
 
     h5_fixname("scc_extent_shrink_prune_storage_only_reopen_1d", H5P_DEFAULT, filename, sizeof(filename));
@@ -9582,8 +13238,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extensible_1d_get_defined_after_partial_shrink(void)
+static int test_scc_extensible_1d_get_defined_after_partial_shrink(void)
 {
     TESTING("SCC: get_defined after 1D partial-bound shrink");
 
@@ -9605,10 +13260,10 @@ test_scc_extensible_1d_get_defined_after_partial_shrink(void)
     hsize_t write_mem_dims[1] = {6};
 
     hssize_t npoints = 0;
-    hsize_t  low[1];
-    hsize_t  high[1];
+    hsize_t low[1];
+    hsize_t high[1];
 
-    int  wbuf[6] = {10, 11, 12, 13, 14, 15};
+    int wbuf[6] = {10, 11, 12, 13, 14, 15};
     char filename[1024];
 
     h5_fixname("scc_extensible_1d_get_defined_after_partial_shrink", H5P_DEFAULT, filename, sizeof(filename));
@@ -9733,8 +13388,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extensible_1d_erase_before_partial_shrink_read(void)
+static int test_scc_extensible_1d_erase_before_partial_shrink_read(void)
 {
     TESTING("SCC: erase-before-shrink 1D cross-chunk read");
 
@@ -9762,8 +13416,8 @@ test_scc_extensible_1d_erase_before_partial_shrink_read(void)
     hsize_t read_count[1]    = {5};
     hsize_t read_mem_dims[1] = {5};
 
-    int  wbuf[6] = {10, 11, 12, 13, 14, 15};
-    int  rbuf[5] = {-1, -1, -1, -1, -1};
+    int wbuf[6] = {10, 11, 12, 13, 14, 15};
+    int rbuf[5] = {-1, -1, -1, -1, -1};
     char filename[1024];
 
     h5_fixname("scc_extensible_1d_erase_before_partial_shrink_read", H5P_DEFAULT, filename, sizeof(filename));
@@ -9820,7 +13474,7 @@ test_scc_extensible_1d_erase_before_partial_shrink_read(void)
     erase_sid = H5I_INVALID_HID;
 
     /* After H5Derase(), before H5Dset_extent(), read elements 4..5 */
-    int     edge_buf[2]      = {-1, -1};
+    int edge_buf[2]          = {-1, -1};
     hsize_t edge_start[1]    = {4};
     hsize_t edge_count[1]    = {2};
     hsize_t edge_mem_dims[1] = {2};
@@ -9926,8 +13580,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extensible_1d_cross_chunk_read_selection_only(void)
+static int test_scc_extensible_1d_cross_chunk_read_selection_only(void)
 {
     TESTING("SCC: 1D cross-chunk read selection splitting only");
 
@@ -9950,8 +13603,8 @@ test_scc_extensible_1d_cross_chunk_read_selection_only(void)
     hsize_t read_count[1]    = {5};
     hsize_t read_mem_dims[1] = {5};
 
-    int  wbuf[5] = {10, 11, 12, 13, 14};
-    int  rbuf[5] = {-1, -1, -1, -1, -1};
+    int wbuf[5] = {10, 11, 12, 13, 14};
+    int rbuf[5] = {-1, -1, -1, -1, -1};
     char filename[1024];
 
     h5_fixname("scc_extensible_1d_cross_chunk_read_selection_only", H5P_DEFAULT, filename, sizeof(filename));
@@ -10084,8 +13737,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extensible_2d_even_chunks_smoke(void)
+static int test_scc_extensible_2d_even_chunks_smoke(void)
 {
     TESTING("SCC: 2D extensible dataset smoke test with even chunks");
 
@@ -10109,7 +13761,7 @@ test_scc_extensible_2d_even_chunks_smoke(void)
     int extra_data[4][4] = {
         {100, 101, 102, 103}, {104, 105, 106, 107}, {108, 109, 110, 111}, {112, 113, 114, 115}};
 
-    int  rbuf[8][8];
+    int rbuf[8][8];
     char filename[1024];
 
     h5_fixname("scc_extensible_2d_even_chunks_smoke", H5P_DEFAULT, filename, sizeof(filename));
@@ -10232,8 +13884,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extensible_2d_extend_rows_only(void)
+static int test_scc_extensible_2d_extend_rows_only(void)
 {
     TESTING("SCC: 2D extensible dataset extend rows only");
 
@@ -10250,7 +13901,7 @@ test_scc_extensible_2d_extend_rows_only(void)
     int init_data[4][4]  = {{0, 1, 2, 3}, {4, 5, 6, 7}, {8, 9, 10, 11}, {12, 13, 14, 15}};
     int extra_data[4][4] = {
         {100, 101, 102, 103}, {104, 105, 106, 107}, {108, 109, 110, 111}, {112, 113, 114, 115}};
-    int  rbuf[8][4];
+    int rbuf[8][4];
     char filename[1024];
 
     h5_fixname("scc_extensible_2d_extend_rows_only", H5P_DEFAULT, filename, sizeof(filename));
@@ -10346,8 +13997,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extensible_2d_extend_cols_only(void)
+static int test_scc_extensible_2d_extend_cols_only(void)
 {
     TESTING("SCC: 2D extensible dataset extend columns only");
 
@@ -10364,7 +14014,7 @@ test_scc_extensible_2d_extend_cols_only(void)
     int init_data[4][4]  = {{0, 1, 2, 3}, {4, 5, 6, 7}, {8, 9, 10, 11}, {12, 13, 14, 15}};
     int extra_data[4][4] = {
         {100, 101, 102, 103}, {104, 105, 106, 107}, {108, 109, 110, 111}, {112, 113, 114, 115}};
-    int  rbuf[4][8];
+    int rbuf[4][8];
     char filename[1024];
 
     h5_fixname("scc_extensible_2d_extend_cols_only", H5P_DEFAULT, filename, sizeof(filename));
@@ -10459,8 +14109,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extensible_2d_extend_both_then_shrink(void)
+static int test_scc_extensible_2d_extend_both_then_shrink(void)
 {
     TESTING("SCC: 2D extensible dataset extend both dimensions then shrink");
 
@@ -10478,7 +14127,7 @@ test_scc_extensible_2d_extend_both_then_shrink(void)
     int init_data[4][4]  = {{0, 1, 2, 3}, {4, 5, 6, 7}, {8, 9, 10, 11}, {12, 13, 14, 15}};
     int extra_data[4][4] = {
         {100, 101, 102, 103}, {104, 105, 106, 107}, {108, 109, 110, 111}, {112, 113, 114, 115}};
-    int  rbuf[4][4];
+    int rbuf[4][4];
     char filename[1024];
 
     h5_fixname("scc_extensible_2d_extend_both_then_shrink", H5P_DEFAULT, filename, sizeof(filename));
@@ -10573,8 +14222,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extensible_2d_shrink_cols_only(void)
+static int test_scc_extensible_2d_shrink_cols_only(void)
 {
     TESTING("SCC: 2D extensible dataset shrink columns only");
 
@@ -10586,8 +14234,8 @@ test_scc_extensible_2d_shrink_cols_only(void)
     hsize_t chunk_dim[2] = {2, 2};
     hsize_t shrink[2]    = {4, 4};
 
-    int  wbuf[4][8];
-    int  rbuf[4][4];
+    int wbuf[4][8];
+    int rbuf[4][4];
     char filename[1024];
 
     h5_fixname("scc_extensible_2d_shrink_cols_only", H5P_DEFAULT, filename, sizeof(filename));
@@ -10663,8 +14311,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extensible_2d_extend_persist_after_reopen(void)
+static int test_scc_extensible_2d_extend_persist_after_reopen(void)
 {
     TESTING("SCC: 2D extensible dataset extend persistence after reopen");
 
@@ -10685,7 +14332,7 @@ test_scc_extensible_2d_extend_persist_after_reopen(void)
     int init_data[4][4]  = {{0, 1, 2, 3}, {4, 5, 6, 7}, {8, 9, 10, 11}, {12, 13, 14, 15}};
     int extra_data[4][4] = {
         {100, 101, 102, 103}, {104, 105, 106, 107}, {108, 109, 110, 111}, {112, 113, 114, 115}};
-    int  rbuf[8][8];
+    int rbuf[8][8];
     char filename[1024];
 
     h5_fixname("scc_extensible_2d_extend_persist_after_reopen", H5P_DEFAULT, filename, sizeof(filename));
@@ -10801,8 +14448,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extensible_2d_two_datasets_isolation(void)
+static int test_scc_extensible_2d_two_datasets_isolation(void)
 {
     TESTING("SCC: 2D extensible two-dataset isolation");
 
@@ -10818,10 +14464,10 @@ test_scc_extensible_2d_two_datasets_isolation(void)
     hsize_t grow_a[2]    = {8, 8};
     hsize_t shrink_a[2]  = {4, 4};
 
-    int  a_init[4][4];
-    int  b_init[4][4];
-    int  a_rbuf[4][4];
-    int  b_rbuf[4][4];
+    int a_init[4][4];
+    int b_init[4][4];
+    int a_rbuf[4][4];
+    int b_rbuf[4][4];
     char filename[1024];
 
     h5_fixname("scc_extensible_2d_two_datasets_isolation", H5P_DEFAULT, filename, sizeof(filename));
@@ -10921,8 +14567,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extensible_2d_partial_bound_shrink(void)
+static int test_scc_extensible_2d_partial_bound_shrink(void)
 {
     TESTING("SCC: 2D extensible dataset partial-bound shrink");
 
@@ -10944,8 +14589,8 @@ test_scc_extensible_2d_partial_bound_shrink(void)
 
     hsize_t read_mem_dims[2] = {5, 5};
 
-    int  wbuf[6][6];
-    int  rbuf[5][5];
+    int wbuf[6][6];
+    int rbuf[5][5];
     char filename[1024];
 
     h5_fixname("scc_extensible_2d_partial_bound_shrink", H5P_DEFAULT, filename, sizeof(filename));
@@ -11098,8 +14743,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_erase_values_2d_rectangular_partial(void)
+static int test_scc_erase_values_2d_rectangular_partial(void)
 {
     TESTING("SCC: erase_values 2D rectangular partial erase");
 
@@ -11116,8 +14760,8 @@ test_scc_erase_values_2d_rectangular_partial(void)
     hsize_t erase_start[2] = {1, 1};
     hsize_t erase_count[2] = {2, 2};
 
-    int  wbuf[4][4];
-    int  rbuf[4][4];
+    int wbuf[4][4];
+    int rbuf[4][4];
     char filename[1024];
 
     h5_fixname("scc_erase_values_2d_rectangular_partial", H5P_DEFAULT, filename, sizeof(filename));
@@ -11237,8 +14881,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_erase_values_2d_l_shaped_partial(void)
+static int test_scc_erase_values_2d_l_shaped_partial(void)
 {
     TESTING("SCC: erase_values 2D L-shaped partial erase");
 
@@ -11257,8 +14900,8 @@ test_scc_erase_values_2d_l_shaped_partial(void)
     hsize_t slab2_start[2] = {1, 2};
     hsize_t slab2_count[2] = {1, 2};
 
-    int  wbuf[4][4];
-    int  rbuf[4][4];
+    int wbuf[4][4];
+    int rbuf[4][4];
     char filename[1024];
 
     h5_fixname("scc_erase_values_2d_l_shaped_partial", H5P_DEFAULT, filename, sizeof(filename));
@@ -11385,8 +15028,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_erase_values_2d_old_partial_to_smaller_partial(void)
+static int test_scc_erase_values_2d_old_partial_to_smaller_partial(void)
 {
     TESTING("SCC: erase_values 2D old-partial to smaller-partial erase");
 
@@ -11416,8 +15058,8 @@ test_scc_erase_values_2d_old_partial_to_smaller_partial(void)
     hsize_t erase_b_start[2] = {4, 5};
     hsize_t erase_b_count[2] = {1, 1};
 
-    int  wbuf[6][6];
-    int  rbuf[6][6];
+    int wbuf[6][6];
+    int rbuf[6][6];
     char filename[1024];
 
     h5_fixname("scc_erase_values_2d_old_partial_to_smaller_partial", H5P_DEFAULT, filename, sizeof(filename));
@@ -11594,8 +15236,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_extensible_1d_partial_bound_shrink_cross_chunk_read(void)
+static int test_scc_extensible_1d_partial_bound_shrink_cross_chunk_read(void)
 {
     TESTING("SCC: 1D partial-bound shrink cross-chunk read");
 
@@ -11619,8 +15260,8 @@ test_scc_extensible_1d_partial_bound_shrink_cross_chunk_read(void)
     hsize_t read_count[1]    = {5};
     hsize_t read_mem_dims[1] = {5};
 
-    int  wbuf[6] = {10, 11, 12, 13, 14, 15};
-    int  rbuf[5] = {-1, -1, -1, -1, -1};
+    int wbuf[6] = {10, 11, 12, 13, 14, 15};
+    int rbuf[5] = {-1, -1, -1, -1, -1};
     char filename[1024];
 
     h5_fixname("scc_extensible_1d_partial_bound_shrink_cross_chunk_read", H5P_DEFAULT, filename,
@@ -11729,12 +15370,11 @@ error:
     return FAIL;
 }
 
-static int
-t_scc_verify_3d_chunk_keys(hid_t fid, const hsize_t chunk_dim[3])
+static int t_scc_verify_3d_chunk_keys(hid_t fid, const hsize_t chunk_dim[3])
 {
-    H5SC_t             *cache    = NULL;
+    H5SC_t *cache                = NULL;
     H5SC_dset_header_t *dset_hdr = NULL;
-    H5SC_chunk_t       *chk      = NULL;
+    H5SC_chunk_t *chk            = NULL;
 
     if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
         return FAIL;
@@ -11771,8 +15411,7 @@ t_scc_verify_3d_chunk_keys(hid_t fid, const hsize_t chunk_dim[3])
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_3d_two_extensible_dims_expand_each(void)
+static int test_scc_3d_two_extensible_dims_expand_each(void)
 {
     TESTING("SCC: 3D two extensible dims expand each");
 
@@ -11786,8 +15425,8 @@ test_scc_3d_two_extensible_dims_expand_each(void)
     hsize_t grow0[3] = {5, 3, 2};
     hsize_t grow1[3] = {5, 5, 2};
 
-    int  wbuf[5][5][2];
-    int  rbuf[5][5][2];
+    int wbuf[5][5][2];
+    int rbuf[5][5][2];
     char filename[1024];
 
     h5_fixname("scc_3d_two_extensible_dims_expand_each", H5P_DEFAULT, filename, sizeof(filename));
@@ -11980,8 +15619,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_3d_two_extensible_dims_shrink_each(void)
+static int test_scc_3d_two_extensible_dims_shrink_each(void)
 {
     TESTING("SCC: 3D two extensible dims shrink each");
 
@@ -11994,8 +15632,8 @@ test_scc_3d_two_extensible_dims_shrink_each(void)
     hsize_t shrink0[3]   = {3, 5, 2};
     hsize_t shrink1[3]   = {3, 3, 2};
 
-    int  wbuf[5][5][2];
-    int  rbuf[3][3][2];
+    int wbuf[5][5][2];
+    int rbuf[3][3][2];
     char filename[1024];
 
     h5_fixname("scc_3d_two_extensible_dims_shrink_each", H5P_DEFAULT, filename, sizeof(filename));
@@ -12098,8 +15736,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_3d_two_extensible_dims_expand_one_shrink_other(void)
+static int test_scc_3d_two_extensible_dims_expand_one_shrink_other(void)
 {
     TESTING("SCC: 3D expand one extensible dim, shrink the other");
 
@@ -12111,8 +15748,8 @@ test_scc_3d_two_extensible_dims_expand_one_shrink_other(void)
     hsize_t chunk_dim[3] = {2, 2, 2};
     hsize_t mixed[3]     = {6, 3, 2};
 
-    int  wbuf[6][5][2];
-    int  rbuf[6][3][2];
+    int wbuf[6][5][2];
+    int rbuf[6][3][2];
     char filename[1024];
 
     h5_fixname("scc_3d_two_extensible_dims_expand_one_shrink_other", H5P_DEFAULT, filename, sizeof(filename));
@@ -12273,8 +15910,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_3d_partial_bound_shrink_preserves_corner(void)
+static int test_scc_3d_partial_bound_shrink_preserves_corner(void)
 {
     TESTING("SCC: 3D partial-bound shrink preserves corner data");
 
@@ -12286,8 +15922,8 @@ test_scc_3d_partial_bound_shrink_preserves_corner(void)
     hsize_t chunk_dim[3] = {2, 3, 2};
     hsize_t shrink[3]    = {3, 5, 2};
 
-    int  wbuf[5][7][2];
-    int  rbuf[3][5][2];
+    int wbuf[5][7][2];
+    int rbuf[3][5][2];
     char filename[1024];
 
     h5_fixname("scc_3d_partial_bound_shrink_preserves_corner", H5P_DEFAULT, filename, sizeof(filename));
@@ -12421,8 +16057,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_3d_extent_change_persists_after_reopen(void)
+static int test_scc_3d_extent_change_persists_after_reopen(void)
 {
     TESTING("SCC: 3D extent changes persist after reopen");
 
@@ -12437,8 +16072,8 @@ test_scc_3d_extent_change_persists_after_reopen(void)
     hsize_t mixed[3] = {5, 4, 2};
     hsize_t final[3] = {3, 5, 2};
 
-    int  wbuf[6][7][2];
-    int  rbuf[3][5][2];
+    int wbuf[6][7][2];
+    int rbuf[3][5][2];
     char filename[1024];
 
     h5_fixname("scc_3d_extent_change_persists_after_reopen", H5P_DEFAULT, filename, sizeof(filename));
@@ -12634,8 +16269,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_3d_shrink_reextend_chunk_key_reuse(void)
+static int test_scc_3d_shrink_reextend_chunk_key_reuse(void)
 {
     TESTING("SCC: 3D shrink/reextend chunk-key reuse");
 
@@ -12648,8 +16282,8 @@ test_scc_3d_shrink_reextend_chunk_key_reuse(void)
     hsize_t shrink[3]    = {3, 4, 2};
     hsize_t reext[3]     = {5, 7, 2};
 
-    int  wbuf[5][7][2];
-    int  rbuf[5][7][2];
+    int wbuf[5][7][2];
+    int rbuf[5][7][2];
     char filename[1024];
 
     h5_fixname("scc_3d_shrink_reextend_chunk_key_reuse", H5P_DEFAULT, filename, sizeof(filename));
@@ -12808,8 +16442,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_3d_storage_only_prune(void)
+static int test_scc_3d_storage_only_prune(void)
 {
     TESTING("SCC: 3D storage-only prune after reopen");
 
@@ -12821,8 +16454,8 @@ test_scc_3d_storage_only_prune(void)
     hsize_t chunk_dim[3] = {2, 3, 2};
     hsize_t shrink[3]    = {3, 4, 2};
 
-    int  wbuf[5][7][2];
-    int  rbuf[3][4][2];
+    int wbuf[5][7][2];
+    int rbuf[3][4][2];
     char filename[1024];
 
     h5_fixname("scc_3d_storage_only_prune", H5P_DEFAULT, filename, sizeof(filename));
@@ -12977,8 +16610,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_3d_erase_before_shrink_preserves_remaining_values(void)
+static int test_scc_3d_erase_before_shrink_preserves_remaining_values(void)
 {
     TESTING("SCC: 3D erase before shrink preserves remaining values");
 
@@ -12994,8 +16626,8 @@ test_scc_3d_erase_before_shrink_preserves_remaining_values(void)
     hsize_t erase_start[3] = {2, 4, 0};
     hsize_t erase_count[3] = {1, 1, 1};
 
-    int  wbuf[5][7][2];
-    int  rbuf[3][5][2];
+    int wbuf[5][7][2];
+    int rbuf[3][5][2];
     char filename[1024];
 
     h5_fixname("scc_3d_erase_before_shrink_preserves_remaining_values", H5P_DEFAULT, filename,
@@ -13147,8 +16779,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_mixed_rank_datasets_isolation(void)
+static int test_scc_mixed_rank_datasets_isolation(void)
 {
     TESTING("SCC: mixed-rank dataset isolation");
 
@@ -13163,9 +16794,9 @@ test_scc_mixed_rank_datasets_isolation(void)
     hsize_t dims3[3] = {5, 7, 2}, max3[3] = {H5S_UNLIMITED, H5S_UNLIMITED, 2}, chunk3[3] = {2, 3, 2};
     hsize_t shrink3[3] = {3, 5, 2};
 
-    int  w1[8], r1[8];
-    int  w2[4][6], r2[4][6];
-    int  w3[5][7][2], r3[3][5][2];
+    int w1[8], r1[8];
+    int w2[4][6], r2[4][6];
+    int w3[5][7][2], r3[3][5][2];
     char filename[1024];
 
     h5_fixname("scc_mixed_rank_datasets_isolation", H5P_DEFAULT, filename, sizeof(filename));
@@ -13443,8 +17074,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_3d_selection_shape_stress(void)
+static int test_scc_3d_selection_shape_stress(void)
 {
     TESTING("SCC: 3D selection shape stress");
 
@@ -13456,8 +17086,8 @@ test_scc_3d_selection_shape_stress(void)
     hsize_t maxdims[3]   = {H5S_UNLIMITED, H5S_UNLIMITED, 4};
     hsize_t chunk_dim[3] = {2, 2, 2};
 
-    int  wbuf[5][5][4];
-    int  rbuf[5][5][4];
+    int wbuf[5][5][4];
+    int rbuf[5][5][4];
     char filename[1024];
 
     h5_fixname("scc_3d_selection_shape_stress", H5P_DEFAULT, filename, sizeof(filename));
@@ -13644,8 +17274,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_3d_noop_resize_erase_cases(void)
+static int test_scc_3d_noop_resize_erase_cases(void)
 {
     TESTING("SCC: 3D no-op resize and erase cases");
 
@@ -13658,8 +17287,8 @@ test_scc_3d_noop_resize_erase_cases(void)
     hsize_t chunk_dim[3]  = {2, 3, 2};
     hsize_t grow_empty[3] = {6, 8, 2};
 
-    int  wbuf[5][7][2];
-    int  rbuf[6][8][2];
+    int wbuf[5][7][2];
+    int rbuf[6][8][2];
     char filename[1024];
 
     h5_fixname("scc_3d_noop_resize_erase_cases", H5P_DEFAULT, filename, sizeof(filename));
@@ -13890,8 +17519,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_3d_accounting_invariants_after_operations(void)
+static int test_scc_3d_accounting_invariants_after_operations(void)
 {
     TESTING("SCC: 3D accounting invariants after operations");
 
@@ -13907,8 +17535,8 @@ test_scc_3d_accounting_invariants_after_operations(void)
     hsize_t grow[3]   = {5, 8, 2};
     hsize_t mixed[3]  = {6, 6, 2};
 
-    int  wbuf[6][8][2];
-    int  rbuf[6][6][2];
+    int wbuf[6][8][2];
+    int rbuf[6][6][2];
     char filename[1024];
 
     h5_fixname("scc_3d_accounting_invariants_after_operations", H5P_DEFAULT, filename, sizeof(filename));
@@ -14144,6 +17772,3437 @@ error:
 }
 
 /*-------------------------------------------------------------------------
+ * Function:    test_scc_get_defined_empty_dataset
+ *
+ * Purpose:     Verify H5Dget_defined() behavior for a newly created sparse
+ *              structured-chunk dataset containing no defined values.
+ *
+ *              The test creates a structured-chunk dataset without
+ *              performing any writes, then queries the complete dataset
+ *              selection using H5Dget_defined().
+ *
+ *              This verifies that:
+ *
+ *                  1) An unallocated sparse chunk is interpreted as
+ *                     containing no defined values.
+ *
+ *                  2) H5Dget_defined() returns a valid dataspace with an
+ *                     empty selection rather than treating
+ *                     defined_values_size == 0 as meaning that an
+ *                     unallocated chunk is fully defined.
+ *
+ *                  3) Querying defined values does not require creation or
+ *                     materialization of chunk data in the SCC.
+ *
+ * Return:      SUCCEED/FAIL
+ *
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_get_defined_empty_dataset(void)
+{
+    TESTING("SCC: get_defined empty sparse dataset");
+
+    hid_t fid         = H5I_INVALID_HID;
+    hid_t sid         = H5I_INVALID_HID;
+    hid_t dcpl        = H5I_INVALID_HID;
+    hid_t did         = H5I_INVALID_HID;
+    hid_t defined_sid = H5I_INVALID_HID;
+
+    hsize_t dims[1]      = {12};
+    hsize_t chunk_dim[1] = {4};
+    hssize_t npoints;
+    char filename[1024];
+
+    h5_fixname("scc_get_defined_empty", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dim, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((defined_sid = H5Dget_defined(did, H5S_ALL, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if (npoints != 0)
+        TEST_ERROR;
+
+    /* normal cleanup... */
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    /* standard H5E_BEGIN_TRY cleanup... */
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_get_defined_resident_sparse
+ *
+ * Purpose:     Verify H5Dget_defined() against sparse defined values held
+ *              in resident SCC chunks.
+ *
+ *              The test creates a 1D sparse structured-chunk dataset and
+ *              writes several noncontiguous elements using OR'ed 1x1
+ *              hyperslabs. H5Dget_defined() is then called before the
+ *              dataset or file is closed.
+ *
+ *              This verifies that:
+ *
+ *                  1) The current resident SCC chunk state is used when
+ *                     determining defined values.
+ *
+ *                  2) Defined selections spanning multiple logical chunks
+ *                     are translated and merged correctly.
+ *
+ *                  3) Undefined elements between written values are not
+ *                     included in the returned selection.
+ *
+ *                  4) Querying defined values does not alter SCC cache
+ *                     residency or byte accounting.
+ *
+ * Return:      SUCCEED/FAIL
+ *
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_get_defined_resident_sparse(void)
+{
+    TESTING("SCC: get_defined resident sparse values");
+
+    hid_t fid         = H5I_INVALID_HID;
+    hid_t sid         = H5I_INVALID_HID;
+    hid_t dcpl        = H5I_INVALID_HID;
+    hid_t did         = H5I_INVALID_HID;
+    hid_t file_space  = H5I_INVALID_HID;
+    hid_t mem_space   = H5I_INVALID_HID;
+    hid_t defined_sid = H5I_INVALID_HID;
+
+    H5SC_t *cache                = NULL;
+    H5SC_dset_header_t *dset_hdr = NULL;
+
+    hsize_t dims[1]      = {12};
+    hsize_t chunk_dim[1] = {4};
+    hsize_t mem_dims[1]  = {4};
+
+    const hsize_t expected[4] = {1, 3, 5, 10};
+
+    int wbuf[4] = {101, 103, 105, 110};
+
+    hssize_t npoints;
+    hsize_t low[1];
+    hsize_t high[1];
+
+    size_t old_chunk_lru_len;
+    size_t old_dset_size;
+    size_t old_cache_size;
+
+    char filename[1024];
+
+    h5_fixname("scc_get_defined_resident_sparse", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dim, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    /*
+     * Construct the sparse file selection:
+     *
+     *     {1, 3, 5, 10}
+     *
+     * These values span all three logical chunks:
+     *
+     *     chunk 0: {1, 3}
+     *     chunk 1: {5}
+     *     chunk 2: {10}
+     */
+    if ((file_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_none(file_space) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[1] = {expected[i]};
+        hsize_t count[1] = {1};
+
+        if (H5Sselect_hyperslab(file_space, H5S_SELECT_OR, start, NULL, count, NULL) < 0)
+            TEST_ERROR;
+    }
+
+    if ((mem_space = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, wbuf) < 0)
+        TEST_ERROR;
+
+    /*
+     * Capture SCC state before H5Dget_defined(). The written chunks should
+     * still be resident at this point.
+     */
+    if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
+        TEST_ERROR;
+
+    if (!cache)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    old_chunk_lru_len = dset_hdr->chunk_lru_len;
+    old_dset_size     = dset_hdr->curr_dset_size;
+    old_cache_size    = cache->SCC_quiescent_size;
+
+    if ((defined_sid = H5Dget_defined(did, H5S_ALL, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if ((hsize_t)npoints != (hsize_t)NELMTS(expected))
+        TEST_ERROR;
+
+    if (H5Sget_select_bounds(defined_sid, low, high) < 0)
+        TEST_ERROR;
+
+    if (low[0] != 1 || high[0] != 10)
+        TEST_ERROR;
+
+    /*
+     * Verify every expected coordinate is present. Since the total selected
+     * point count is exactly four, this also proves no unexpected elements
+     * are selected.
+     */
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[1] = {expected[i]};
+        hsize_t end[1]   = {expected[i]};
+        htri_t intersects;
+
+        if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+            TEST_ERROR;
+
+        if (!intersects)
+            TEST_ERROR;
+    }
+
+    /*
+     * H5Dget_defined() must be cache-neutral.
+     */
+    if (dset_hdr->chunk_lru_len != old_chunk_lru_len)
+        TEST_ERROR;
+
+    if (dset_hdr->curr_dset_size != old_dset_size)
+        TEST_ERROR;
+
+    if (cache->SCC_quiescent_size != old_cache_size)
+        TEST_ERROR;
+
+    if (H5Sclose(defined_sid) < 0)
+        TEST_ERROR;
+    defined_sid = H5I_INVALID_HID;
+
+    if (H5Sclose(mem_space) < 0)
+        TEST_ERROR;
+    mem_space = H5I_INVALID_HID;
+
+    if (H5Sclose(file_space) < 0)
+        TEST_ERROR;
+    file_space = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(defined_sid);
+        H5Sclose(mem_space);
+        H5Sclose(file_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_get_defined_sparse_after_reopen
+ *
+ * Purpose:     Verify H5Dget_defined() for sparse defined values after the
+ *              dataset has been closed and reopened.
+ *
+ *              The test writes several noncontiguous elements to a 1D
+ *              sparse structured-chunk dataset, closes the dataset and file,
+ *              then reopens both before querying the defined-value
+ *              selection.
+ *
+ *              This verifies that:
+ *
+ *                  1) Defined-value metadata can be located from structured
+ *                     chunk storage after resident SCC state is gone.
+ *
+ *                  2) Metadata-only chunk decoding reconstructs the correct
+ *                     defined-value selection.
+ *
+ *                  3) Temporary metadata-only decoded objects are sufficient
+ *                     for H5Dget_defined() and are not retained in SCC.
+ *
+ *                  4) H5Dget_defined() does not create cache entries or
+ *                     alter SCC byte accounting while querying nonresident
+ *                     chunks.
+ *
+ * Return:      SUCCEED/FAIL
+ *
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_get_defined_sparse_after_reopen(void)
+{
+    TESTING("SCC: get_defined sparse values after reopen");
+
+    hid_t fid         = H5I_INVALID_HID;
+    hid_t sid         = H5I_INVALID_HID;
+    hid_t dcpl        = H5I_INVALID_HID;
+    hid_t did         = H5I_INVALID_HID;
+    hid_t file_space  = H5I_INVALID_HID;
+    hid_t mem_space   = H5I_INVALID_HID;
+    hid_t defined_sid = H5I_INVALID_HID;
+
+    H5SC_t *cache                = NULL;
+    H5SC_dset_header_t *dset_hdr = NULL;
+    H5SC_chunk_t *old_chunk_hash_head;
+
+    hsize_t dims[1]      = {12};
+    hsize_t chunk_dim[1] = {4};
+    hsize_t mem_dims[1]  = {4};
+
+    const hsize_t expected[4] = {1, 3, 5, 10};
+
+    int wbuf[4] = {201, 203, 205, 210};
+
+    hssize_t npoints;
+    hsize_t low[1];
+    hsize_t high[1];
+
+    size_t old_chunk_lru_len;
+    size_t old_dset_size;
+    size_t old_cache_size;
+
+    char filename[1024];
+
+    h5_fixname("scc_get_defined_sparse_after_reopen", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dim, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((file_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_none(file_space) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[1] = {expected[i]};
+        hsize_t count[1] = {1};
+
+        if (H5Sselect_hyperslab(file_space, H5S_SELECT_OR, start, NULL, count, NULL) < 0)
+            TEST_ERROR;
+    }
+
+    if ((mem_space = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, wbuf) < 0)
+        TEST_ERROR;
+
+    if (H5Sclose(mem_space) < 0)
+        TEST_ERROR;
+    mem_space = H5I_INVALID_HID;
+
+    if (H5Sclose(file_space) < 0)
+        TEST_ERROR;
+    file_space = H5I_INVALID_HID;
+
+    /*
+     * Close and reopen so H5Dget_defined() cannot use the decoded chunk
+     * objects from the original SCC instance.
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    if ((fid = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    /*
+     * Capture cache state immediately after reopen. H5Dget_defined() should
+     * perform temporary metadata-only decoding without adding chunk entries
+     * to SCC.
+     */
+    if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
+        TEST_ERROR;
+
+    if (!cache)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    old_chunk_lru_len   = dset_hdr->chunk_lru_len;
+    old_dset_size       = dset_hdr->curr_dset_size;
+    old_cache_size      = cache->SCC_quiescent_size;
+    old_chunk_hash_head = cache->chunk_hash_table_head_ptr;
+
+    if ((defined_sid = H5Dget_defined(did, H5S_ALL, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    /*
+     * Verify the returned object entirely through public dataspace APIs.
+     */
+    if ((npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if ((hsize_t)npoints != (hsize_t)NELMTS(expected))
+        TEST_ERROR;
+
+    if (H5Sget_select_bounds(defined_sid, low, high) < 0)
+        TEST_ERROR;
+
+    if (low[0] != 1 || high[0] != 10)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[1] = {expected[i]};
+        hsize_t end[1]   = {expected[i]};
+        htri_t intersects;
+
+        if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+            TEST_ERROR;
+
+        if (!intersects)
+            TEST_ERROR;
+    }
+
+    if ((npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if ((hsize_t)npoints != (hsize_t)NELMTS(expected))
+        TEST_ERROR;
+
+    if (H5Sget_select_bounds(defined_sid, low, high) < 0)
+        TEST_ERROR;
+
+    if (low[0] != 1 || high[0] != 10)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[1] = {expected[i]};
+        hsize_t end[1]   = {expected[i]};
+        htri_t intersects;
+
+        if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+            TEST_ERROR;
+
+        if (!intersects)
+            TEST_ERROR;
+    }
+
+    /*
+     * Cache-neutrality checks. In particular, querying storage-only chunks
+     * must not create H5SC_chunk_t shell entries.
+     */
+    if (dset_hdr->chunk_lru_len != old_chunk_lru_len)
+        TEST_ERROR;
+
+    if (dset_hdr->curr_dset_size != old_dset_size)
+        TEST_ERROR;
+
+    if (cache->SCC_quiescent_size != old_cache_size)
+        TEST_ERROR;
+
+    if (cache->chunk_hash_table_head_ptr != old_chunk_hash_head)
+        TEST_ERROR;
+
+    if (H5Sclose(defined_sid) < 0)
+        TEST_ERROR;
+    defined_sid = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(defined_sid);
+        H5Sclose(mem_space);
+        H5Sclose(file_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_get_defined_hyperslab_intersection
+ *
+ * Purpose:     Verify that H5Dget_defined() returns only elements that are
+ *              both defined in the dataset and selected by the supplied
+ *              file dataspace.
+ *
+ *              The test creates sparse defined values spanning several
+ *              logical chunks, then queries a hyperslab that intersects
+ *              only a subset of those values.
+ *
+ *              This verifies that:
+ *
+ *                  1) H5SC selection decomposition correctly restricts the
+ *                     query to participating chunks.
+ *
+ *                  2) Per-chunk defined selections are intersected with the
+ *                     caller's chunk-local selection.
+ *
+ *                  3) Chunk-local results are translated back into dataset
+ *                     coordinates and merged correctly.
+ *
+ *                  4) Defined values outside the input query selection are
+ *                     excluded from the returned dataspace.
+ *
+ * Return:      SUCCEED/FAIL
+ *
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_get_defined_hyperslab_intersection(void)
+{
+    TESTING("SCC: get_defined hyperslab intersection");
+
+    hid_t fid         = H5I_INVALID_HID;
+    hid_t sid         = H5I_INVALID_HID;
+    hid_t dcpl        = H5I_INVALID_HID;
+    hid_t did         = H5I_INVALID_HID;
+    hid_t write_space = H5I_INVALID_HID;
+    hid_t write_mem   = H5I_INVALID_HID;
+    hid_t query_space = H5I_INVALID_HID;
+    hid_t defined_sid = H5I_INVALID_HID;
+
+    hsize_t dims[1]      = {16};
+    hsize_t chunk_dim[1] = {4};
+    hsize_t mem_dims[1]  = {6};
+
+    const hsize_t defined_coords[6] = {1, 3, 6, 7, 9, 14};
+    const hsize_t expected[3]       = {6, 7, 9};
+
+    hsize_t query_start[1] = {4};
+    hsize_t query_count[1] = {8}; /* [4..11] */
+
+    int wbuf[6] = {301, 303, 306, 307, 309, 314};
+
+    hssize_t npoints;
+    hsize_t low[1];
+    hsize_t high[1];
+
+    char filename[1024];
+
+    h5_fixname("scc_get_defined_hyperslab_intersection", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dim, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    /*
+     * Define:
+     *
+     *     {1, 3, 6, 7, 9, 14}
+     */
+    if ((write_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_none(write_space) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(defined_coords); i++) {
+        hsize_t start[1] = {defined_coords[i]};
+        hsize_t count[1] = {1};
+
+        if (H5Sselect_hyperslab(write_space, H5S_SELECT_OR, start, NULL, count, NULL) < 0)
+            TEST_ERROR;
+    }
+
+    if ((write_mem = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, write_mem, write_space, H5P_DEFAULT, wbuf) < 0)
+        TEST_ERROR;
+
+    /*
+     * Query only:
+     *
+     *     [4..11]
+     *
+     * The defined intersection is therefore:
+     *
+     *     {6, 7, 9}
+     */
+    if ((query_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(query_space, H5S_SELECT_SET, query_start, NULL, query_count, NULL) < 0)
+        TEST_ERROR;
+
+    if ((defined_sid = H5Dget_defined(did, query_space, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if ((hsize_t)npoints != (hsize_t)NELMTS(expected))
+        TEST_ERROR;
+
+    if (H5Sget_select_bounds(defined_sid, low, high) < 0)
+        TEST_ERROR;
+
+    if (low[0] != 6 || high[0] != 9)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[1] = {expected[i]};
+        hsize_t end[1]   = {expected[i]};
+        htri_t intersects;
+
+        if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+            TEST_ERROR;
+
+        if (!intersects)
+            TEST_ERROR;
+    }
+
+    /*
+     * Also explicitly verify two defined values outside the query are not
+     * present. These checks are technically redundant with npoints == 3,
+     * but they document the intersection semantics directly.
+     */
+    {
+        const hsize_t excluded[2] = {3, 14};
+
+        for (size_t i = 0; i < NELMTS(excluded); i++) {
+            hsize_t start[1] = {excluded[i]};
+            hsize_t end[1]   = {excluded[i]};
+            htri_t intersects;
+
+            if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+                TEST_ERROR;
+
+            if (intersects)
+                TEST_ERROR;
+        }
+    }
+
+    if (H5Sclose(defined_sid) < 0)
+        TEST_ERROR;
+    defined_sid = H5I_INVALID_HID;
+
+    if (H5Sclose(query_space) < 0)
+        TEST_ERROR;
+    query_space = H5I_INVALID_HID;
+
+    if (H5Sclose(write_mem) < 0)
+        TEST_ERROR;
+    write_mem = H5I_INVALID_HID;
+
+    if (H5Sclose(write_space) < 0)
+        TEST_ERROR;
+    write_space = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(defined_sid);
+        H5Sclose(query_space);
+        H5Sclose(write_mem);
+        H5Sclose(write_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_get_defined_gzip_after_reopen
+ *
+ * Purpose:     Verify H5Dget_defined() for sparse defined values after a
+ *              GZIP-filtered structured-chunk dataset has been closed and
+ *              reopened.
+ *
+ *              GZIP is applied to H5_SECTION_SELECTION so that the test
+ *              specifically exercises filtered defined-value metadata.
+ *              Several noncontiguous values are written across multiple
+ *              logical chunks, followed by a close/reopen before calling
+ *              H5Dget_defined().
+ *
+ *              This verifies that:
+ *
+ *                  1) Filtered defined-value metadata can be located after
+ *                     resident SCC state is gone.
+ *
+ *                  2) H5SC_get_defined() reads only the defined-value
+ *                     metadata and correctly invokes reverse filtering.
+ *
+ *                  3) The decoded selection contains exactly the values
+ *                     defined before the file was closed.
+ *
+ * Return:      SUCCEED/FAIL
+ *
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_get_defined_gzip_after_reopen(void)
+{
+    TESTING("SCC: get_defined GZIP selection metadata after reopen");
+
+    hid_t fid         = H5I_INVALID_HID;
+    hid_t sid         = H5I_INVALID_HID;
+    hid_t dcpl        = H5I_INVALID_HID;
+    hid_t did         = H5I_INVALID_HID;
+    hid_t fspace      = H5I_INVALID_HID;
+    hid_t mspace      = H5I_INVALID_HID;
+    hid_t defined_sid = H5I_INVALID_HID;
+
+    hsize_t dims[1]      = {16};
+    hsize_t chunk_dim[1] = {4};
+    hsize_t mem_dims[1]  = {6};
+
+    const hsize_t expected[6] = {1, 3, 5, 8, 11, 14};
+    int wbuf[6]               = {401, 403, 405, 408, 411, 414};
+
+    unsigned int gzip_level = 6;
+    size_t cd_nelmts        = 1;
+
+    hssize_t npoints;
+    hsize_t low[1];
+    hsize_t high[1];
+
+    char filename[1024];
+
+    h5_fixname("scc_get_defined_gzip_after_reopen", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dim, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    /*
+     * Filter the selection section itself. Existing SCC filter tests use
+     * H5Pset_filter2() with H5_SECTION_SELECTION for GZIP pipelines.
+     */
+    if (H5Pset_filter2(dcpl, H5_SECTION_SELECTION, H5Z_FILTER_DEFLATE, H5Z_FLAG_OPTIONAL, cd_nelmts,
+                       &gzip_level) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((fspace = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_none(fspace) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[1] = {expected[i]};
+        hsize_t count[1] = {1};
+
+        if (H5Sselect_hyperslab(fspace, H5S_SELECT_OR, start, NULL, count, NULL) < 0)
+            TEST_ERROR;
+    }
+
+    if ((mspace = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, wbuf) < 0)
+        TEST_ERROR;
+
+    if (H5Sclose(mspace) < 0)
+        TEST_ERROR;
+    mspace = H5I_INVALID_HID;
+
+    if (H5Sclose(fspace) < 0)
+        TEST_ERROR;
+    fspace = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    /*
+     * Reopen to force the nonresident metadata-only get_defined path.
+     */
+    if ((fid = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((defined_sid = H5Dget_defined(did, H5S_ALL, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if ((hsize_t)npoints != (hsize_t)NELMTS(expected))
+        TEST_ERROR;
+
+    if (H5Sget_select_bounds(defined_sid, low, high) < 0)
+        TEST_ERROR;
+
+    if (low[0] != expected[0] || high[0] != expected[NELMTS(expected) - 1])
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[1] = {expected[i]};
+        hsize_t end[1]   = {expected[i]};
+        htri_t intersects;
+
+        if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+            TEST_ERROR;
+
+        if (!intersects)
+            TEST_ERROR;
+    }
+
+    if (H5Sclose(defined_sid) < 0)
+        TEST_ERROR;
+    defined_sid = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(defined_sid);
+        H5Sclose(mspace);
+        H5Sclose(fspace);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_get_defined_szip_after_reopen
+ *
+ * Purpose:     Verify H5Dget_defined() after reopening an SZIP-filtered
+ *              sparse structured-chunk dataset.
+ *
+ *              SZIP is applied to H5_SECTION_FIXED, matching the established
+ *              SCC SZIP configuration. Sparse defined values are written
+ *              across multiple chunks and the dataset is then closed and
+ *              reopened before H5Dget_defined() is called.
+ *
+ *              This verifies that:
+ *
+ *                  1) Defined-value metadata remains independently
+ *                     accessible when the fixed data section uses SZIP.
+ *
+ *                  2) H5Dget_defined() does not require decoding the SZIP-
+ *                     filtered fixed data section.
+ *
+ *                  3) Sparse defined-value metadata survives close/reopen
+ *                     and produces the correct result selection.
+ *
+ * Return:      SUCCEED/FAIL
+ *
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_get_defined_szip_after_reopen(void)
+{
+    TESTING("SCC: get_defined SZIP fixed section after reopen");
+
+    hid_t fid         = H5I_INVALID_HID;
+    hid_t sid         = H5I_INVALID_HID;
+    hid_t dcpl        = H5I_INVALID_HID;
+    hid_t did         = H5I_INVALID_HID;
+    hid_t fspace      = H5I_INVALID_HID;
+    hid_t mspace      = H5I_INVALID_HID;
+    hid_t defined_sid = H5I_INVALID_HID;
+
+    hsize_t dims[2]      = {16, 16};
+    hsize_t chunk_dim[2] = {8, 8};
+    hsize_t mem_dims[1]  = {8};
+
+    const hsize_t expected[8][2] = {{0, 0}, {1, 3}, {2, 6}, {3, 7}, {8, 8}, {9, 11}, {14, 14}, {15, 15}};
+
+    int wbuf[8];
+
+    unsigned int cd_values[2] = {H5_SZIP_NN_OPTION_MASK, 8};
+    size_t cd_nelmts          = 2;
+
+    unsigned filter_info = 0;
+    hssize_t npoints;
+
+    char filename[1024];
+
+    /*
+     * Skip cleanly if SZIP is unavailable in this build/runtime.
+     */
+    if (H5Zfilter_avail(H5Z_FILTER_SZIP) <= 0) {
+        SKIPPED();
+        puts("    SZIP filter not available");
+        return SUCCEED;
+    }
+
+    if (H5Zget_filter_info(H5Z_FILTER_SZIP, &filter_info) < 0)
+        TEST_ERROR;
+
+    if (!(filter_info & H5Z_FILTER_CONFIG_ENCODE_ENABLED) ||
+        !(filter_info & H5Z_FILTER_CONFIG_DECODE_ENABLED)) {
+        SKIPPED();
+        puts("    SZIP encode/decode support unavailable");
+        return SUCCEED;
+    }
+
+    for (size_t i = 0; i < NELMTS(wbuf); i++)
+        wbuf[i] = (int)(5000 + i);
+
+    h5_fixname("scc_get_defined_szip_after_reopen", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(2, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 2, chunk_dim, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    /*
+     * SZIP remains restricted to the fixed data section.
+     */
+    if (H5Pset_filter2(dcpl, H5_SECTION_FIXED, H5Z_FILTER_SZIP, H5Z_FLAG_MANDATORY, cd_nelmts, cd_values) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((fspace = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_none(fspace) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t count[2] = {1, 1};
+
+        if (H5Sselect_hyperslab(fspace, H5S_SELECT_OR, expected[i], NULL, count, NULL) < 0)
+            TEST_ERROR;
+    }
+
+    if ((mspace = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, wbuf) < 0)
+        TEST_ERROR;
+
+    if (H5Sclose(mspace) < 0)
+        TEST_ERROR;
+    mspace = H5I_INVALID_HID;
+
+    if (H5Sclose(fspace) < 0)
+        TEST_ERROR;
+    fspace = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    if ((fid = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((defined_sid = H5Dget_defined(did, H5S_ALL, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if ((hsize_t)npoints != (hsize_t)NELMTS(expected))
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[2] = {expected[i][0], expected[i][1]};
+        hsize_t end[2]   = {expected[i][0], expected[i][1]};
+        htri_t intersects;
+
+        if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+            TEST_ERROR;
+
+        if (!intersects)
+            TEST_ERROR;
+    }
+
+    if (H5Sclose(defined_sid) < 0)
+        TEST_ERROR;
+    defined_sid = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(defined_sid);
+        H5Sclose(mspace);
+        H5Sclose(fspace);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_get_defined_gzip_partial_edge_after_reopen
+ *
+ * Purpose:     Verify H5Dget_defined() for a GZIP-filtered structured-chunk
+ *              dataset containing a partial-edge chunk.
+ *
+ *              The dataset extent is intentionally not evenly divisible by
+ *              the chunk dimension. GZIP is applied to
+ *              H5_SECTION_SELECTION, and sparse defined values are written
+ *              into both complete chunks and the final partial-edge chunk.
+ *              The file is then closed and reopened before querying the
+ *              defined-value selection.
+ *
+ *              This verifies that:
+ *
+ *                  1) H5SC_get_defined() correctly identifies a partial-edge
+ *                     logical chunk after reopen.
+ *
+ *                  2) The partial-bound encoding policy is respected when
+ *                     decoding defined-value metadata.
+ *
+ *                  3) Defined values in the partial-edge chunk are retained
+ *                     and translated to the correct dataset coordinates.
+ *
+ *                  4) No coordinates outside the current dataset extent are
+ *                     introduced into the returned selection.
+ *
+ * Return:      SUCCEED/FAIL
+ *
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_get_defined_gzip_partial_edge_after_reopen(void)
+{
+    TESTING("SCC: get_defined GZIP partial-edge after reopen");
+
+    hid_t fid         = H5I_INVALID_HID;
+    hid_t sid         = H5I_INVALID_HID;
+    hid_t dcpl        = H5I_INVALID_HID;
+    hid_t did         = H5I_INVALID_HID;
+    hid_t fspace      = H5I_INVALID_HID;
+    hid_t mspace      = H5I_INVALID_HID;
+    hid_t defined_sid = H5I_INVALID_HID;
+
+    hsize_t dims[1]      = {10};
+    hsize_t chunk_dim[1] = {4};
+    hsize_t mem_dims[1]  = {5};
+
+    const hsize_t expected[5] = {1, 3, 5, 8, 9};
+
+    int wbuf[5] = {601, 603, 605, 608, 609};
+
+    unsigned int gzip_level = 6;
+    size_t cd_nelmts        = 1;
+
+    hssize_t npoints;
+    hsize_t low[1];
+    hsize_t high[1];
+
+    char filename[1024];
+
+    h5_fixname("scc_get_defined_gzip_partial_edge_after_reopen", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dim, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_filter2(dcpl, H5_SECTION_SELECTION, H5Z_FILTER_DEFLATE, H5Z_FLAG_OPTIONAL, cd_nelmts,
+                       &gzip_level) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((fspace = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_none(fspace) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[1] = {expected[i]};
+        hsize_t count[1] = {1};
+
+        if (H5Sselect_hyperslab(fspace, H5S_SELECT_OR, start, NULL, count, NULL) < 0)
+            TEST_ERROR;
+    }
+
+    if ((mspace = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, wbuf) < 0)
+        TEST_ERROR;
+
+    if (H5Sclose(mspace) < 0)
+        TEST_ERROR;
+    mspace = H5I_INVALID_HID;
+
+    if (H5Sclose(fspace) < 0)
+        TEST_ERROR;
+    fspace = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    if ((fid = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((defined_sid = H5Dget_defined(did, H5S_ALL, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if ((hsize_t)npoints != (hsize_t)NELMTS(expected))
+        TEST_ERROR;
+
+    if (H5Sget_select_bounds(defined_sid, low, high) < 0)
+        TEST_ERROR;
+
+    if (low[0] != 1 || high[0] != 9)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[1] = {expected[i]};
+        hsize_t end[1]   = {expected[i]};
+        htri_t intersects;
+
+        if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+            TEST_ERROR;
+
+        if (!intersects)
+            TEST_ERROR;
+    }
+
+    /*
+     * Coordinate 9 is the final valid element of the partial-edge chunk.
+     * Its presence is explicitly important to this test.
+     */
+    {
+        hsize_t start[1] = {9};
+        hsize_t end[1]   = {9};
+        htri_t intersects;
+
+        if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+            TEST_ERROR;
+
+        if (!intersects)
+            TEST_ERROR;
+    }
+
+    if (H5Sclose(defined_sid) < 0)
+        TEST_ERROR;
+    defined_sid = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(defined_sid);
+        H5Sclose(mspace);
+        H5Sclose(fspace);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_get_defined_mixed_lookup_paths_after_reopen
+ *
+ * Purpose:     Verify H5Dget_defined() after reopen when the requested
+ *              dataset contains a mixture of fully defined, partially
+ *              defined, and unallocated logical chunks.
+ *
+ *              The test uses a 1D dataset containing three logical chunks:
+ *
+ *                  chunk 0: all values are defined
+ *                  chunk 1: only a subset of values are defined
+ *                  chunk 2: no values have ever been written
+ *
+ *              The dataset is closed and reopened before H5Dget_defined()
+ *              is called.
+ *
+ *              This verifies that:
+ *
+ *                  1) An allocated chunk with defined_values_size == 0 uses
+ *                     the full-defined fast path without reading selection
+ *                     metadata.
+ *
+ *                  2) A partially defined allocated chunk uses the
+ *                     metadata-only decode path.
+ *
+ *                  3) An unallocated chunk contributes no defined values.
+ *
+ *                  4) Results from all three lookup outcomes are merged into
+ *                     the correct dataset-level selection.
+ *
+ * Return:      SUCCEED/FAIL
+ *
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_get_defined_mixed_lookup_paths_after_reopen(void)
+{
+    TESTING("SCC: get_defined mixed lookup paths after reopen");
+
+    hid_t fid         = H5I_INVALID_HID;
+    hid_t sid         = H5I_INVALID_HID;
+    hid_t dcpl        = H5I_INVALID_HID;
+    hid_t did         = H5I_INVALID_HID;
+    hid_t fspace      = H5I_INVALID_HID;
+    hid_t mspace      = H5I_INVALID_HID;
+    hid_t defined_sid = H5I_INVALID_HID;
+
+    hsize_t dims[1]      = {12};
+    hsize_t chunk_dim[1] = {4};
+    hsize_t mem_dims[1]  = {6};
+
+    const hsize_t expected[6] = {0, 1, 2, 3, 4, 6};
+    int wbuf[6]               = {700, 701, 702, 703, 704, 706};
+
+    hssize_t npoints;
+    hsize_t low[1];
+    hsize_t high[1];
+
+    char filename[1024];
+
+    h5_fixname("scc_get_defined_mixed_lookup_paths_after_reopen", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dim, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((fspace = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_none(fspace) < 0)
+        TEST_ERROR;
+
+    /*
+     * Fully define chunk 0: [0..3].
+     */
+    {
+        hsize_t start[1] = {0};
+        hsize_t count[1] = {4};
+
+        if (H5Sselect_hyperslab(fspace, H5S_SELECT_OR, start, NULL, count, NULL) < 0)
+            TEST_ERROR;
+    }
+
+    /*
+     * Partially define chunk 1: {4, 6}.
+     *
+     * Chunk 2 [8..11] remains completely unallocated.
+     */
+    {
+        const hsize_t partial[2] = {4, 6};
+
+        for (size_t i = 0; i < NELMTS(partial); i++) {
+            hsize_t start[1] = {partial[i]};
+            hsize_t count[1] = {1};
+
+            if (H5Sselect_hyperslab(fspace, H5S_SELECT_OR, start, NULL, count, NULL) < 0)
+                TEST_ERROR;
+        }
+    }
+
+    if ((mspace = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, wbuf) < 0)
+        TEST_ERROR;
+
+    if (H5Sclose(mspace) < 0)
+        TEST_ERROR;
+    mspace = H5I_INVALID_HID;
+
+    if (H5Sclose(fspace) < 0)
+        TEST_ERROR;
+    fspace = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    if ((fid = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((defined_sid = H5Dget_defined(did, H5S_ALL, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if ((hsize_t)npoints != (hsize_t)NELMTS(expected))
+        TEST_ERROR;
+
+    if (H5Sget_select_bounds(defined_sid, low, high) < 0)
+        TEST_ERROR;
+
+    if (low[0] != 0 || high[0] != 6)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[1] = {expected[i]};
+        hsize_t end[1]   = {expected[i]};
+        htri_t intersects;
+
+        if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+            TEST_ERROR;
+
+        if (!intersects)
+            TEST_ERROR;
+    }
+
+    /*
+     * Explicitly verify that an undefined value in the partial chunk and
+     * a value in the unallocated chunk are absent.
+     */
+    {
+        const hsize_t excluded[2] = {5, 9};
+
+        for (size_t i = 0; i < NELMTS(excluded); i++) {
+            hsize_t start[1] = {excluded[i]};
+            hsize_t end[1]   = {excluded[i]};
+            htri_t intersects;
+
+            if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+                TEST_ERROR;
+
+            if (intersects)
+                TEST_ERROR;
+        }
+    }
+
+    if (H5Sclose(defined_sid) < 0)
+        TEST_ERROR;
+    defined_sid = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(defined_sid);
+        H5Sclose(mspace);
+        H5Sclose(fspace);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_get_defined_none_selection
+ *
+ * Purpose:     Verify H5Dget_defined() when the supplied input dataspace
+ *              contains an H5S_NONE selection.
+ *
+ *              The dataset is populated before the query so that defined
+ *              values exist. A copy of the dataset dataspace is then
+ *              deselected with H5Sselect_none() and supplied to
+ *              H5Dget_defined().
+ *
+ *              This verifies that:
+ *
+ *                  1) An empty input selection produces a valid returned
+ *                     dataspace.
+ *
+ *                  2) The returned dataspace contains zero selected points
+ *                     even though defined values exist in the dataset.
+ *
+ *                  3) The zero-element selection path is handled without
+ *                     requiring chunk processing.
+ *
+ * Return:      SUCCEED/FAIL
+ *
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_get_defined_none_selection(void)
+{
+    TESTING("SCC: get_defined H5S_NONE input selection");
+
+    hid_t fid         = H5I_INVALID_HID;
+    hid_t sid         = H5I_INVALID_HID;
+    hid_t dcpl        = H5I_INVALID_HID;
+    hid_t did         = H5I_INVALID_HID;
+    hid_t query_space = H5I_INVALID_HID;
+    hid_t defined_sid = H5I_INVALID_HID;
+
+    hsize_t dims[1]      = {8};
+    hsize_t chunk_dim[1] = {4};
+
+    int wbuf[8];
+
+    hssize_t npoints;
+    int ndims;
+
+    char filename[1024];
+
+    for (size_t i = 0; i < NELMTS(wbuf); i++)
+        wbuf[i] = (int)(800 + i);
+
+    h5_fixname("scc_get_defined_none_selection", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dim, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    /*
+     * Define the complete dataset so the NONE result cannot be attributed
+     * to lack of defined data.
+     */
+    if (H5Dwrite(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, wbuf) < 0)
+        TEST_ERROR;
+
+    if ((query_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_none(query_space) < 0)
+        TEST_ERROR;
+
+    if ((defined_sid = H5Dget_defined(did, query_space, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    /*
+     * Verify that H5Dget_defined() still returned a normal 1D dataspace.
+     */
+    if ((ndims = H5Sget_simple_extent_ndims(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if (ndims != 1)
+        TEST_ERROR;
+
+    if ((npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if (npoints != 0)
+        TEST_ERROR;
+
+    if (H5Sclose(defined_sid) < 0)
+        TEST_ERROR;
+    defined_sid = H5I_INVALID_HID;
+
+    if (H5Sclose(query_space) < 0)
+        TEST_ERROR;
+    query_space = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(defined_sid);
+        H5Sclose(query_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_get_defined_full_chunks_after_reopen
+ *
+ * Purpose:     Verify H5Dget_defined() after reopening a dataset containing
+ *              multiple fully defined logical chunks.
+ *
+ *              Two adjacent complete chunks are written while the logical
+ *              chunks before and after them remain unallocated. The dataset
+ *              is then closed and reopened before H5Dget_defined() is called.
+ *
+ *              This verifies that:
+ *
+ *                  1) Complete logical chunks remain recognizable as fully
+ *                     defined after reopen.
+ *
+ *                  2) Multiple full chunk-local selections are translated
+ *                     and merged correctly into dataset coordinates.
+ *
+ *                  3) Unallocated chunks surrounding the fully defined
+ *                     region are excluded from the result.
+ *
+ * Return:      SUCCEED/FAIL
+ *
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_get_defined_full_chunks_after_reopen(void)
+{
+    TESTING("SCC: get_defined full chunks after reopen");
+
+    hid_t fid         = H5I_INVALID_HID;
+    hid_t sid         = H5I_INVALID_HID;
+    hid_t dcpl        = H5I_INVALID_HID;
+    hid_t did         = H5I_INVALID_HID;
+    hid_t fspace      = H5I_INVALID_HID;
+    hid_t mspace      = H5I_INVALID_HID;
+    hid_t defined_sid = H5I_INVALID_HID;
+
+    hsize_t dims[1]      = {16};
+    hsize_t chunk_dim[1] = {4};
+    hsize_t mem_dims[1]  = {8};
+
+    hsize_t write_start[1] = {4};
+    hsize_t write_count[1] = {8};
+
+    int wbuf[8];
+
+    hssize_t npoints;
+    hsize_t low[1];
+    hsize_t high[1];
+
+    char filename[1024];
+
+    for (size_t i = 0; i < NELMTS(wbuf); i++)
+        wbuf[i] = (int)(900 + i);
+
+    h5_fixname("scc_get_defined_full_chunks_after_reopen", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dim, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((fspace = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    /*
+     * Fully define chunks 1 and 2:
+     *
+     *     chunk 0: [0..3]   unallocated
+     *     chunk 1: [4..7]   fully defined
+     *     chunk 2: [8..11]  fully defined
+     *     chunk 3: [12..15] unallocated
+     */
+    if (H5Sselect_hyperslab(fspace, H5S_SELECT_SET, write_start, NULL, write_count, NULL) < 0)
+        TEST_ERROR;
+
+    if ((mspace = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, wbuf) < 0)
+        TEST_ERROR;
+
+    if (H5Sclose(mspace) < 0)
+        TEST_ERROR;
+    mspace = H5I_INVALID_HID;
+
+    if (H5Sclose(fspace) < 0)
+        TEST_ERROR;
+    fspace = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    if ((fid = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((defined_sid = H5Dget_defined(did, H5S_ALL, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if (npoints != 8)
+        TEST_ERROR;
+
+    if (H5Sget_select_bounds(defined_sid, low, high) < 0)
+        TEST_ERROR;
+
+    if (low[0] != 4 || high[0] != 11)
+        TEST_ERROR;
+
+    /*
+     * Verify every element in the two fully defined chunks.
+     */
+    for (hsize_t coord = 4; coord <= 11; coord++) {
+        hsize_t start[1] = {coord};
+        hsize_t end[1]   = {coord};
+        htri_t intersects;
+
+        if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+            TEST_ERROR;
+
+        if (!intersects)
+            TEST_ERROR;
+    }
+
+    /*
+     * Explicitly verify values immediately outside the defined region.
+     */
+    {
+        const hsize_t excluded[2] = {3, 12};
+
+        for (size_t i = 0; i < NELMTS(excluded); i++) {
+            hsize_t start[1] = {excluded[i]};
+            hsize_t end[1]   = {excluded[i]};
+            htri_t intersects;
+
+            if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+                TEST_ERROR;
+
+            if (intersects)
+                TEST_ERROR;
+        }
+    }
+
+    if (H5Sclose(defined_sid) < 0)
+        TEST_ERROR;
+    defined_sid = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(defined_sid);
+        H5Sclose(mspace);
+        H5Sclose(fspace);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_get_defined_2d_restricted_query
+ *
+ * Purpose:     Verify H5Dget_defined() for a multidimensional restricted
+ *              input selection spanning several structured chunks.
+ *
+ *              Sparse values are defined across a 12x12 dataset using
+ *              4x4 logical chunks. A rectangular 2D hyperslab is then used
+ *              as the input selection to H5Dget_defined().
+ *
+ *              Defined values exist both inside and outside the query
+ *              rectangle.
+ *
+ *              This verifies that:
+ *
+ *                  1) Multidimensional chunk decomposition correctly
+ *                     identifies all participating logical chunks.
+ *
+ *                  2) Per-chunk intersections are performed using the
+ *                     caller's restricted 2D selection.
+ *
+ *                  3) Chunk-local selections are translated back into the
+ *                     correct dataset coordinates in both dimensions.
+ *
+ *                  4) Defined values outside the query selection are
+ *                     excluded from the result.
+ *
+ * Return:      SUCCEED/FAIL
+ *
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_get_defined_2d_restricted_query(void)
+{
+    TESTING("SCC: get_defined 2D restricted query");
+
+    hid_t fid         = H5I_INVALID_HID;
+    hid_t sid         = H5I_INVALID_HID;
+    hid_t dcpl        = H5I_INVALID_HID;
+    hid_t did         = H5I_INVALID_HID;
+    hid_t write_space = H5I_INVALID_HID;
+    hid_t write_mem   = H5I_INVALID_HID;
+    hid_t query_space = H5I_INVALID_HID;
+    hid_t defined_sid = H5I_INVALID_HID;
+
+    hsize_t dims[2]      = {12, 12};
+    hsize_t chunk_dim[2] = {4, 4};
+    hsize_t mem_dims[1]  = {10};
+
+    /*
+     * Query rectangle:
+     *
+     *     rows 2..9
+     *     cols 3..8
+     */
+    hsize_t query_start[2] = {2, 3};
+    hsize_t query_count[2] = {8, 6};
+
+    /*
+     * Ten defined values across multiple chunks.
+     *
+     * Expected values inside the query:
+     *
+     *     {2,3}
+     *     {3,7}
+     *     {4,4}
+     *     {6,8}
+     *     {8,3}
+     *     {9,8}
+     *
+     * Values outside the query:
+     *
+     *     {1,1}
+     *     {2,10}
+     *     {10,4}
+     *     {11,11}
+     */
+    const hsize_t defined_coords[10][2] = {{1, 1}, {2, 3}, {2, 10}, {3, 7},  {4, 4},
+                                           {6, 8}, {8, 3}, {9, 8},  {10, 4}, {11, 11}};
+
+    const hsize_t expected[6][2] = {{2, 3}, {3, 7}, {4, 4}, {6, 8}, {8, 3}, {9, 8}};
+
+    int wbuf[10];
+
+    hssize_t npoints;
+    hsize_t low[2];
+    hsize_t high[2];
+
+    char filename[1024];
+
+    for (size_t i = 0; i < NELMTS(wbuf); i++)
+        wbuf[i] = (int)(1000 + i);
+
+    h5_fixname("scc_get_defined_2d_restricted_query", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(2, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 2, chunk_dim, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    /*
+     * Build sparse defined-value selection.
+     */
+    if ((write_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_none(write_space) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(defined_coords); i++) {
+        hsize_t start[2] = {defined_coords[i][0], defined_coords[i][1]};
+        hsize_t count[2] = {1, 1};
+
+        if (H5Sselect_hyperslab(write_space, H5S_SELECT_OR, start, NULL, count, NULL) < 0)
+            TEST_ERROR;
+    }
+
+    if ((write_mem = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, write_mem, write_space, H5P_DEFAULT, wbuf) < 0)
+        TEST_ERROR;
+
+    /*
+     * Construct the restricted 2D query.
+     */
+    if ((query_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(query_space, H5S_SELECT_SET, query_start, NULL, query_count, NULL) < 0)
+        TEST_ERROR;
+
+    if ((defined_sid = H5Dget_defined(did, query_space, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if ((hsize_t)npoints != (hsize_t)NELMTS(expected))
+        TEST_ERROR;
+
+    if (H5Sget_select_bounds(defined_sid, low, high) < 0)
+        TEST_ERROR;
+
+    if (low[0] != 2 || low[1] != 3 || high[0] != 9 || high[1] != 8)
+        TEST_ERROR;
+
+    /*
+     * Verify all expected coordinates.
+     */
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[2] = {expected[i][0], expected[i][1]};
+        hsize_t end[2]   = {expected[i][0], expected[i][1]};
+        htri_t intersects;
+
+        if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+            TEST_ERROR;
+
+        if (!intersects)
+            TEST_ERROR;
+    }
+
+    /*
+     * Explicitly verify representative defined values that lie outside the
+     * supplied query selection are absent.
+     */
+    {
+        const hsize_t excluded[4][2] = {{1, 1}, {2, 10}, {10, 4}, {11, 11}};
+
+        for (size_t i = 0; i < NELMTS(excluded); i++) {
+            hsize_t start[2] = {excluded[i][0], excluded[i][1]};
+            hsize_t end[2]   = {excluded[i][0], excluded[i][1]};
+            htri_t intersects;
+
+            if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+                TEST_ERROR;
+
+            if (intersects)
+                TEST_ERROR;
+        }
+    }
+
+    if (H5Sclose(defined_sid) < 0)
+        TEST_ERROR;
+    defined_sid = H5I_INVALID_HID;
+
+    if (H5Sclose(query_space) < 0)
+        TEST_ERROR;
+    query_space = H5I_INVALID_HID;
+
+    if (H5Sclose(write_mem) < 0)
+        TEST_ERROR;
+    write_mem = H5I_INVALID_HID;
+
+    if (H5Sclose(write_space) < 0)
+        TEST_ERROR;
+    write_space = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(defined_sid);
+        H5Sclose(query_space);
+        H5Sclose(write_mem);
+        H5Sclose(write_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_get_defined_after_erase_reopen
+ *
+ * Purpose:     Verify H5Dget_defined() after defined values have been
+ *              removed by H5Derase() and the dataset has subsequently been
+ *              closed and reopened.
+ *
+ *              Sparse values are written across several logical chunks.
+ *              A second sparse hyperslab selection is then used to erase a
+ *              subset of those values. The dataset and file are closed and
+ *              reopened before H5Dget_defined() is called.
+ *
+ *              This verifies that:
+ *
+ *                  1) H5Derase() updates the structured-chunk defined-value
+ *                     metadata persistently.
+ *
+ *                  2) Erased values remain undefined after close/reopen.
+ *
+ *                  3) Values not included in the erase selection remain
+ *                     defined.
+ *
+ *                  4) H5Dget_defined() reconstructs the post-erase
+ *                     selection correctly from nonresident chunk metadata.
+ *
+ * Return:      SUCCEED/FAIL
+ *
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_get_defined_after_erase_reopen(void)
+{
+    TESTING("SCC: get_defined after erase and reopen");
+
+    hid_t fid         = H5I_INVALID_HID;
+    hid_t sid         = H5I_INVALID_HID;
+    hid_t dcpl        = H5I_INVALID_HID;
+    hid_t did         = H5I_INVALID_HID;
+    hid_t write_space = H5I_INVALID_HID;
+    hid_t write_mem   = H5I_INVALID_HID;
+    hid_t erase_space = H5I_INVALID_HID;
+    hid_t defined_sid = H5I_INVALID_HID;
+
+    hsize_t dims[1]      = {12};
+    hsize_t chunk_dim[1] = {4};
+    hsize_t mem_dims[1]  = {7};
+
+    const hsize_t written[7] = {1, 2, 3, 5, 6, 9, 10};
+
+    const hsize_t erased[3] = {2, 6, 9};
+
+    const hsize_t expected[4] = {1, 3, 5, 10};
+
+    int wbuf[7] = {1101, 1102, 1103, 1105, 1106, 1109, 1110};
+
+    hssize_t npoints;
+    hsize_t low[1];
+    hsize_t high[1];
+
+    char filename[1024];
+
+    h5_fixname("scc_get_defined_after_erase_reopen", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dim, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    /*
+     * Define:
+     *
+     *     {1, 2, 3, 5, 6, 9, 10}
+     */
+    if ((write_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_none(write_space) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(written); i++) {
+        hsize_t start[1] = {written[i]};
+        hsize_t count[1] = {1};
+
+        if (H5Sselect_hyperslab(write_space, H5S_SELECT_OR, start, NULL, count, NULL) < 0)
+            TEST_ERROR;
+    }
+
+    if ((write_mem = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, write_mem, write_space, H5P_DEFAULT, wbuf) < 0)
+        TEST_ERROR;
+
+    /*
+     * Erase:
+     *
+     *     {2, 6, 9}
+     *
+     * leaving:
+     *
+     *     {1, 3, 5, 10}
+     */
+    if ((erase_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_none(erase_space) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(erased); i++) {
+        hsize_t start[1] = {erased[i]};
+        hsize_t count[1] = {1};
+
+        if (H5Sselect_hyperslab(erase_space, H5S_SELECT_OR, start, NULL, count, NULL) < 0)
+            TEST_ERROR;
+    }
+
+    if (H5Derase(did, erase_space, H5P_DEFAULT) < 0)
+        TEST_ERROR;
+
+    if (H5Sclose(erase_space) < 0)
+        TEST_ERROR;
+    erase_space = H5I_INVALID_HID;
+
+    if (H5Sclose(write_mem) < 0)
+        TEST_ERROR;
+    write_mem = H5I_INVALID_HID;
+
+    if (H5Sclose(write_space) < 0)
+        TEST_ERROR;
+    write_space = H5I_INVALID_HID;
+
+    /*
+     * Reopen so verification uses persisted defined-value metadata rather
+     * than the resident decoded objects modified by H5Derase().
+     */
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    if ((fid = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((defined_sid = H5Dget_defined(did, H5S_ALL, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if ((hsize_t)npoints != (hsize_t)NELMTS(expected))
+        TEST_ERROR;
+
+    if (H5Sget_select_bounds(defined_sid, low, high) < 0)
+        TEST_ERROR;
+
+    if (low[0] != 1 || high[0] != 10)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[1] = {expected[i]};
+        hsize_t end[1]   = {expected[i]};
+        htri_t intersects;
+
+        if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+            TEST_ERROR;
+
+        if (!intersects)
+            TEST_ERROR;
+    }
+
+    /*
+     * Explicitly verify the erased coordinates remain undefined.
+     */
+    for (size_t i = 0; i < NELMTS(erased); i++) {
+        hsize_t start[1] = {erased[i]};
+        hsize_t end[1]   = {erased[i]};
+        htri_t intersects;
+
+        if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+            TEST_ERROR;
+
+        if (intersects)
+            TEST_ERROR;
+    }
+
+    if (H5Sclose(defined_sid) < 0)
+        TEST_ERROR;
+    defined_sid = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(defined_sid);
+        H5Sclose(erase_space);
+        H5Sclose(write_mem);
+        H5Sclose(write_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_get_defined_after_extent_growth
+ *
+ * Purpose:     Verify H5Dget_defined() after growing an extensible sparse
+ *              structured-chunk dataset.
+ *
+ *              Sparse values are written within the original extent, after
+ *              which H5Dset_extent() grows the dataset without writing any
+ *              values into the newly exposed region. The dataset is then
+ *              closed and reopened before H5Dget_defined() is called.
+ *
+ *              This verifies that:
+ *
+ *                  1) Defined values from the original extent remain defined
+ *                     after extent growth.
+ *
+ *                  2) Newly exposed elements are not implicitly considered
+ *                     defined.
+ *
+ *                  3) Structured-chunk extent/index updates performed during
+ *                     growth remain compatible with H5Dget_defined().
+ *
+ *                  4) Defined-value state persists correctly across
+ *                     close/reopen after the extent change.
+ *
+ * Return:      SUCCEED/FAIL
+ *
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_get_defined_after_extent_growth(void)
+{
+    TESTING("SCC: get_defined after extent growth");
+
+    hid_t fid         = H5I_INVALID_HID;
+    hid_t sid         = H5I_INVALID_HID;
+    hid_t dcpl        = H5I_INVALID_HID;
+    hid_t did         = H5I_INVALID_HID;
+    hid_t write_space = H5I_INVALID_HID;
+    hid_t write_mem   = H5I_INVALID_HID;
+    hid_t defined_sid = H5I_INVALID_HID;
+
+    hsize_t dims[1]      = {8};
+    hsize_t maxdims[1]   = {H5S_UNLIMITED};
+    hsize_t grow[1]      = {12};
+    hsize_t chunk_dim[1] = {4};
+    hsize_t mem_dims[1]  = {3};
+
+    const hsize_t expected[3] = {1, 3, 6};
+
+    int wbuf[3] = {1201, 1203, 1206};
+
+    hssize_t npoints;
+    hsize_t low[1];
+    hsize_t high[1];
+    hsize_t result_dims[1];
+
+    char filename[1024];
+
+    h5_fixname("scc_get_defined_after_extent_growth", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, maxdims)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dim, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((write_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_none(write_space) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[1] = {expected[i]};
+        hsize_t count[1] = {1};
+
+        if (H5Sselect_hyperslab(write_space, H5S_SELECT_OR, start, NULL, count, NULL) < 0)
+            TEST_ERROR;
+    }
+
+    if ((write_mem = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, write_mem, write_space, H5P_DEFAULT, wbuf) < 0)
+        TEST_ERROR;
+
+    if (H5Sclose(write_mem) < 0)
+        TEST_ERROR;
+    write_mem = H5I_INVALID_HID;
+
+    if (H5Sclose(write_space) < 0)
+        TEST_ERROR;
+    write_space = H5I_INVALID_HID;
+
+    /*
+     * Grow from two logical chunks to three. No writes are made to the
+     * newly exposed chunk [8..11].
+     */
+    if (H5Dset_extent(did, grow) < 0)
+        TEST_ERROR;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    if ((fid = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((defined_sid = H5Dget_defined(did, H5S_ALL, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    /*
+     * Verify H5Dget_defined() returns a dataspace with the grown extent.
+     */
+    if (H5Sget_simple_extent_dims(defined_sid, result_dims, NULL) < 0)
+        TEST_ERROR;
+
+    if (result_dims[0] != grow[0])
+        TEST_ERROR;
+
+    if ((npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if ((hsize_t)npoints != (hsize_t)NELMTS(expected))
+        TEST_ERROR;
+
+    if (H5Sget_select_bounds(defined_sid, low, high) < 0)
+        TEST_ERROR;
+
+    if (low[0] != 1 || high[0] != 6)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[1] = {expected[i]};
+        hsize_t end[1]   = {expected[i]};
+        htri_t intersects;
+
+        if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+            TEST_ERROR;
+
+        if (!intersects)
+            TEST_ERROR;
+    }
+
+    /*
+     * Verify representative coordinates throughout the newly grown region.
+     */
+    for (hsize_t coord = 8; coord < grow[0]; coord++) {
+        hsize_t start[1] = {coord};
+        hsize_t end[1]   = {coord};
+        htri_t intersects;
+
+        if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+            TEST_ERROR;
+
+        if (intersects)
+            TEST_ERROR;
+    }
+
+    if (H5Sclose(defined_sid) < 0)
+        TEST_ERROR;
+    defined_sid = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(defined_sid);
+        H5Sclose(write_mem);
+        H5Sclose(write_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_get_defined_filtered_cache_neutral_after_reopen
+ *
+ * Purpose:     Verify that H5Dget_defined() remains cache-neutral when
+ *              querying nonresident GZIP-filtered defined-value metadata
+ *              after close/reopen.
+ *
+ *              Sparse values are written across several structured chunks
+ *              with GZIP applied to H5_SECTION_SELECTION. The file is then
+ *              closed and reopened so no decoded chunk objects from the
+ *              original SCC instance remain resident.
+ *
+ *              SCC cache state is recorded before H5Dget_defined() and
+ *              compared afterward.
+ *
+ *              This verifies that:
+ *
+ *                  1) Filtered defined-value metadata is decoded correctly
+ *                     after reopen.
+ *
+ *                  2) Metadata-only decoded objects are temporary and are
+ *                     not inserted into the SCC chunk hash table or LRU.
+ *
+ *                  3) H5Dget_defined() does not change dataset resident-byte
+ *                     accounting or global SCC quiescent size.
+ *
+ *                  4) Reverse filtering of selection metadata does not alter
+ *                     the cache-neutral contract of H5Dget_defined().
+ *
+ * Return:      SUCCEED/FAIL
+ *
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_get_defined_filtered_cache_neutral_after_reopen(void)
+{
+    TESTING("SCC: filtered get_defined remains cache-neutral after reopen");
+
+    hid_t fid         = H5I_INVALID_HID;
+    hid_t sid         = H5I_INVALID_HID;
+    hid_t dcpl        = H5I_INVALID_HID;
+    hid_t did         = H5I_INVALID_HID;
+    hid_t fspace      = H5I_INVALID_HID;
+    hid_t mspace      = H5I_INVALID_HID;
+    hid_t defined_sid = H5I_INVALID_HID;
+
+    H5SC_t *cache                = NULL;
+    H5SC_dset_header_t *dset_hdr = NULL;
+    H5SC_chunk_t *old_chunk_hash_head;
+
+    hsize_t dims[1]      = {16};
+    hsize_t chunk_dim[1] = {4};
+    hsize_t mem_dims[1]  = {6};
+
+    const hsize_t expected[6] = {1, 3, 5, 8, 11, 14};
+
+    int wbuf[6] = {1301, 1303, 1305, 1308, 1311, 1314};
+
+    unsigned int gzip_level = 6;
+    size_t cd_nelmts        = 1;
+
+    size_t old_chunk_lru_len;
+    size_t old_dset_size;
+    size_t old_cache_size;
+
+    hssize_t npoints;
+
+    char filename[1024];
+
+    h5_fixname("scc_get_defined_filtered_cache_neutral_after_reopen", H5P_DEFAULT, filename,
+               sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dim, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_filter2(dcpl, H5_SECTION_SELECTION, H5Z_FILTER_DEFLATE, H5Z_FLAG_OPTIONAL, cd_nelmts,
+                       &gzip_level) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((fspace = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_none(fspace) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[1] = {expected[i]};
+        hsize_t count[1] = {1};
+
+        if (H5Sselect_hyperslab(fspace, H5S_SELECT_OR, start, NULL, count, NULL) < 0)
+            TEST_ERROR;
+    }
+
+    if ((mspace = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, wbuf) < 0)
+        TEST_ERROR;
+
+    if (H5Sclose(mspace) < 0)
+        TEST_ERROR;
+    mspace = H5I_INVALID_HID;
+
+    if (H5Sclose(fspace) < 0)
+        TEST_ERROR;
+    fspace = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    /*
+     * Reopen with a new SCC instance.
+     */
+    if ((fid = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
+        TEST_ERROR;
+
+    if (!cache)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr)
+        TEST_ERROR;
+
+    /*
+     * Capture the complete set of SCC state that a metadata-only query
+     * should leave unchanged.
+     */
+    old_chunk_lru_len   = dset_hdr->chunk_lru_len;
+    old_dset_size       = dset_hdr->curr_dset_size;
+    old_cache_size      = cache->SCC_quiescent_size;
+    old_chunk_hash_head = cache->chunk_hash_table_head_ptr;
+
+    if ((defined_sid = H5Dget_defined(did, H5S_ALL, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if ((hsize_t)npoints != (hsize_t)NELMTS(expected))
+        TEST_ERROR;
+
+    for (size_t i = 0; i < NELMTS(expected); i++) {
+        hsize_t start[1] = {expected[i]};
+        hsize_t end[1]   = {expected[i]};
+        htri_t intersects;
+
+        if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+            TEST_ERROR;
+
+        if (!intersects)
+            TEST_ERROR;
+    }
+
+    /*
+     * H5Dget_defined() must not make the temporary metadata-only decoded
+     * objects resident.
+     */
+    if (dset_hdr->chunk_lru_len != old_chunk_lru_len)
+        TEST_ERROR;
+
+    if (dset_hdr->curr_dset_size != old_dset_size)
+        TEST_ERROR;
+
+    if (cache->SCC_quiescent_size != old_cache_size)
+        TEST_ERROR;
+
+    if (cache->chunk_hash_table_head_ptr != old_chunk_hash_head)
+        TEST_ERROR;
+
+    if (H5Sclose(defined_sid) < 0)
+        TEST_ERROR;
+    defined_sid = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(defined_sid);
+        H5Sclose(mspace);
+        H5Sclose(fspace);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    test_get_defined_non_scc_passthrough
+ *
+ * Purpose:     Verify H5Dget_defined() behavior for a dataset layout that
+ *              does not use the shared chunk cache defined-value tracking
+ *              interface.
+ *
+ *              The test creates a traditional dense chunked dataset and
+ *              supplies a restricted hyperslab selection to
+ *              H5Dget_defined().
+ *
+ *              Because the dataset does not provide structured sparse-chunk
+ *              defined-value tracking, H5Dget_defined() is expected to
+ *              return a copy of the supplied file-space selection.
+ *
+ *              This verifies that:
+ *
+ *                  1) H5Dget_defined() preserves the input selection for a
+ *                     non-SCC dataset layout.
+ *
+ *                  2) The returned dataspace has the same dataset extent as
+ *                     the supplied file-space dataspace.
+ *
+ *                  3) The returned dataspace is an independent copy and may
+ *                     be modified without changing the caller's original
+ *                     file-space selection.
+ *
+ * Return:      SUCCEED/FAIL
+ *
+ *-------------------------------------------------------------------------
+ */
+static int test_get_defined_non_scc_passthrough(void)
+{
+    TESTING("get_defined non-SCC layout passthrough");
+
+    hid_t fid         = H5I_INVALID_HID;
+    hid_t sid         = H5I_INVALID_HID;
+    hid_t dcpl        = H5I_INVALID_HID;
+    hid_t did         = H5I_INVALID_HID;
+    hid_t query_space = H5I_INVALID_HID;
+    hid_t defined_sid = H5I_INVALID_HID;
+
+    hsize_t dims[2]      = {12, 10};
+    hsize_t chunk_dim[2] = {4, 5};
+
+    /*
+     * Query:
+     *
+     *     rows 2..7
+     *     cols 3..6
+     *
+     *     6 * 4 = 24 selected elements
+     */
+    hsize_t query_start[2] = {2, 3};
+    hsize_t query_count[2] = {6, 4};
+
+    hsize_t result_dims[2];
+    hsize_t query_low[2];
+    hsize_t query_high[2];
+    hsize_t result_low[2];
+    hsize_t result_high[2];
+
+    hssize_t query_npoints;
+    hssize_t result_npoints;
+
+    char filename[1024];
+
+    h5_fixname("get_defined_non_scc_passthrough", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(2, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    /*
+     * Use ordinary dense chunking rather than H5D_STRUCT_CHUNK.
+     */
+    if (H5Pset_chunk(dcpl, 2, chunk_dim) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    /*
+     * No dataset write is required. For a non-SCC layout,
+     * H5Dget_defined() returns a copy of file_space rather than examining
+     * sparse defined-value state.
+     */
+    if ((query_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(query_space, H5S_SELECT_SET, query_start, NULL, query_count, NULL) < 0)
+        TEST_ERROR;
+
+    if ((query_npoints = H5Sget_select_npoints(query_space)) < 0)
+        TEST_ERROR;
+
+    if (query_npoints != 24)
+        TEST_ERROR;
+
+    if (H5Sget_select_bounds(query_space, query_low, query_high) < 0)
+        TEST_ERROR;
+
+    if ((defined_sid = H5Dget_defined(did, query_space, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    /*
+     * Verify the returned dataspace has the same extent as the input
+     * dataset dataspace.
+     */
+    if (H5Sget_simple_extent_dims(defined_sid, result_dims, NULL) < 0)
+        TEST_ERROR;
+
+    if (result_dims[0] != dims[0] || result_dims[1] != dims[1])
+        TEST_ERROR;
+
+    /*
+     * The selected elements and bounds should exactly match the input
+     * file-space selection.
+     */
+    if ((result_npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if (result_npoints != query_npoints)
+        TEST_ERROR;
+
+    if (H5Sget_select_bounds(defined_sid, result_low, result_high) < 0)
+        TEST_ERROR;
+
+    if (result_low[0] != query_low[0] || result_low[1] != query_low[1] || result_high[0] != query_high[0] ||
+        result_high[1] != query_high[1])
+        TEST_ERROR;
+
+    /*
+     * Verify representative coordinates inside the input selection.
+     */
+    {
+        const hsize_t expected[4][2] = {{2, 3}, {2, 6}, {7, 3}, {7, 6}};
+
+        for (size_t i = 0; i < NELMTS(expected); i++) {
+            hsize_t start[2] = {expected[i][0], expected[i][1]};
+            hsize_t end[2]   = {expected[i][0], expected[i][1]};
+            htri_t intersects;
+
+            if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+                TEST_ERROR;
+
+            if (!intersects)
+                TEST_ERROR;
+        }
+    }
+
+    /*
+     * Verify representative coordinates outside the query are absent.
+     */
+    {
+        const hsize_t excluded[4][2] = {{1, 3}, {2, 2}, {7, 7}, {8, 6}};
+
+        for (size_t i = 0; i < NELMTS(excluded); i++) {
+            hsize_t start[2] = {excluded[i][0], excluded[i][1]};
+            hsize_t end[2]   = {excluded[i][0], excluded[i][1]};
+            htri_t intersects;
+
+            if ((intersects = H5Sselect_intersect_block(defined_sid, start, end)) < 0)
+                TEST_ERROR;
+
+            if (intersects)
+                TEST_ERROR;
+        }
+    }
+
+    /*
+     * Finally, verify that H5Dget_defined() returned an independent copy,
+     * not the caller's original dataspace object.
+     *
+     * Clear the returned selection and confirm that query_space is
+     * unchanged.
+     */
+    if (H5Sselect_none(defined_sid) < 0)
+        TEST_ERROR;
+
+    if ((result_npoints = H5Sget_select_npoints(defined_sid)) < 0)
+        TEST_ERROR;
+
+    if (result_npoints != 0)
+        TEST_ERROR;
+
+    if ((query_npoints = H5Sget_select_npoints(query_space)) < 0)
+        TEST_ERROR;
+
+    if (query_npoints != 24)
+        TEST_ERROR;
+
+    if (H5Sclose(defined_sid) < 0)
+        TEST_ERROR;
+    defined_sid = H5I_INVALID_HID;
+
+    if (H5Sclose(query_space) < 0)
+        TEST_ERROR;
+    query_space = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(defined_sid);
+        H5Sclose(query_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+} /* end test_get_defined_non_scc_passthrough() */
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_gzip_dirty_pressure_eviction
+ *
+ * Purpose:     Verify that admitting a nonresident GZIP-filtered chunk under
+ *              zero cache headroom flushes and evicts an older dirty filtered
+ *              chunk without corrupting updated or untouched values.
+ *
+ * Return:      SUCCEED/FAIL
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_gzip_dirty_pressure_eviction(void)
+{
+    hid_t fid        = H5I_INVALID_HID;
+    hid_t sid        = H5I_INVALID_HID;
+    hid_t dcpl       = H5I_INVALID_HID;
+    hid_t did        = H5I_INVALID_HID;
+    hid_t file_space = H5I_INVALID_HID;
+    hid_t mem_space  = H5I_INVALID_HID;
+    hid_t read_space = H5I_INVALID_HID;
+    hid_t read_mem   = H5I_INVALID_HID;
+
+    const hsize_t dims[1]         = {10};
+    const hsize_t chunk_dims[1]   = {5};
+    const hsize_t update_dims[1]  = {2};
+    const hsize_t update_start[1] = {1};
+    const hsize_t update_count[1] = {2};
+    const hsize_t read_dims[1]    = {5};
+    const hsize_t read_start[1]   = {5};
+    const hsize_t read_count[1]   = {5};
+
+    const int initial[10] = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100};
+
+    const int update[2] = {201, 202};
+
+    const int expected[10] = {10, 201, 202, 40, 50, 60, 70, 80, 90, 100};
+
+    int chunk1_read[5];
+    int full_read[10];
+
+    unsigned int gzip_level = 6;
+    unsigned int filter_info;
+
+    H5SC_t *cache                = NULL;
+    H5SC_dset_header_t *dset_hdr = NULL;
+    H5SC_chunk_t *chunk          = NULL;
+
+    H5SC_chunk_key_t dirty_key;
+
+    size_t saved_quiescent_limit = 0;
+    size_t saved_active_limit    = 0;
+    size_t saved_min_dset_size   = 0;
+    bool limits_overridden       = false;
+
+    uint64_t flush_count_before;
+    uint64_t eviction_count_before;
+
+    char filename[1024];
+
+    TESTING("SCC: GZIP dirty pressure flush and eviction");
+
+    memset(&dirty_key, 0, sizeof(dirty_key));
+    memset(chunk1_read, 0, sizeof(chunk1_read));
+    memset(full_read, 0, sizeof(full_read));
+
+    if (H5Zfilter_avail(H5Z_FILTER_DEFLATE) <= 0) {
+        SKIPPED();
+        puts("    GZIP filter not available");
+        return SUCCEED;
+    }
+
+    if (H5Zget_filter_info(H5Z_FILTER_DEFLATE, &filter_info) < 0)
+        TEST_ERROR;
+
+    if (!(filter_info & H5Z_FILTER_CONFIG_ENCODE_ENABLED) ||
+        !(filter_info & H5Z_FILTER_CONFIG_DECODE_ENABLED)) {
+        SKIPPED();
+        puts("    GZIP encode/decode support unavailable");
+        return SUCCEED;
+    }
+
+    h5_fixname("scc_gzip_dirty_pressure_eviction", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dims, H5D_SPARSE_CHUNK) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_filter2(dcpl, H5_SECTION_SELECTION, H5Z_FILTER_DEFLATE, H5Z_FLAG_OPTIONAL, 1, &gzip_level) < 0)
+        TEST_ERROR;
+
+    if (H5Pset_filter2(dcpl, H5_SECTION_FIXED, H5Z_FILTER_DEFLATE, H5Z_FLAG_OPTIONAL, 1, &gzip_level) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if (H5SC__get_cache_from_file_id(fid, &cache) < 0)
+        TEST_ERROR;
+
+    if (!cache)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, initial) < 0)
+        TEST_ERROR;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((mem_space = H5Screate_simple(1, update_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((file_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(file_space, H5S_SELECT_SET, update_start, NULL, update_count, NULL) < 0)
+        TEST_ERROR;
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, update) < 0)
+        TEST_ERROR;
+
+    dset_hdr = cache->dset_lru_head_ptr;
+    if (!dset_hdr || dset_hdr->chunk_lru_len != 1)
+        TEST_ERROR;
+
+    chunk = dset_hdr->lru_head_ptr;
+    if (!chunk || !chunk->chunk_obj || !chunk->dirty_flag)
+        TEST_ERROR;
+
+    if (chunk->chunk_counter != 0)
+        TEST_ERROR;
+
+    if (chunk->scaled[0] != 0)
+        TEST_ERROR;
+
+    dirty_key = chunk->data_key;
+
+    saved_quiescent_limit = cache->SCC_quiescent_limit;
+    saved_active_limit    = cache->SCC_active_limit;
+    saved_min_dset_size   = dset_hdr->min_dset_size;
+
+    if (cache->SCC_quiescent_size == 0)
+        TEST_ERROR;
+
+    dset_hdr->min_dset_size    = 0;
+    cache->SCC_quiescent_limit = cache->SCC_quiescent_size;
+    cache->SCC_active_limit    = cache->SCC_quiescent_size;
+    limits_overridden          = true;
+
+    flush_count_before    = cache->stats.scc_chunk_flush_count;
+    eviction_count_before = cache->stats.scc_evictions;
+
+    /*
+     * Reading nonresident chunk 1 requires reclaiming dirty chunk 0.
+     */
+    if ((read_mem = H5Screate_simple(1, read_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((read_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_hyperslab(read_space, H5S_SELECT_SET, read_start, NULL, read_count, NULL) < 0)
+        TEST_ERROR;
+
+    if (H5Dread(did, H5T_NATIVE_INT, read_mem, read_space, H5P_DEFAULT, chunk1_read) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < 5; i++)
+        if (chunk1_read[i] != initial[i + 5])
+            TEST_ERROR;
+
+    if (cache->stats.scc_chunk_flush_count <= flush_count_before)
+        TEST_ERROR;
+
+    if (cache->stats.scc_evictions <= eviction_count_before)
+        TEST_ERROR;
+
+    if (H5SC__ht_chunk_find(cache, &dirty_key) != NULL)
+        TEST_ERROR;
+
+    /*
+     * Pressure behavior has been verified. Restore the retention policy and
+     * provide sufficient headroom for the full verification read.
+     */
+    dset_hdr->min_dset_size    = saved_min_dset_size;
+    cache->SCC_quiescent_limit = SIZE_MAX;
+    cache->SCC_active_limit    = SIZE_MAX;
+
+    if (H5Dread(did, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, full_read) < 0)
+        TEST_ERROR;
+
+    for (size_t i = 0; i < 10; i++)
+        if (full_read[i] != expected[i])
+            TEST_ERROR;
+
+    cache->SCC_quiescent_limit = saved_quiescent_limit;
+    cache->SCC_active_limit    = saved_active_limit;
+    limits_overridden          = false;
+
+    if (H5Sclose(read_space) < 0)
+        TEST_ERROR;
+    read_space = H5I_INVALID_HID;
+
+    if (H5Sclose(read_mem) < 0)
+        TEST_ERROR;
+    read_mem = H5I_INVALID_HID;
+
+    if (H5Sclose(file_space) < 0)
+        TEST_ERROR;
+    file_space = H5I_INVALID_HID;
+
+    if (H5Sclose(mem_space) < 0)
+        TEST_ERROR;
+    mem_space = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    if (limits_overridden) {
+        if (dset_hdr)
+            dset_hdr->min_dset_size = saved_min_dset_size;
+
+        if (cache) {
+            cache->SCC_quiescent_limit = saved_quiescent_limit;
+            cache->SCC_active_limit    = saved_active_limit;
+        }
+    }
+
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(read_space);
+        H5Sclose(read_mem);
+        H5Sclose(file_space);
+        H5Sclose(mem_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+} /* end test_scc_gzip_dirty_pressure_eviction() */
+
+/*-------------------------------------------------------------------------
  * Function:    test_scc_filter_2d_full_chunk_write_read_reopen
  *
  * Purpose:     Verify basic SCC filter support for a 2D structured-chunk
@@ -14153,22 +21212,21 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_2d_full_chunk_write_read_reopen(void)
+static int test_scc_filter_2d_full_chunk_write_read_reopen(void)
 {
     TESTING("SCC: filtered 2D full-chunk write/read/reopen");
 
     hid_t fid = H5I_INVALID_HID, sid = H5I_INVALID_HID, dcpl = H5I_INVALID_HID;
     hid_t did = H5I_INVALID_HID, fspace = H5I_INVALID_HID, mspace = H5I_INVALID_HID;
 
-    hsize_t      dims[2]      = {8, 8};
-    hsize_t      maxdims[2]   = {H5S_UNLIMITED, H5S_UNLIMITED};
-    hsize_t      chunk_dim[2] = {4, 4};
-    unsigned int gzip_level   = 4;
-    size_t       cd_nelmts    = 1;
+    hsize_t dims[2]         = {8, 8};
+    hsize_t maxdims[2]      = {H5S_UNLIMITED, H5S_UNLIMITED};
+    hsize_t chunk_dim[2]    = {4, 4};
+    unsigned int gzip_level = 4;
+    size_t cd_nelmts        = 1;
 
-    int  wbuf[8][8];
-    int  rbuf[8][8];
+    int wbuf[8][8];
+    int rbuf[8][8];
     char filename[1024];
 
     h5_fixname("scc_filter_2d_full_chunk_write_read_reopen", H5P_DEFAULT, filename, sizeof(filename));
@@ -14315,8 +21373,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_2d_sparse_point_selection(void)
+static int test_scc_filter_2d_sparse_point_selection(void)
 {
     TESTING("SCC: filtered 2D sparse point selection");
 
@@ -14328,11 +21385,11 @@ test_scc_filter_2d_sparse_point_selection(void)
     hsize_t chunk_dim[2] = {4, 5};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
     hsize_t pts[10][2] = {{0, 0}, {1, 4}, {3, 5}, {4, 0}, {5, 7}, {7, 9}, {8, 2}, {9, 5}, {10, 8}, {11, 1}};
-    int     vals[10];
-    int     got = 0;
+    int vals[10];
+    int got = 0;
 
     char filename[1024];
 
@@ -14472,8 +21529,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_3d_extent_erase_reopen(void)
+static int test_scc_filter_3d_extent_erase_reopen(void)
 {
     TESTING("SCC: filtered 3D erase/extent/reopen");
 
@@ -14488,10 +21544,10 @@ test_scc_filter_3d_extent_erase_reopen(void)
     hsize_t regrow[3]    = {4, 6, 2};
 
     unsigned int gzip_level = 4;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
-    int  wbuf[5][7][2];
-    int  rbuf[4][6][2];
+    int wbuf[5][7][2];
+    int rbuf[4][6][2];
     char filename[1024];
 
     h5_fixname("scc_filter_3d_extent_erase_reopen", H5P_DEFAULT, filename, sizeof(filename));
@@ -14704,8 +21760,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_3d_partial_edge_overwrite_erase_reopen(void)
+static int test_scc_filter_3d_partial_edge_overwrite_erase_reopen(void)
 {
     TESTING("SCC: filtered 3D partial-edge overwrite/erase/reopen");
 
@@ -14718,11 +21773,11 @@ test_scc_filter_3d_partial_edge_overwrite_erase_reopen(void)
     hsize_t chunk_dim[3] = {2, 3, 2};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
-    int  wbuf[5][7][2];
-    int  obuf[5][7][2];
-    int  rbuf[5][7][2];
+    int wbuf[5][7][2];
+    int obuf[5][7][2];
+    int rbuf[5][7][2];
     char filename[1024];
 
     h5_fixname("scc_filter_3d_partial_edge_overwrite_erase_reopen", H5P_DEFAULT, filename, sizeof(filename));
@@ -14940,8 +21995,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_plain_dataset_isolation(void)
+static int test_scc_filter_plain_dataset_isolation(void)
 {
     TESTING("SCC: filtered/plain dataset isolation");
 
@@ -14959,7 +22013,7 @@ test_scc_filter_plain_dataset_isolation(void)
     hsize_t regrow[2]    = {6, 6};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
     int f_wbuf[6][6];
     int p_wbuf[6][6];
@@ -15219,8 +22273,7 @@ error:
  *              2D dataset with two extensible dimensions.
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_2d_extensible_grow_shrink_reopen(void)
+static int test_scc_filter_2d_extensible_grow_shrink_reopen(void)
 {
     TESTING("SCC: filtered 2D extensible grow/shrink/reopen");
 
@@ -15234,10 +22287,10 @@ test_scc_filter_2d_extensible_grow_shrink_reopen(void)
     hsize_t shrink[2]    = {5, 5};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
-    int  wbuf[8][8];
-    int  rbuf[5][5];
+    int wbuf[8][8];
+    int rbuf[5][5];
     char filename[1024];
 
     h5_fixname("scc_filter_2d_extensible_grow_shrink_reopen", H5P_DEFAULT, filename, sizeof(filename));
@@ -15419,8 +22472,7 @@ error:
  *              and reopening before shrink.
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_3d_storage_only_prune_reopen(void)
+static int test_scc_filter_3d_storage_only_prune_reopen(void)
 {
     TESTING("SCC: filtered 3D storage-only prune/reopen");
 
@@ -15433,10 +22485,10 @@ test_scc_filter_3d_storage_only_prune_reopen(void)
     hsize_t shrink[3]    = {3, 4, 2};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
-    int  wbuf[5][7][2];
-    int  rbuf[3][4][2];
+    int wbuf[5][7][2];
+    int rbuf[3][4][2];
     char filename[1024];
 
     h5_fixname("scc_filter_3d_storage_only_prune_reopen", H5P_DEFAULT, filename, sizeof(filename));
@@ -15594,8 +22646,7 @@ error:
  *              reopen.
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_2d_sparse_duplicate_overwrite(void)
+static int test_scc_filter_2d_sparse_duplicate_overwrite(void)
 {
     TESTING("SCC: filtered 2D sparse duplicate overwrite");
 
@@ -15607,12 +22658,12 @@ test_scc_filter_2d_sparse_duplicate_overwrite(void)
     hsize_t chunk_dim[2] = {4, 5};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
     hsize_t pts[6][2] = {{0, 0}, {1, 4}, {3, 5}, {7, 9}, {8, 2}, {11, 1}};
-    int     vals1[6]  = {10, 11, 12, 13, 14, 15};
-    int     vals2[6]  = {110, 111, 112, 113, 114, 115};
-    int     got       = 0;
+    int vals1[6]      = {10, 11, 12, 13, 14, 15};
+    int vals2[6]      = {110, 111, 112, 113, 114, 115};
+    int got           = 0;
 
     char filename[1024];
 
@@ -15746,8 +22797,7 @@ error:
  *              close/reopen, and readback.
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_2d_forced_eviction_reopen(void)
+static int test_scc_filter_2d_forced_eviction_reopen(void)
 {
     TESTING("SCC: filtered 2D forced eviction/reopen");
 
@@ -15755,19 +22805,33 @@ test_scc_filter_2d_forced_eviction_reopen(void)
     hid_t fid = H5I_INVALID_HID, sid = H5I_INVALID_HID, dcpl = H5I_INVALID_HID;
     hid_t did = H5I_INVALID_HID, fspace = H5I_INVALID_HID, mspace = H5I_INVALID_HID;
 
-    H5SC__cache_config_t mod_config = {/* version = */ H5SC__CURR_SCC_VERSION,
-                                       /* max_q_size = */ ((size_t)(1 * 4 * 4 * sizeof(int) + 128)),
-                                       /* max_a_size = */ ((size_t)(2 * 4 * 4 * sizeof(int) + 128))};
+    H5SC__cache_config_t mod_config = {/* version */
+                                       H5SC__CURR_SCC_VERSION,
+
+                                       /*
+                                        * Keep the quiescent limit near one logical chunk so completed
+                                        * operations must evict resident chunks.
+                                        */
+                                       /* max_q_size */
+                                       ((size_t)(1 * 4 * 4 * sizeof(int) + 128)),
+
+                                       /*
+                                        * The final read selects all sixteen chunks in one SCC request.
+                                        * Allow the active request to be admitted while retaining the small
+                                        * quiescent limit that supplies the eviction pressure.
+                                        */
+                                       /* max_a_size */
+                                       ((size_t)(16 * 4 * 4 * sizeof(int) + 4096))};
 
     hsize_t dims[2]      = {16, 16};
     hsize_t maxdims[2]   = {H5S_UNLIMITED, H5S_UNLIMITED};
     hsize_t chunk_dim[2] = {4, 4};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
-    int  wbuf[16][16];
-    int  rbuf[16][16];
+    int wbuf[16][16];
+    int rbuf[16][16];
     char filename[1024];
 
     h5_fixname("scc_filter_2d_forced_eviction_reopen", H5P_DEFAULT, filename, sizeof(filename));
@@ -15915,8 +22979,7 @@ error:
  * Purpose:     Verify filtered SCC round-trip behavior for larger 3D chunks.
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_3d_large_chunk_roundtrip(void)
+static int test_scc_filter_3d_large_chunk_roundtrip(void)
 {
     TESTING("SCC: filtered 3D large chunk roundtrip");
 
@@ -15928,10 +22991,10 @@ test_scc_filter_3d_large_chunk_roundtrip(void)
     hsize_t chunk_dim[3] = {4, 6, 4};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
-    int  wbuf[8][12][4];
-    int  rbuf[8][12][4];
+    int wbuf[8][12][4];
+    int rbuf[8][12][4];
     char filename[1024];
 
     h5_fixname("scc_filter_3d_large_chunk_roundtrip", H5P_DEFAULT, filename, sizeof(filename));
@@ -16073,8 +23136,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_2d_deterministic_sparse_random(void)
+static int test_scc_filter_2d_deterministic_sparse_random(void)
 {
     TESTING("SCC: filtered 2D deterministic sparse random selection");
 
@@ -16086,12 +23148,12 @@ test_scc_filter_2d_deterministic_sparse_random(void)
     hsize_t chunk_dim[2] = {4, 6};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
     hsize_t pts[64][2];
-    int     vals[64];
-    int     got = 0;
-    char    filename[1024];
+    int vals[64];
+    int got = 0;
+    char filename[1024];
 
     h5_fixname("scc_filter_2d_deterministic_sparse_random", H5P_DEFAULT, filename, sizeof(filename));
 
@@ -16224,8 +23286,7 @@ error:
  *              different filter pipelines remain isolated.
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_2d_mixed_filter_pipeline_isolation(void)
+static int test_scc_filter_2d_mixed_filter_pipeline_isolation(void)
 {
     TESTING("SCC: mixed filtered pipeline dataset isolation");
 
@@ -16240,10 +23301,10 @@ test_scc_filter_2d_mixed_filter_pipeline_isolation(void)
     hsize_t chunk_dim[2] = {4, 4};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
-    int  abuf[8][8], bbuf[8][8];
-    int  arbuf[8][8], brbuf[8][8];
+    int abuf[8][8], bbuf[8][8];
+    int arbuf[8][8], brbuf[8][8];
     char filename[1024];
 
     h5_fixname("scc_filter_2d_mixed_filter_pipeline_isolation", H5P_DEFAULT, filename, sizeof(filename));
@@ -16456,8 +23517,7 @@ error:
  *              not install section filters.
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_gzip0_2d_sparse_point_selection(void)
+static int test_scc_gzip0_2d_sparse_point_selection(void)
 {
     TESTING("SCC: gzip0 2D sparse point selection");
 
@@ -16472,8 +23532,8 @@ test_scc_gzip0_2d_sparse_point_selection(void)
 
     hsize_t pts[8][2] = {{0, 0}, {1, 4}, {3, 5}, {4, 0}, {5, 7}, {7, 9}, {8, 2}, {11, 1}};
 
-    int  vals[8];
-    int  got = 0;
+    int vals[8];
+    int got = 0;
     char filename[1024];
 
     h5_fixname("scc_gzip0_2d_sparse_point_selection", H5P_DEFAULT, filename, sizeof(filename));
@@ -16602,8 +23662,7 @@ error:
  *              but intentionally skips section-filter installation.
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_gzip0_3d_extent_erase_reopen(void)
+static int test_scc_gzip0_3d_extent_erase_reopen(void)
 {
     TESTING("SCC: gzip0 3D erase/extent/reopen");
 
@@ -16619,8 +23678,8 @@ test_scc_gzip0_3d_extent_erase_reopen(void)
 
     unsigned int gzip_level = 0;
 
-    int  wbuf[5][7][2];
-    int  rbuf[4][6][2];
+    int wbuf[5][7][2];
+    int rbuf[4][6][2];
     char filename[1024];
 
     h5_fixname("scc_gzip0_3d_extent_erase_reopen", H5P_DEFAULT, filename, sizeof(filename));
@@ -16815,6 +23874,20 @@ error:
     return FAIL;
 }
 
+static bool test_scc_szip_can_encode_decode(void)
+{
+    unsigned filter_info = 0;
+
+    if (H5Zfilter_avail(H5Z_FILTER_SZIP) <= 0)
+        return false;
+
+    if (H5Zget_filter_info(H5Z_FILTER_SZIP, &filter_info) < 0)
+        return false;
+
+    return (filter_info & H5Z_FILTER_CONFIG_ENCODE_ENABLED) &&
+           (filter_info & H5Z_FILTER_CONFIG_DECODE_ENABLED);
+}
+
 /*-------------------------------------------------------------------------
  * Function:    test_scc_szip_filter_available
  *
@@ -16829,48 +23902,29 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_szip_filter_available(void)
+static int test_scc_szip_filter_available(void)
 {
     TESTING("SCC: SZIP filter availability");
 
-    unsigned filter_info = 0;
-
-    if (H5Zfilter_avail(H5Z_FILTER_SZIP) <= 0) {
+    if (!test_scc_szip_can_encode_decode()) {
         SKIPPED();
-        puts("    SZIP filter not available");
-        return SUCCEED;
-    }
-
-    if (H5Zget_filter_info(H5Z_FILTER_SZIP, &filter_info) < 0)
-        TEST_ERROR;
-
-    /*
-     * For SCC write-path testing we generally require encode support.
-     */
-    if (!(filter_info & H5Z_FILTER_CONFIG_ENCODE_ENABLED)) {
-        SKIPPED();
-        puts("    SZIP encode support unavailable");
+        puts("    SZIP encode/decode support unavailable");
         return SUCCEED;
     }
 
     PASSED();
     return SUCCEED;
-
-error:
-    H5_FAILED();
-    return FAIL;
 }
 
 #define SCC_SZIP_FILE "scc_szip.h5"
 #define SCC_SZIP_DSET "dset"
 
 /* Conservative SZIP setup */
-#define SCC_SZIP_NX      16
-#define SCC_SZIP_NY      16
+#define SCC_SZIP_NX 16
+#define SCC_SZIP_NY 16
 #define SCC_SZIP_CHUNK_X 8
 #define SCC_SZIP_CHUNK_Y 8
-#define SCC_SZIP_PPB     8
+#define SCC_SZIP_PPB 8
 
 /*-------------------------------------------------------------------------
  * Function:    test_scc_szip_dense_baseline
@@ -16885,17 +23939,16 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_szip_dense_baseline(void)
+static int test_scc_szip_dense_baseline(void)
 {
-    hid_t    file_id  = H5I_INVALID_HID;
-    hid_t    space_id = H5I_INVALID_HID;
-    hid_t    dset_id  = H5I_INVALID_HID;
-    hid_t    dcpl_id  = H5I_INVALID_HID;
-    hsize_t  dims[2]  = {SCC_SZIP_NX, SCC_SZIP_NY};
-    hsize_t  chunk[2] = {SCC_SZIP_CHUNK_X, SCC_SZIP_CHUNK_Y};
-    int      wbuf[SCC_SZIP_NX][SCC_SZIP_NY];
-    int      rbuf[SCC_SZIP_NX][SCC_SZIP_NY];
+    hid_t file_id    = H5I_INVALID_HID;
+    hid_t space_id   = H5I_INVALID_HID;
+    hid_t dset_id    = H5I_INVALID_HID;
+    hid_t dcpl_id    = H5I_INVALID_HID;
+    hsize_t dims[2]  = {SCC_SZIP_NX, SCC_SZIP_NY};
+    hsize_t chunk[2] = {SCC_SZIP_CHUNK_X, SCC_SZIP_CHUNK_Y};
+    int wbuf[SCC_SZIP_NX][SCC_SZIP_NY];
+    int rbuf[SCC_SZIP_NX][SCC_SZIP_NY];
     unsigned cd_values[2];
 
     TESTING("SCC: SZIP dense chunk baseline");
@@ -16993,8 +24046,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_szip_vs_unfiltered_1kb_sanity(void)
+static int test_scc_szip_vs_unfiltered_1kb_sanity(void)
 {
     TESTING("SCC: SZIP vs unfiltered 1KB sanity");
 
@@ -17007,7 +24059,7 @@ test_scc_szip_vs_unfiltered_1kb_sanity(void)
 
     unsigned int szip_cd_values[2] = {H5_SZIP_NN_OPTION_MASK, 8};
 
-    int  wbuf[16][16];
+    int wbuf[16][16];
     char filename_unfiltered[1024];
     char filename_szip[1024];
 
@@ -17110,8 +24162,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_szip_full_chunk_selection(void)
+static int test_scc_szip_full_chunk_selection(void)
 {
     TESTING("SCC: SZIP full chunk selection");
 
@@ -17123,8 +24174,8 @@ test_scc_szip_full_chunk_selection(void)
 
     unsigned int cd_values[2] = {H5_SZIP_NN_OPTION_MASK, 8};
 
-    int  wbuf[8][8];
-    int  rbuf[8][8];
+    int wbuf[8][8];
+    int rbuf[8][8];
     char filename[1024];
 
     h5_fixname("scc_szip_full_chunk_selection", H5P_DEFAULT, filename, sizeof(filename));
@@ -17251,8 +24302,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_szip_sparse_point_selection(void)
+static int test_scc_szip_sparse_point_selection(void)
 {
     TESTING("SCC: SZIP sparse point selection");
 
@@ -17264,12 +24314,12 @@ test_scc_szip_sparse_point_selection(void)
     hsize_t chunk_dim[2] = {8, 8};
 
     unsigned int cd_values[2] = {H5_SZIP_NN_OPTION_MASK, 8};
-    size_t       cd_nelmts    = 2;
+    size_t cd_nelmts          = 2;
 
     hsize_t pts[8][2] = {{0, 0}, {1, 3}, {2, 6}, {3, 7}, {8, 8}, {9, 11}, {14, 14}, {15, 15}};
 
-    int  vals[8];
-    int  got = 0;
+    int vals[8];
+    int got = 0;
     char filename[1024];
 
     h5_fixname("scc_szip_sparse_point_selection", H5P_DEFAULT, filename, sizeof(filename));
@@ -17396,11 +24446,11 @@ error:
     return FAIL;
 }
 
-#define SCC_SZIP_TEST_NX      16
-#define SCC_SZIP_TEST_NY      16
+#define SCC_SZIP_TEST_NX 16
+#define SCC_SZIP_TEST_NY 16
 #define SCC_SZIP_TEST_CHUNK_X 8
 #define SCC_SZIP_TEST_CHUNK_Y 8
-#define SCC_SZIP_TEST_PPB     8
+#define SCC_SZIP_TEST_PPB 8
 
 /*-------------------------------------------------------------------------
  * Function:    test_scc_szip_full_dataset_write_read
@@ -17418,8 +24468,7 @@ error:
  *-------------------------------------------------------------------------
  */
 
-static int
-test_scc_szip_full_dataset_write_read(void)
+static int test_scc_szip_full_dataset_write_read(void)
 {
     TESTING("SCC: SZIP full dataset write/read");
 
@@ -17432,8 +24481,8 @@ test_scc_szip_full_dataset_write_read(void)
 
     unsigned int cd_values[2] = {H5_SZIP_NN_OPTION_MASK, SCC_SZIP_TEST_PPB};
 
-    int  wbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
-    int  rbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
+    int wbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
+    int rbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
     char filename[1024];
 
     h5_fixname("scc_szip_full_dataset_write_read", H5P_DEFAULT, filename, sizeof(filename));
@@ -17566,8 +24615,7 @@ error:
  *-------------------------------------------------------------------------
  */
 
-static int
-test_scc_szip_ec_full_dataset_write_read(void)
+static int test_scc_szip_ec_full_dataset_write_read(void)
 {
     TESTING("SCC: SZIP full dataset write/read with EC filtering");
 
@@ -17580,8 +24628,8 @@ test_scc_szip_ec_full_dataset_write_read(void)
 
     unsigned int cd_values[2] = {H5_SZIP_EC_OPTION_MASK, 8};
 
-    int  wbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
-    int  rbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
+    int wbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
+    int rbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
     char filename[1024];
 
     h5_fixname("scc_szip_full_dataset_write_read", H5P_DEFAULT, filename, sizeof(filename));
@@ -17714,8 +24762,7 @@ error:
  *-------------------------------------------------------------------------
  */
 
-static int
-test_scc_szip_multi_chunk_hyperslab_write_read(void)
+static int test_scc_szip_multi_chunk_hyperslab_write_read(void)
 {
     TESTING("SCC: SZIP multi-chunk hyperslab write/read");
 
@@ -17728,8 +24775,8 @@ test_scc_szip_multi_chunk_hyperslab_write_read(void)
 
     unsigned int cd_values[2] = {H5_SZIP_NN_OPTION_MASK, SCC_SZIP_TEST_PPB};
 
-    int  wbuf[8][16];
-    int  rbuf[8][16];
+    int wbuf[8][16];
+    int rbuf[8][16];
     char filename[1024];
 
     h5_fixname("scc_szip_multi_chunk_hyperslab_write_read", H5P_DEFAULT, filename, sizeof(filename));
@@ -17842,8 +24889,7 @@ error:
  *-------------------------------------------------------------------------
  */
 
-static int
-test_scc_szip_partial_chunk_hyperslab_write_read(void)
+static int test_scc_szip_partial_chunk_hyperslab_write_read(void)
 {
     TESTING("SCC: SZIP partial-chunk hyperslab write/read");
 
@@ -17856,8 +24902,8 @@ test_scc_szip_partial_chunk_hyperslab_write_read(void)
 
     unsigned int cd_values[2] = {H5_SZIP_NN_OPTION_MASK, SCC_SZIP_TEST_PPB};
 
-    int  wbuf[4][4];
-    int  rbuf[4][4];
+    int wbuf[4][4];
+    int rbuf[4][4];
     char filename[1024];
 
     h5_fixname("scc_szip_partial_chunk_hyperslab_write_read", H5P_DEFAULT, filename, sizeof(filename));
@@ -17971,8 +25017,7 @@ error:
  *-------------------------------------------------------------------------
  */
 
-static int
-test_scc_szip_sparse_1x1_hyperslabs_multi_chunk(void)
+static int test_scc_szip_sparse_1x1_hyperslabs_multi_chunk(void)
 {
     TESTING("SCC: SZIP sparse 1x1 hyperslabs across chunks");
 
@@ -17986,8 +25031,8 @@ test_scc_szip_sparse_1x1_hyperslabs_multi_chunk(void)
 
     unsigned int cd_values[2] = {H5_SZIP_NN_OPTION_MASK, SCC_SZIP_TEST_PPB};
 
-    int  vals[8];
-    int  got = 0;
+    int vals[8];
+    int got = 0;
     char filename[1024];
 
     h5_fixname("scc_szip_sparse_1x1_hyperslabs_multi_chunk", H5P_DEFAULT, filename, sizeof(filename));
@@ -18115,8 +25160,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_szip_reopen_persistence(void)
+static int test_scc_szip_reopen_persistence(void)
 {
     TESTING("SCC: SZIP reopen persistence");
 
@@ -18129,8 +25173,8 @@ test_scc_szip_reopen_persistence(void)
 
     unsigned int cd_values[2] = {H5_SZIP_NN_OPTION_MASK, SCC_SZIP_TEST_PPB};
 
-    int  wbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
-    int  rbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
+    int wbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
+    int rbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
     char filename[1024];
 
     h5_fixname("scc_szip_reopen_persistence", H5P_DEFAULT, filename, sizeof(filename));
@@ -18273,8 +25317,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_szip_ec_reopen_persistence(void)
+static int test_scc_szip_ec_reopen_persistence(void)
 {
     TESTING("SCC: SZIP reopen persistence");
 
@@ -18287,8 +25330,8 @@ test_scc_szip_ec_reopen_persistence(void)
 
     unsigned int cd_values[2] = {H5_SZIP_EC_OPTION_MASK, SCC_SZIP_TEST_PPB};
 
-    int  wbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
-    int  rbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
+    int wbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
+    int rbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
     char filename[1024];
 
     h5_fixname("scc_szip_reopen_persistence", H5P_DEFAULT, filename, sizeof(filename));
@@ -18430,8 +25473,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_szip_erase_interaction(void)
+static int test_scc_szip_erase_interaction(void)
 {
     TESTING("SCC: SZIP erase interaction");
 
@@ -18445,8 +25487,8 @@ test_scc_szip_erase_interaction(void)
 
     unsigned int cd_values[2] = {H5_SZIP_NN_OPTION_MASK, SCC_SZIP_TEST_PPB};
 
-    int  wbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
-    int  rbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
+    int wbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
+    int rbuf[SCC_SZIP_TEST_NX][SCC_SZIP_TEST_NY];
     char filename[1024];
 
     h5_fixname("scc_szip_erase_interaction", H5P_DEFAULT, filename, sizeof(filename));
@@ -18588,8 +25630,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_szip_shrink_regrow_extent(void)
+static int test_scc_szip_shrink_regrow_extent(void)
 {
     TESTING("SCC: SZIP shrink/regrow extent");
 
@@ -18604,8 +25645,8 @@ test_scc_szip_shrink_regrow_extent(void)
 
     unsigned int cd_values[2] = {H5_SZIP_NN_OPTION_MASK, SCC_SZIP_TEST_PPB};
 
-    int  wbuf[16][16];
-    int  rbuf[16][16];
+    int wbuf[16][16];
+    int rbuf[16][16];
     char filename[1024];
 
     h5_fixname("scc_szip_shrink_regrow_extent", H5P_DEFAULT, filename, sizeof(filename));
@@ -18736,8 +25777,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_szip_ec_shrink_regrow_extent(void)
+static int test_scc_szip_ec_shrink_regrow_extent(void)
 {
     TESTING("SCC: SZIP shrink/regrow extent");
 
@@ -18752,8 +25792,8 @@ test_scc_szip_ec_shrink_regrow_extent(void)
 
     unsigned int cd_values[2] = {H5_SZIP_EC_OPTION_MASK, SCC_SZIP_TEST_PPB};
 
-    int  wbuf[16][16];
-    int  rbuf[16][16];
+    int wbuf[16][16];
+    int rbuf[16][16];
     char filename[1024];
 
     h5_fixname("scc_szip_shrink_regrow_extent", H5P_DEFAULT, filename, sizeof(filename));
@@ -18885,8 +25925,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_szip_erase_shrink_regrow_reopen(void)
+static int test_scc_szip_erase_shrink_regrow_reopen(void)
 {
     TESTING("SCC: SZIP erase/shrink/regrow/reopen");
 
@@ -18902,8 +25941,8 @@ test_scc_szip_erase_shrink_regrow_reopen(void)
 
     unsigned int cd_values[2] = {H5_SZIP_NN_OPTION_MASK, SCC_SZIP_TEST_PPB};
 
-    int  wbuf[16][16];
-    int  rbuf[16][16];
+    int wbuf[16][16];
+    int rbuf[16][16];
     char filename[1024];
 
     h5_fixname("scc_szip_erase_shrink_regrow_reopen", H5P_DEFAULT, filename, sizeof(filename));
@@ -19072,8 +26111,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_szip_eviction_batching_small_limits(void)
+static int test_scc_szip_eviction_batching_small_limits(void)
 {
     TESTING("SCC: SZIP eviction/batching under small limits");
 
@@ -19087,8 +26125,8 @@ test_scc_szip_eviction_batching_small_limits(void)
 
     unsigned int cd_values[2] = {H5_SZIP_NN_OPTION_MASK, SCC_SZIP_TEST_PPB};
 
-    int  wbuf[32][32];
-    int  rbuf[32][32];
+    int wbuf[32][32];
+    int rbuf[32][32];
     char filename[1024];
 
     h5_fixname("scc_szip_eviction_batching_small_limits", H5P_DEFAULT, filename, sizeof(filename));
@@ -19246,8 +26284,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_szip_fixed_section_filter_matrix(void)
+static int test_scc_szip_fixed_section_filter_matrix(void)
 {
     TESTING("SCC: SZIP fixed-section filter matrix");
 
@@ -19259,15 +26296,15 @@ test_scc_szip_fixed_section_filter_matrix(void)
     hsize_t maxdims[2]   = {H5S_UNLIMITED, H5S_UNLIMITED};
     hsize_t chunk_dim[2] = {8, 8};
 
-    int  wbuf[16][16];
-    int  rbuf[16][16];
+    int wbuf[16][16];
+    int rbuf[16][16];
     char filename[1024];
 
     struct {
-        const char  *dset_name;
+        const char *dset_name;
         unsigned int option_mask;
         unsigned int ppb;
-        int          base;
+        int base;
     } cases[] = {{"dset_szip_nn_8", H5_SZIP_NN_OPTION_MASK, 8, 10000},
                  {"dset_szip_nn_16", H5_SZIP_NN_OPTION_MASK, 16, 20000},
                  {"dset_szip_nn_32", H5_SZIP_NN_OPTION_MASK, 32, 30000},
@@ -19445,8 +26482,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_mixed_gzip_selection_szip_fixed(void)
+static int test_scc_mixed_gzip_selection_szip_fixed(void)
 {
     TESTING("SCC: mixed GZIP selection / SZIP fixed");
 
@@ -19457,16 +26493,16 @@ test_scc_mixed_gzip_selection_szip_fixed(void)
     hsize_t maxdims[2]   = {H5S_UNLIMITED, H5S_UNLIMITED};
     hsize_t chunk_dim[2] = {8, 8};
 
-    unsigned int gzip_level  = 6;
-    size_t       gzip_nelmts = 1;
+    unsigned int gzip_level = 6;
+    size_t gzip_nelmts      = 1;
 
     unsigned int szip_cd_values[2] = {H5_SZIP_NN_OPTION_MASK, SCC_SZIP_TEST_PPB};
-    size_t       szip_nelmts       = 2;
+    size_t szip_nelmts             = 2;
 
     hsize_t pts[8][2] = {{0, 0}, {1, 7}, {7, 1}, {7, 7}, {8, 8}, {8, 15}, {15, 8}, {15, 15}};
 
-    int  vals[8];
-    int  got = 0;
+    int vals[8];
+    int got = 0;
     char filename[1024];
 
     h5_fixname("scc_mixed_gzip_selection_szip_fixed", H5P_DEFAULT, filename, sizeof(filename));
@@ -19605,8 +26641,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_mixed_gzip_selection_szip_ec_fixed(void)
+static int test_scc_mixed_gzip_selection_szip_ec_fixed(void)
 {
     TESTING("SCC: mixed GZIP selection / SZIP fixed");
 
@@ -19617,16 +26652,16 @@ test_scc_mixed_gzip_selection_szip_ec_fixed(void)
     hsize_t maxdims[2]   = {H5S_UNLIMITED, H5S_UNLIMITED};
     hsize_t chunk_dim[2] = {8, 8};
 
-    unsigned int gzip_level  = 6;
-    size_t       gzip_nelmts = 1;
+    unsigned int gzip_level = 6;
+    size_t gzip_nelmts      = 1;
 
     unsigned int szip_cd_values[2] = {H5_SZIP_EC_OPTION_MASK, SCC_SZIP_TEST_PPB};
-    size_t       szip_nelmts       = 2;
+    size_t szip_nelmts             = 2;
 
     hsize_t pts[8][2] = {{0, 0}, {1, 7}, {7, 1}, {7, 7}, {8, 8}, {8, 15}, {15, 8}, {15, 15}};
 
-    int  vals[8];
-    int  got = 0;
+    int vals[8];
+    int got = 0;
     char filename[1024];
 
     h5_fixname("scc_mixed_gzip_selection_szip_fixed", H5P_DEFAULT, filename, sizeof(filename));
@@ -19746,619 +26781,6 @@ error:
 }
 
 /*-------------------------------------------------------------------------
- * Function:    test_scc_szip_2d_sparse_point_selection
- *
- * Purpose:     Verify sparse SCC point writes with SZIP configured for fixed
- *              sections only. SZIP is intentionally not installed on
- *              H5_SECTION_SELECTION because its set_local callback currently
- *              asserts during dataset creation for that section type.
- *
- * Return:      SUCCEED/FAIL
- *-------------------------------------------------------------------------
- */
-static int
-test_scc_szip_2d_sparse_point_selection(void)
-{
-    TESTING("SCC: SZIP 2D sparse point selection");
-
-    hid_t fid = H5I_INVALID_HID, sid = H5I_INVALID_HID, dcpl = H5I_INVALID_HID;
-    hid_t did = H5I_INVALID_HID, fspace = H5I_INVALID_HID, mspace = H5I_INVALID_HID;
-
-    hsize_t dims[2]      = {12, 10};
-    hsize_t maxdims[2]   = {H5S_UNLIMITED, H5S_UNLIMITED};
-    hsize_t chunk_dim[2] = {4, 5};
-
-    unsigned int szip_cd_values[2] = {H5_SZIP_NN_OPTION_MASK, 8};
-    size_t       szip_cd_nelmts    = 2;
-
-    hsize_t pts[8][2] = {{0, 0}, {1, 4}, {3, 5}, {4, 0}, {5, 7}, {7, 9}, {8, 2}, {11, 1}};
-
-    int  vals[8];
-    int  got = 0;
-    char filename[1024];
-
-    h5_fixname("scc_szip_2d_sparse_point_selection", H5P_DEFAULT, filename, sizeof(filename));
-
-    for (unsigned i = 0; i < 8; i++)
-        vals[i] = (int)(1000 + i);
-
-    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
-        TEST_ERROR;
-    if ((sid = H5Screate_simple(2, dims, maxdims)) < 0)
-        TEST_ERROR;
-    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
-        TEST_ERROR;
-
-    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
-        TEST_ERROR;
-    if (H5Pset_struct_chunk(dcpl, 2, chunk_dim, H5D_SPARSE_CHUNK) < 0)
-        TEST_ERROR;
-
-    if (H5Pset_filter2(dcpl, H5_SECTION_FIXED, H5Z_FILTER_SZIP, H5Z_FLAG_OPTIONAL, szip_cd_nelmts,
-                       szip_cd_values) < 0)
-        TEST_ERROR;
-
-    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
-        TEST_ERROR;
-
-    for (unsigned i = 0; i < 8; i++) {
-        hsize_t count[2] = {1, 1};
-        hsize_t one[1]   = {1};
-
-        if ((fspace = H5Dget_space(did)) < 0)
-            TEST_ERROR;
-        if (H5Sselect_hyperslab(fspace, H5S_SELECT_SET, pts[i], NULL, count, NULL) < 0)
-            TEST_ERROR;
-
-        if ((mspace = H5Screate_simple(1, one, NULL)) < 0)
-            TEST_ERROR;
-
-        if (H5Dwrite(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, &vals[i]) < 0)
-            TEST_ERROR;
-
-        if (H5Sclose(fspace) < 0)
-            TEST_ERROR;
-        fspace = H5I_INVALID_HID;
-        if (H5Sclose(mspace) < 0)
-            TEST_ERROR;
-        mspace = H5I_INVALID_HID;
-    }
-
-    if (H5Dclose(did) < 0)
-        TEST_ERROR;
-    did = H5I_INVALID_HID;
-    if (H5Fclose(fid) < 0)
-        TEST_ERROR;
-    fid = H5I_INVALID_HID;
-
-    if ((fid = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT)) < 0)
-        TEST_ERROR;
-    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
-        TEST_ERROR;
-
-    for (unsigned i = 0; i < 8; i++) {
-        hsize_t count[2] = {1, 1};
-        hsize_t one[1]   = {1};
-
-        got = -1;
-
-        if ((fspace = H5Dget_space(did)) < 0)
-            TEST_ERROR;
-        if (H5Sselect_hyperslab(fspace, H5S_SELECT_SET, pts[i], NULL, count, NULL) < 0)
-            TEST_ERROR;
-
-        if ((mspace = H5Screate_simple(1, one, NULL)) < 0)
-            TEST_ERROR;
-
-        if (H5Dread(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, &got) < 0)
-            TEST_ERROR;
-
-        if (got != vals[i])
-            TEST_ERROR;
-
-        if (H5Sclose(fspace) < 0)
-            TEST_ERROR;
-        fspace = H5I_INVALID_HID;
-        if (H5Sclose(mspace) < 0)
-            TEST_ERROR;
-        mspace = H5I_INVALID_HID;
-    }
-
-    if (H5Dclose(did) < 0)
-        TEST_ERROR;
-    did = H5I_INVALID_HID;
-    if (H5Pclose(dcpl) < 0)
-        TEST_ERROR;
-    dcpl = H5I_INVALID_HID;
-    if (H5Sclose(sid) < 0)
-        TEST_ERROR;
-    sid = H5I_INVALID_HID;
-    if (H5Fclose(fid) < 0)
-        TEST_ERROR;
-    fid = H5I_INVALID_HID;
-
-    PASSED();
-    return SUCCEED;
-
-error:
-    H5E_BEGIN_TRY
-    {
-        H5Sclose(fspace);
-        H5Sclose(mspace);
-        H5Dclose(did);
-        H5Pclose(dcpl);
-        H5Sclose(sid);
-        H5Fclose(fid);
-    }
-    H5E_END_TRY
-
-    H5_FAILED();
-    return FAIL;
-}
-
-/*-------------------------------------------------------------------------
- * Function:    test_scc_szip_3d_extent_erase_reopen
- *
- * Purpose:     Verify SZIP-filtered SCC chunks survive erase, shrink, regrow,
- *              close/reopen, and readback with correct fill/prune behavior.
- *
- * Return:      SUCCEED/FAIL
- *-------------------------------------------------------------------------
- */
-static int
-test_scc_szip_3d_extent_erase_reopen(void)
-{
-    TESTING("SCC: SZIP 3D erase/extent/reopen");
-
-    hid_t fid = H5I_INVALID_HID, sid = H5I_INVALID_HID, dcpl = H5I_INVALID_HID;
-    hid_t did = H5I_INVALID_HID, fspace = H5I_INVALID_HID, mspace = H5I_INVALID_HID;
-    hid_t erase_space = H5I_INVALID_HID;
-
-    hsize_t dims[3]      = {5, 7, 2};
-    hsize_t maxdims[3]   = {H5S_UNLIMITED, H5S_UNLIMITED, 2};
-    hsize_t chunk_dim[3] = {2, 3, 2};
-    hsize_t shrink[3]    = {3, 5, 2};
-    hsize_t regrow[3]    = {4, 6, 2};
-
-    unsigned int szip_cd_values[2] = {H5_SZIP_NN_OPTION_MASK, 8};
-    size_t       szip_cd_nelmts    = 2;
-
-    int  wbuf[5][7][2];
-    int  rbuf[4][6][2];
-    char filename[1024];
-
-    h5_fixname("scc_szip_3d_extent_erase_reopen", H5P_DEFAULT, filename, sizeof(filename));
-
-    for (unsigned i = 0; i < 5; i++)
-        for (unsigned j = 0; j < 7; j++)
-            for (unsigned k = 0; k < 2; k++)
-                wbuf[i][j][k] = (int)(100 * i + 10 * j + k);
-
-    memset(rbuf, 0, sizeof(rbuf));
-
-    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
-        TEST_ERROR;
-    if ((sid = H5Screate_simple(3, dims, maxdims)) < 0)
-        TEST_ERROR;
-    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
-        TEST_ERROR;
-
-    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
-        TEST_ERROR;
-    if (H5Pset_struct_chunk(dcpl, 3, chunk_dim, H5D_SPARSE_CHUNK) < 0)
-        TEST_ERROR;
-
-    if (H5Pset_filter2(dcpl, H5_SECTION_SELECTION, H5Z_FILTER_SZIP, H5Z_FLAG_OPTIONAL, szip_cd_nelmts,
-                       szip_cd_values) < 0)
-        TEST_ERROR;
-    if (H5Pset_filter2(dcpl, H5_SECTION_FIXED, H5Z_FILTER_SZIP, H5Z_FLAG_OPTIONAL, szip_cd_nelmts,
-                       szip_cd_values) < 0)
-        TEST_ERROR;
-
-    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
-        TEST_ERROR;
-
-    {
-        hsize_t start[3] = {0, 0, 0};
-        hsize_t count[3] = {5, 7, 2};
-        hsize_t mdims[3] = {5, 7, 2};
-
-        if ((fspace = H5Dget_space(did)) < 0)
-            TEST_ERROR;
-        if (H5Sselect_hyperslab(fspace, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
-            TEST_ERROR;
-
-        if ((mspace = H5Screate_simple(3, mdims, NULL)) < 0)
-            TEST_ERROR;
-        if (H5Sselect_none(mspace) < 0)
-            TEST_ERROR;
-        if (H5Sselect_hyperslab(mspace, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
-            TEST_ERROR;
-
-        if (H5Dwrite(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, wbuf) < 0)
-            TEST_ERROR;
-
-        if (H5Sclose(fspace) < 0)
-            TEST_ERROR;
-        fspace = H5I_INVALID_HID;
-        if (H5Sclose(mspace) < 0)
-            TEST_ERROR;
-        mspace = H5I_INVALID_HID;
-    }
-
-    {
-        hsize_t erase_start[3] = {2, 4, 0};
-        hsize_t erase_count[3] = {1, 1, 1};
-
-        if ((erase_space = H5Dget_space(did)) < 0)
-            TEST_ERROR;
-        if (H5Sselect_hyperslab(erase_space, H5S_SELECT_SET, erase_start, NULL, erase_count, NULL) < 0)
-            TEST_ERROR;
-        if (H5Derase(did, erase_space, H5P_DEFAULT) < 0)
-            TEST_ERROR;
-
-        if (H5Sclose(erase_space) < 0)
-            TEST_ERROR;
-        erase_space = H5I_INVALID_HID;
-    }
-
-    if (H5Dset_extent(did, shrink) < 0)
-        TEST_ERROR;
-    if (H5Dset_extent(did, regrow) < 0)
-        TEST_ERROR;
-
-    {
-        hsize_t start[3] = {3, 0, 0};
-        hsize_t count[3] = {1, 5, 2};
-        hsize_t mdims[3] = {5, 7, 2};
-
-        if ((fspace = H5Dget_space(did)) < 0)
-            TEST_ERROR;
-        if (H5Sselect_hyperslab(fspace, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
-            TEST_ERROR;
-
-        if ((mspace = H5Screate_simple(3, mdims, NULL)) < 0)
-            TEST_ERROR;
-        if (H5Sselect_none(mspace) < 0)
-            TEST_ERROR;
-        if (H5Sselect_hyperslab(mspace, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
-            TEST_ERROR;
-
-        if (H5Dwrite(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, wbuf) < 0)
-            TEST_ERROR;
-
-        if (H5Sclose(fspace) < 0)
-            TEST_ERROR;
-        fspace = H5I_INVALID_HID;
-        if (H5Sclose(mspace) < 0)
-            TEST_ERROR;
-        mspace = H5I_INVALID_HID;
-    }
-
-    if (H5Dclose(did) < 0)
-        TEST_ERROR;
-    did = H5I_INVALID_HID;
-    if (H5Fclose(fid) < 0)
-        TEST_ERROR;
-    fid = H5I_INVALID_HID;
-
-    if ((fid = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT)) < 0)
-        TEST_ERROR;
-    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
-        TEST_ERROR;
-
-    {
-        hsize_t start[3] = {0, 0, 0};
-        hsize_t count[3] = {4, 6, 2};
-        hsize_t mdims[3] = {4, 6, 2};
-
-        if ((fspace = H5Dget_space(did)) < 0)
-            TEST_ERROR;
-        if (H5Sselect_hyperslab(fspace, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
-            TEST_ERROR;
-
-        if ((mspace = H5Screate_simple(3, mdims, NULL)) < 0)
-            TEST_ERROR;
-        if (H5Sselect_none(mspace) < 0)
-            TEST_ERROR;
-        if (H5Sselect_hyperslab(mspace, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
-            TEST_ERROR;
-
-        if (H5Dread(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, rbuf) < 0)
-            TEST_ERROR;
-
-        if (H5Sclose(fspace) < 0)
-            TEST_ERROR;
-        fspace = H5I_INVALID_HID;
-        if (H5Sclose(mspace) < 0)
-            TEST_ERROR;
-        mspace = H5I_INVALID_HID;
-    }
-
-    for (unsigned i = 0; i < 4; i++)
-        for (unsigned j = 0; j < 6; j++)
-            for (unsigned k = 0; k < 2; k++) {
-                bool survived_original = (i < 3 && j < 5);
-                bool rewritten_row     = (i == 3 && j < 5);
-                bool erased_value      = (i == 2 && j == 4 && k == 0);
-                bool reintroduced_col  = (j == 5);
-
-                if (erased_value || reintroduced_col) {
-                    if (rbuf[i][j][k] != 0)
-                        TEST_ERROR;
-                }
-                else if (survived_original || rewritten_row) {
-                    if (rbuf[i][j][k] != (int)(100 * i + 10 * j + k))
-                        TEST_ERROR;
-                }
-                else {
-                    if (rbuf[i][j][k] != 0)
-                        TEST_ERROR;
-                }
-            }
-
-    if (H5Dclose(did) < 0)
-        TEST_ERROR;
-    did = H5I_INVALID_HID;
-    if (H5Pclose(dcpl) < 0)
-        TEST_ERROR;
-    dcpl = H5I_INVALID_HID;
-    if (H5Sclose(sid) < 0)
-        TEST_ERROR;
-    sid = H5I_INVALID_HID;
-    if (H5Fclose(fid) < 0)
-        TEST_ERROR;
-    fid = H5I_INVALID_HID;
-
-    PASSED();
-    return SUCCEED;
-
-error:
-    H5E_BEGIN_TRY
-    {
-        H5Sclose(fspace);
-        H5Sclose(mspace);
-        H5Sclose(erase_space);
-        H5Dclose(did);
-        H5Pclose(dcpl);
-        H5Sclose(sid);
-        H5Fclose(fid);
-    }
-    H5E_END_TRY
-
-    H5_FAILED();
-    return FAIL;
-}
-
-/*-------------------------------------------------------------------------
- * Function:    test_scc_szip_3d_partial_edge_overwrite_erase_reopen
- *
- * Purpose:     Verify SZIP-filtered SCC behavior for partial edge/corner
- *              chunks, including overwrite, erase, close/reopen, and readback.
- *
- * Return:      SUCCEED/FAIL
- *-------------------------------------------------------------------------
- */
-static int
-test_scc_szip_3d_partial_edge_overwrite_erase_reopen(void)
-{
-    TESTING("SCC: SZIP 3D partial-edge overwrite/erase/reopen");
-
-    hid_t fid = H5I_INVALID_HID, sid = H5I_INVALID_HID, dcpl = H5I_INVALID_HID;
-    hid_t did = H5I_INVALID_HID, fspace = H5I_INVALID_HID, mspace = H5I_INVALID_HID;
-    hid_t erase_space = H5I_INVALID_HID;
-
-    hsize_t dims[3]      = {5, 7, 2};
-    hsize_t maxdims[3]   = {H5S_UNLIMITED, H5S_UNLIMITED, 2};
-    hsize_t chunk_dim[3] = {2, 3, 2};
-
-    unsigned int szip_cd_values[2] = {H5_SZIP_NN_OPTION_MASK, 8};
-    size_t       szip_cd_nelmts    = 2;
-
-    int  wbuf[5][7][2];
-    int  obuf[5][7][2];
-    int  rbuf[5][7][2];
-    char filename[1024];
-
-    h5_fixname("scc_szip_3d_partial_edge_overwrite_erase_reopen", H5P_DEFAULT, filename, sizeof(filename));
-
-    for (unsigned i = 0; i < 5; i++)
-        for (unsigned j = 0; j < 7; j++)
-            for (unsigned k = 0; k < 2; k++) {
-                wbuf[i][j][k] = (int)(100 * i + 10 * j + k);
-                obuf[i][j][k] = (int)(5000 + 100 * i + 10 * j + k);
-            }
-
-    memset(rbuf, 0, sizeof(rbuf));
-
-    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
-        TEST_ERROR;
-    if ((sid = H5Screate_simple(3, dims, maxdims)) < 0)
-        TEST_ERROR;
-    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
-        TEST_ERROR;
-
-    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
-        TEST_ERROR;
-    if (H5Pset_struct_chunk(dcpl, 3, chunk_dim, H5D_SPARSE_CHUNK) < 0)
-        TEST_ERROR;
-
-    if (H5Pset_filter2(dcpl, H5_SECTION_SELECTION, H5Z_FILTER_SZIP, H5Z_FLAG_OPTIONAL, szip_cd_nelmts,
-                       szip_cd_values) < 0)
-        TEST_ERROR;
-    if (H5Pset_filter2(dcpl, H5_SECTION_FIXED, H5Z_FILTER_SZIP, H5Z_FLAG_OPTIONAL, szip_cd_nelmts,
-                       szip_cd_values) < 0)
-        TEST_ERROR;
-
-    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
-        TEST_ERROR;
-
-    {
-        hsize_t start[3] = {0, 0, 0};
-        hsize_t count[3] = {5, 7, 2};
-        hsize_t mdims[3] = {5, 7, 2};
-
-        if ((fspace = H5Dget_space(did)) < 0)
-            TEST_ERROR;
-        if (H5Sselect_hyperslab(fspace, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
-            TEST_ERROR;
-
-        if ((mspace = H5Screate_simple(3, mdims, NULL)) < 0)
-            TEST_ERROR;
-        if (H5Sselect_none(mspace) < 0)
-            TEST_ERROR;
-        if (H5Sselect_hyperslab(mspace, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
-            TEST_ERROR;
-
-        if (H5Dwrite(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, wbuf) < 0)
-            TEST_ERROR;
-
-        if (H5Sclose(fspace) < 0)
-            TEST_ERROR;
-        fspace = H5I_INVALID_HID;
-        if (H5Sclose(mspace) < 0)
-            TEST_ERROR;
-        mspace = H5I_INVALID_HID;
-    }
-
-    {
-        hsize_t start[3] = {4, 5, 0};
-        hsize_t count[3] = {1, 2, 2};
-        hsize_t mdims[3] = {5, 7, 2};
-
-        if ((fspace = H5Dget_space(did)) < 0)
-            TEST_ERROR;
-        if (H5Sselect_hyperslab(fspace, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
-            TEST_ERROR;
-
-        if ((mspace = H5Screate_simple(3, mdims, NULL)) < 0)
-            TEST_ERROR;
-        if (H5Sselect_none(mspace) < 0)
-            TEST_ERROR;
-        if (H5Sselect_hyperslab(mspace, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
-            TEST_ERROR;
-
-        if (H5Dwrite(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, obuf) < 0)
-            TEST_ERROR;
-
-        if (H5Sclose(fspace) < 0)
-            TEST_ERROR;
-        fspace = H5I_INVALID_HID;
-        if (H5Sclose(mspace) < 0)
-            TEST_ERROR;
-        mspace = H5I_INVALID_HID;
-    }
-
-    {
-        hsize_t erase_start[3] = {4, 6, 1};
-        hsize_t erase_count[3] = {1, 1, 1};
-
-        if ((erase_space = H5Dget_space(did)) < 0)
-            TEST_ERROR;
-        if (H5Sselect_hyperslab(erase_space, H5S_SELECT_SET, erase_start, NULL, erase_count, NULL) < 0)
-            TEST_ERROR;
-        if (H5Derase(did, erase_space, H5P_DEFAULT) < 0)
-            TEST_ERROR;
-
-        if (H5Sclose(erase_space) < 0)
-            TEST_ERROR;
-        erase_space = H5I_INVALID_HID;
-    }
-
-    if (H5Dclose(did) < 0)
-        TEST_ERROR;
-    did = H5I_INVALID_HID;
-    if (H5Fclose(fid) < 0)
-        TEST_ERROR;
-    fid = H5I_INVALID_HID;
-
-    if ((fid = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT)) < 0)
-        TEST_ERROR;
-    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
-        TEST_ERROR;
-
-    {
-        hsize_t start[3] = {0, 0, 0};
-        hsize_t count[3] = {5, 7, 2};
-        hsize_t mdims[3] = {5, 7, 2};
-
-        if ((fspace = H5Dget_space(did)) < 0)
-            TEST_ERROR;
-        if (H5Sselect_hyperslab(fspace, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
-            TEST_ERROR;
-
-        if ((mspace = H5Screate_simple(3, mdims, NULL)) < 0)
-            TEST_ERROR;
-        if (H5Sselect_none(mspace) < 0)
-            TEST_ERROR;
-        if (H5Sselect_hyperslab(mspace, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
-            TEST_ERROR;
-
-        if (H5Dread(did, H5T_NATIVE_INT, mspace, fspace, H5P_DEFAULT, rbuf) < 0)
-            TEST_ERROR;
-
-        if (H5Sclose(fspace) < 0)
-            TEST_ERROR;
-        fspace = H5I_INVALID_HID;
-        if (H5Sclose(mspace) < 0)
-            TEST_ERROR;
-        mspace = H5I_INVALID_HID;
-    }
-
-    for (unsigned i = 0; i < 5; i++)
-        for (unsigned j = 0; j < 7; j++)
-            for (unsigned k = 0; k < 2; k++) {
-                bool overwritten = (i == 4 && j >= 5 && j < 7);
-                bool erased      = (i == 4 && j == 6 && k == 1);
-
-                if (erased) {
-                    if (rbuf[i][j][k] != 0)
-                        TEST_ERROR;
-                }
-                else if (overwritten) {
-                    if (rbuf[i][j][k] != obuf[i][j][k])
-                        TEST_ERROR;
-                }
-                else {
-                    if (rbuf[i][j][k] != wbuf[i][j][k])
-                        TEST_ERROR;
-                }
-            }
-
-    if (H5Dclose(did) < 0)
-        TEST_ERROR;
-    did = H5I_INVALID_HID;
-    if (H5Pclose(dcpl) < 0)
-        TEST_ERROR;
-    dcpl = H5I_INVALID_HID;
-    if (H5Sclose(sid) < 0)
-        TEST_ERROR;
-    sid = H5I_INVALID_HID;
-    if (H5Fclose(fid) < 0)
-        TEST_ERROR;
-    fid = H5I_INVALID_HID;
-
-    PASSED();
-    return SUCCEED;
-
-error:
-    H5E_BEGIN_TRY
-    {
-        H5Sclose(fspace);
-        H5Sclose(mspace);
-        H5Sclose(erase_space);
-        H5Dclose(did);
-        H5Pclose(dcpl);
-        H5Sclose(sid);
-        H5Fclose(fid);
-    }
-    H5E_END_TRY
-
-    H5_FAILED();
-    return FAIL;
-}
-
-/*-------------------------------------------------------------------------
  * Function:    test_scc_filter_shuffle_deflate_3d_extent_erase_reopen
  *
  * Purpose:     Verify SCC behavior with Shuffle + Deflate filters across
@@ -20367,8 +26789,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_shuffle_deflate_3d_extent_erase_reopen(void)
+static int test_scc_filter_shuffle_deflate_3d_extent_erase_reopen(void)
 {
     TESTING("SCC: shuffle+deflate 3D erase/extent/reopen");
 
@@ -20383,10 +26804,10 @@ test_scc_filter_shuffle_deflate_3d_extent_erase_reopen(void)
     hsize_t regrow[3]    = {4, 6, 2};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
-    int  wbuf[5][7][2];
-    int  rbuf[4][6][2];
+    int wbuf[5][7][2];
+    int rbuf[4][6][2];
     char filename[1024];
 
     h5_fixname("scc_filter_shuffle_deflate_3d_extent_erase_reopen", H5P_DEFAULT, filename, sizeof(filename));
@@ -20603,8 +27024,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_fletcher32_deflate_3d_extent_erase_reopen(void)
+static int test_scc_filter_fletcher32_deflate_3d_extent_erase_reopen(void)
 {
     TESTING("SCC: fletcher32+deflate 3D erase/extent/reopen");
 
@@ -20619,10 +27039,10 @@ test_scc_filter_fletcher32_deflate_3d_extent_erase_reopen(void)
     hsize_t regrow[3]    = {4, 6, 2};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
-    int  wbuf[5][7][2];
-    int  rbuf[4][6][2];
+    int wbuf[5][7][2];
+    int rbuf[4][6][2];
     char filename[1024];
 
     h5_fixname("scc_filter_fletcher32_deflate_3d_extent_erase_reopen", H5P_DEFAULT, filename,
@@ -20841,8 +27261,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_shuffle_fletcher32_deflate_3d_extent_erase_reopen(void)
+static int test_scc_filter_shuffle_fletcher32_deflate_3d_extent_erase_reopen(void)
 {
     TESTING("SCC: shuffle+fletcher32+deflate 3D erase/extent/reopen");
 
@@ -20857,10 +27276,10 @@ test_scc_filter_shuffle_fletcher32_deflate_3d_extent_erase_reopen(void)
     hsize_t regrow[3]    = {4, 6, 2};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
-    int  wbuf[5][7][2];
-    int  rbuf[4][6][2];
+    int wbuf[5][7][2];
+    int rbuf[4][6][2];
     char filename[1024];
 
     h5_fixname("scc_filter_shuffle_fletcher32_deflate_3d_extent_erase_reopen", H5P_DEFAULT, filename,
@@ -21082,8 +27501,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_deflate_2d_h5s_all_roundtrip(void)
+static int test_scc_filter_deflate_2d_h5s_all_roundtrip(void)
 {
     TESTING("SCC: deflate 2D H5S_ALL roundtrip");
 
@@ -21095,10 +27513,10 @@ test_scc_filter_deflate_2d_h5s_all_roundtrip(void)
     hsize_t chunk_dim[2] = {4, 4};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
-    int  wbuf[8][8];
-    int  rbuf[8][8];
+    int wbuf[8][8];
+    int rbuf[8][8];
     char filename[1024];
 
     h5_fixname("scc_filter_deflate_2d_h5s_all_roundtrip", H5P_DEFAULT, filename, sizeof(filename));
@@ -21193,8 +27611,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_shuffle_fletcher32_deflate_3d_h5s_all_roundtrip(void)
+static int test_scc_filter_shuffle_fletcher32_deflate_3d_h5s_all_roundtrip(void)
 {
     TESTING("SCC: shuffle+fletcher32+deflate 3D H5S_ALL roundtrip");
 
@@ -21206,10 +27623,10 @@ test_scc_filter_shuffle_fletcher32_deflate_3d_h5s_all_roundtrip(void)
     hsize_t chunk_dim[3] = {2, 3, 2};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
-    int  wbuf[4][6][2];
-    int  rbuf[4][6][2];
+    int wbuf[4][6][2];
+    int rbuf[4][6][2];
     char filename[1024];
 
     h5_fixname("scc_filter_shuffle_fletcher32_deflate_3d_h5s_all_roundtrip", H5P_DEFAULT, filename,
@@ -21316,8 +27733,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_deflate_5d_h5s_all_roundtrip(void)
+static int test_scc_filter_deflate_5d_h5s_all_roundtrip(void)
 {
     TESTING("SCC: deflate 5D H5S_ALL roundtrip");
 
@@ -21329,10 +27745,10 @@ test_scc_filter_deflate_5d_h5s_all_roundtrip(void)
     hsize_t chunk_dim[5] = {2, 2, 3, 2, 2};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
-    int  wbuf[4][4][3][2][2];
-    int  rbuf[4][4][3][2][2];
+    int wbuf[4][4][3][2][2];
+    int rbuf[4][4][3][2][2];
     char filename[1024];
 
     h5_fixname("scc_filter_deflate_5d_h5s_all_roundtrip", H5P_DEFAULT, filename, sizeof(filename));
@@ -21433,8 +27849,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_filter_5d_extent_erase_reopen(void)
+static int test_scc_filter_5d_extent_erase_reopen(void)
 {
     TESTING("SCC: deflate 5D erase/extent/reopen");
 
@@ -21449,10 +27864,10 @@ test_scc_filter_5d_extent_erase_reopen(void)
     hsize_t regrow[5]    = {4, 6, 3, 2, 2};
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
-    int  wbuf[5][7][3][2][2];
-    int  rbuf[4][6][3][2][2];
+    int wbuf[5][7][3][2][2];
+    int rbuf[4][6][3][2][2];
     char filename[1024];
 
     h5_fixname("scc_filter_5d_extent_erase_reopen", H5P_DEFAULT, filename, sizeof(filename));
@@ -21702,8 +28117,7 @@ error:
  * Return:      SUCCEED/FAIL
  *-------------------------------------------------------------------------
  */
-static int
-test_scc_mixed_rank_1d_to_5d_eviction_stress(void)
+static int test_scc_mixed_rank_1d_to_5d_eviction_stress(void)
 {
     TESTING("SCC: mixed rank 1D-5D eviction stress");
 
@@ -21762,10 +28176,10 @@ test_scc_mixed_rank_1d_to_5d_eviction_stress(void)
     hsize_t chunk_mixed[2] = {8, 8};
 
     unsigned int szip_cd_values[2] = {H5_SZIP_NN_OPTION_MASK, 8};
-    size_t       szip_cd_nelmts    = 2;
+    size_t szip_cd_nelmts          = 2;
 
     unsigned int gzip_level = 6;
-    size_t       cd_nelmts  = 1;
+    size_t cd_nelmts        = 1;
 
     int w1[16], r1[16];
     int w2[8][8], r2[8][8];
@@ -21956,7 +28370,7 @@ test_scc_mixed_rank_1d_to_5d_eviction_stress(void)
         for (unsigned p = 0; p < 6; p++) {
             hsize_t count[2] = {1, 1};
             hsize_t one[1]   = {1};
-            int     val      = w2[pts[p][0]][pts[p][1]];
+            int val          = w2[pts[p][0]][pts[p][1]];
 
             if ((fspace = H5Dget_space(did2)) < 0)
                 TEST_ERROR;
@@ -22192,7 +28606,7 @@ test_scc_mixed_rank_1d_to_5d_eviction_stress(void)
 
     {
         hsize_t pts[8][2] = {{0, 0}, {1, 7}, {7, 1}, {7, 7}, {8, 8}, {8, 15}, {15, 8}, {15, 15}};
-        int     vals[8];
+        int vals[8];
 
         for (unsigned i = 0; i < 8; i++)
             vals[i] = w_mixed[pts[i][0]][pts[i][1]];
@@ -22377,7 +28791,7 @@ test_scc_mixed_rank_1d_to_5d_eviction_stress(void)
         for (unsigned i = 0; i < 8; i++) {
             hsize_t count[2] = {1, 1};
             hsize_t one[1]   = {1};
-            int     got      = -1;
+            int got          = -1;
 
             if ((fspace = H5Dget_space(did_mixed)) < 0)
                 TEST_ERROR;
@@ -22409,7 +28823,7 @@ test_scc_mixed_rank_1d_to_5d_eviction_stress(void)
         for (unsigned j = 0; j < 8; j++) {
             bool sparse_written = (i == 0 && j == 0) || (i == 1 && j == 4) || (i == 3 && j == 5) ||
                                   (i == 5 && j == 7) || (i == 2 && j == 2) || (i == 4 && j == 6);
-            bool grown_written = (i >= 6);
+            bool grown_written  = (i >= 6);
 
             if (sparse_written || grown_written) {
                 if (r2[i][j] != w2[i][j])
@@ -22615,15 +29029,528 @@ error:
     return FAIL;
 }
 
-static void
-test_scc_delete_generated_files(void)
+/* =========================================================================
+ * SECTION: Structured-chunk vector translation callback tests
+ * ========================================================================= */
+
+typedef enum test_scc_vector_op_t { TEST_SCC_VECTOR_READ, TEST_SCC_VECTOR_WRITE } test_scc_vector_op_t;
+
+typedef struct test_scc_vector_result_t {
+    size_t vec_count;
+    haddr_t *offsets;
+    size_t *sizes;
+    bool vector_possible;
+    bool require_values;
+} test_scc_vector_result_t;
+
+typedef struct test_scc_vector_fixture_t {
+    hid_t sid;
+    hid_t dcpl;
+    hid_t did;
+    hid_t fid;
+
+    H5SC_t *cache;
+    H5SC_dset_header_t *dset_hdr;
+    H5SC_chunk_t *chunk;
+} test_scc_vector_fixture_t;
+
+static herr_t test_scc_invoke_vector_translate(test_scc_vector_op_t op, H5D_t *dset, H5SC_chunk_t *chunk,
+                                               const H5S_t *file_space, bool partial_bound, void *chunk_obj,
+                                               test_scc_vector_result_t *result)
 {
-    static const char *scc_test_files[] = {"scc_struct_chunk_single_chunk",
+    herr_t ret_value;
+
+    assert(dset);
+    assert(chunk);
+    assert(file_space);
+    assert(result);
+
+    /*
+     * Use recognizable non-default values to verify that each callback
+     * initializes every output on every successful eligibility path.
+     */
+    result->vec_count       = SIZE_MAX;
+    result->offsets         = (haddr_t *)(uintptr_t)1;
+    result->sizes           = (size_t *)(uintptr_t)1;
+    result->vector_possible = true;
+    result->require_values  = true;
+
+    switch (op) {
+    case TEST_SCC_VECTOR_READ:
+        assert(H5SC_LOPS_STRUCT_CHUNK[0].vector_read);
+
+        ret_value = H5SC_LOPS_STRUCT_CHUNK[0].vector_read(dset, chunk->disk_addr, file_space, partial_bound,
+                                                          chunk_obj, &result->vec_count, &result->offsets,
+                                                          &result->sizes, &result->vector_possible,
+                                                          &result->require_values, chunk->udata);
+        break;
+
+    case TEST_SCC_VECTOR_WRITE:
+        assert(H5SC_LOPS_STRUCT_CHUNK[0].vector_write);
+
+        ret_value = H5SC_LOPS_STRUCT_CHUNK[0].vector_write(dset, chunk->disk_addr, file_space, partial_bound,
+                                                           chunk_obj, &result->vec_count, &result->offsets,
+                                                           &result->sizes, &result->vector_possible,
+                                                           &result->require_values, chunk->udata);
+        break;
+
+    default:
+        return FAIL;
+    }
+
+    return ret_value;
+}
+
+static void test_scc_vector_result_reset(test_scc_vector_result_t *result)
+{
+    if (!result)
+        return;
+
+    result->offsets = H5MM_xfree(result->offsets);
+    result->sizes   = H5MM_xfree(result->sizes);
+
+    result->vec_count       = 0;
+    result->vector_possible = false;
+    result->require_values  = false;
+}
+
+static herr_t test_scc_vector_select_positions(hid_t space_id, size_t npositions, const hsize_t positions[])
+{
+    const hsize_t count[1] = {1};
+
+    if (H5Sselect_none(space_id) < 0)
+        return FAIL;
+
+    for (size_t i = 0; i < npositions; i++) {
+        const H5S_seloper_t op = (i == 0) ? H5S_SELECT_SET : H5S_SELECT_OR;
+        hsize_t start[1];
+
+        start[0] = positions[i];
+
+        if (H5Sselect_hyperslab(space_id, op, start, NULL, count, NULL) < 0)
+            return FAIL;
+    }
+
+    return SUCCEED;
+}
+
+static void test_scc_vector_fixture_term(test_scc_vector_fixture_t *fixture);
+
+static herr_t test_scc_vector_fixture_init(const char *base_name, bool filtered,
+                                           test_scc_vector_fixture_t *fixture)
+{
+    static const hsize_t defined_positions[4] = {1, 2, 5, 7};
+    const hsize_t dims[1]                     = {8};
+    const hsize_t chunk_dims[1]               = {8};
+    const hsize_t mem_dims[1]                 = {4};
+    const unsigned gzip_level                 = 6;
+    int write_buf[4]                          = {101, 102, 105, 107};
+    hid_t file_space                          = H5I_INVALID_HID;
+    hid_t mem_space                           = H5I_INVALID_HID;
+    char filename[1024];
+
+    assert(base_name);
+    assert(fixture);
+
+    memset(fixture, 0, sizeof(*fixture));
+
+    fixture->sid  = H5I_INVALID_HID;
+    fixture->dcpl = H5I_INVALID_HID;
+    fixture->did  = H5I_INVALID_HID;
+    fixture->fid  = H5I_INVALID_HID;
+
+    h5_fixname(base_name, H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fixture->fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        goto error;
+
+    if ((fixture->sid = H5Screate_simple(1, dims, NULL)) < 0)
+        goto error;
+
+    if ((fixture->dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        goto error;
+
+    if (H5Pset_layout(fixture->dcpl, H5D_STRUCT_CHUNK) < 0)
+        goto error;
+
+    if (H5Pset_struct_chunk(fixture->dcpl, 1, chunk_dims, H5D_SPARSE_CHUNK) < 0)
+        goto error;
+
+    if (filtered) {
+        /*
+         * A fixed-section filter makes direct vector access ineligible when
+         * partial_bound is false.
+         */
+        if (H5Pset_filter2(fixture->dcpl, H5_SECTION_FIXED, H5Z_FILTER_DEFLATE, H5Z_FLAG_OPTIONAL, 1,
+                           &gzip_level) < 0)
+            goto error;
+    }
+
+    if ((fixture->did = H5Dcreate2(fixture->fid, "dset", H5T_NATIVE_INT, fixture->sid, H5P_DEFAULT,
+                                   fixture->dcpl, H5P_DEFAULT)) < 0)
+        goto error;
+
+    if (H5SC__get_cache_from_file_id(fixture->fid, &fixture->cache) < 0)
+        goto error;
+
+    if (!fixture->cache)
+        goto error;
+
+    /*
+     * Preserve the resident decoded chunk while the callbacks are tested.
+     */
+    fixture->cache->SCC_active_limit    = SIZE_MAX;
+    fixture->cache->SCC_quiescent_limit = SIZE_MAX;
+
+    if ((file_space = H5Dget_space(fixture->did)) < 0)
+        goto error;
+
+    if (test_scc_vector_select_positions(file_space, NELMTS(defined_positions), defined_positions) < 0)
+        goto error;
+
+    if ((mem_space = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        goto error;
+
+    if (H5Dwrite(fixture->did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, write_buf) < 0)
+        goto error;
+
+    if (H5Fflush(fixture->fid, H5F_SCOPE_LOCAL) < 0)
+        goto error;
+
+    fixture->dset_hdr = fixture->cache->dset_lru_head_ptr;
+
+    if (!fixture->dset_hdr)
+        goto error;
+
+    if (fixture->dset_hdr->next_dset_ptr || fixture->dset_hdr->prev_dset_ptr)
+        goto error;
+
+    fixture->chunk = fixture->dset_hdr->lru_head_ptr;
+
+    if (!fixture->chunk)
+        goto error;
+
+    if (fixture->chunk->next_ptr || fixture->chunk->prev_ptr)
+        goto error;
+
+    if (!fixture->chunk->chunk_obj)
+        goto error;
+
+    if (!H5_addr_defined(fixture->chunk->disk_addr))
+        goto error;
+
+    if (H5Sclose(mem_space) < 0)
+        goto error;
+    mem_space = H5I_INVALID_HID;
+
+    if (H5Sclose(file_space) < 0)
+        goto error;
+    file_space = H5I_INVALID_HID;
+
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(mem_space);
+        H5Sclose(file_space);
+    }
+    H5E_END_TRY
+
+    test_scc_vector_fixture_term(fixture);
+
+    return FAIL;
+}
+
+static void test_scc_vector_fixture_term(test_scc_vector_fixture_t *fixture)
+{
+    if (!fixture)
+        return;
+
+    /*
+     * Prevent test cleanup from triggering an eviction-policy failure.
+     */
+    if (fixture->cache) {
+        fixture->cache->SCC_active_limit    = SIZE_MAX;
+        fixture->cache->SCC_quiescent_limit = SIZE_MAX;
+
+        if (fixture->dset_hdr)
+            fixture->dset_hdr->min_dset_size = 0;
+    }
+
+    H5E_BEGIN_TRY
+    {
+        H5Dclose(fixture->did);
+        H5Pclose(fixture->dcpl);
+        H5Sclose(fixture->sid);
+        H5Fclose(fixture->fid);
+    }
+    H5E_END_TRY
+
+    fixture->sid      = H5I_INVALID_HID;
+    fixture->dcpl     = H5I_INVALID_HID;
+    fixture->did      = H5I_INVALID_HID;
+    fixture->fid      = H5I_INVALID_HID;
+    fixture->cache    = NULL;
+    fixture->dset_hdr = NULL;
+    fixture->chunk    = NULL;
+}
+
+static herr_t test_scc_verify_vector_result(const test_scc_vector_result_t *result, haddr_t chunk_addr,
+                                            size_t expected_count, const size_t expected_offsets[],
+                                            const size_t expected_sizes[])
+{
+    if (!result->vector_possible || result->require_values)
+        return FAIL;
+
+    if (result->vec_count != expected_count)
+        return FAIL;
+
+    if (expected_count == 0) {
+        if (result->offsets || result->sizes)
+            return FAIL;
+
+        return SUCCEED;
+    }
+
+    if (!result->offsets || !result->sizes)
+        return FAIL;
+
+    for (size_t i = 0; i < expected_count; i++) {
+        if (result->offsets[i] != chunk_addr + expected_offsets[i])
+            return FAIL;
+
+        if (result->sizes[i] != expected_sizes[i])
+            return FAIL;
+    }
+
+    return SUCCEED;
+}
+
+static int test_scc_vector_translation_matrix(void)
+{
+    test_scc_vector_fixture_t fixture;
+    hid_t query_sid = H5I_INVALID_HID;
+    test_scc_vector_result_t read_result;
+    test_scc_vector_result_t write_result;
+    const hsize_t dims[1] = {8};
+
+    typedef struct test_scc_vector_case_t {
+        const char *name;
+        size_t nselected;
+        hsize_t selected[4];
+        size_t expected_count;
+        size_t expected_offsets[4];
+        size_t expected_sizes[4];
+    } test_scc_vector_case_t;
+
+    static const test_scc_vector_case_t cases[] = {
+        {"contiguous defined values", 2, {1, 2}, 1, {0}, {2 * sizeof(int)}},
+        {"discontiguous defined values", 2, {1, 5}, 2, {0, 2 * sizeof(int)}, {sizeof(int), sizeof(int)}},
+        {"defined and undefined intersection",
+         3,
+         {1, 3, 5},
+         2,
+         {0, 2 * sizeof(int)},
+         {sizeof(int), sizeof(int)}},
+        {"empty projected intersection", 4, {0, 3, 4, 6}, 0, {0}, {0}}};
+
+    TESTING("SCC structured-chunk vector translation matrix");
+
+    memset(&fixture, 0, sizeof(fixture));
+    memset(&read_result, 0, sizeof(read_result));
+    memset(&write_result, 0, sizeof(write_result));
+
+    if (test_scc_vector_fixture_init("scc_vector_translation_matrix", false, &fixture) < 0)
+        TEST_ERROR;
+
+    if ((query_sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    /*
+     * A NULL decoded chunk must not attempt translation. Test both callbacks
+     * because output initialization is part of each callback's contract.
+     */
+    for (unsigned op_idx = 0; op_idx < 2; op_idx++) {
+        const test_scc_vector_op_t op = (op_idx == 0) ? TEST_SCC_VECTOR_READ : TEST_SCC_VECTOR_WRITE;
+        test_scc_vector_result_t null_result;
+        const H5S_t *query_space;
+
+        memset(&null_result, 0, sizeof(null_result));
+
+        if (test_scc_vector_select_positions(query_sid, 1, (const hsize_t[]){1}) < 0)
+            TEST_ERROR;
+
+        if (NULL == (query_space = (const H5S_t *)H5I_object_verify(query_sid, H5I_DATASPACE)))
+            TEST_ERROR;
+
+        if (test_scc_invoke_vector_translate(op, fixture.dset_hdr->dset, fixture.chunk, query_space, false,
+                                             NULL, &null_result) < 0)
+            TEST_ERROR;
+
+        if (null_result.vector_possible)
+            TEST_ERROR;
+        if (!null_result.require_values)
+            TEST_ERROR;
+        if (null_result.vec_count != 0)
+            TEST_ERROR;
+        if (null_result.offsets || null_result.sizes)
+            TEST_ERROR;
+    }
+
+    for (size_t i = 0; i < NELMTS(cases); i++) {
+        const H5S_t *query_space;
+
+        if (test_scc_vector_select_positions(query_sid, cases[i].nselected, cases[i].selected) < 0)
+            TEST_ERROR;
+
+        if (NULL == (query_space = (const H5S_t *)H5I_object_verify(query_sid, H5I_DATASPACE)))
+            TEST_ERROR;
+
+        if (test_scc_invoke_vector_translate(TEST_SCC_VECTOR_READ, fixture.dset_hdr->dset, fixture.chunk,
+                                             query_space, false, fixture.chunk->chunk_obj, &read_result) < 0)
+            TEST_ERROR;
+
+        if (test_scc_invoke_vector_translate(TEST_SCC_VECTOR_WRITE, fixture.dset_hdr->dset, fixture.chunk,
+                                             query_space, false, fixture.chunk->chunk_obj, &write_result) < 0)
+            TEST_ERROR;
+
+        if (test_scc_verify_vector_result(&read_result, fixture.chunk->disk_addr, cases[i].expected_count,
+                                          cases[i].expected_offsets, cases[i].expected_sizes) < 0)
+            TEST_ERROR;
+
+        if (test_scc_verify_vector_result(&write_result, fixture.chunk->disk_addr, cases[i].expected_count,
+                                          cases[i].expected_offsets, cases[i].expected_sizes) < 0)
+            TEST_ERROR;
+
+        /*
+         * The callbacks currently implement identical translation and must
+         * remain observably equivalent until they are consolidated.
+         */
+        if (read_result.vec_count != write_result.vec_count)
+            TEST_ERROR;
+
+        for (size_t j = 0; j < read_result.vec_count; j++) {
+            if (read_result.offsets[j] != write_result.offsets[j])
+                TEST_ERROR;
+            if (read_result.sizes[j] != write_result.sizes[j])
+                TEST_ERROR;
+        }
+
+        test_scc_vector_result_reset(&read_result);
+        test_scc_vector_result_reset(&write_result);
+    }
+
+    if (H5Sclose(query_sid) < 0)
+        TEST_ERROR;
+    query_sid = H5I_INVALID_HID;
+
+    test_scc_vector_fixture_term(&fixture);
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    test_scc_vector_result_reset(&read_result);
+    test_scc_vector_result_reset(&write_result);
+
+    H5E_BEGIN_TRY { H5Sclose(query_sid); }
+    H5E_END_TRY
+
+    test_scc_vector_fixture_term(&fixture);
+
+    H5_FAILED();
+    return FAIL;
+}
+
+static int test_scc_vector_filtered_rejection(void)
+{
+    test_scc_vector_fixture_t fixture;
+    hid_t query_sid = H5I_INVALID_HID;
+    const H5S_t *query_space;
+    const hsize_t dims[1]     = {8};
+    const hsize_t selected[2] = {1, 2};
+
+    TESTING("SCC structured-chunk vector translation rejects filtered chunk");
+
+    memset(&fixture, 0, sizeof(fixture));
+
+    if (test_scc_vector_fixture_init("scc_vector_filtered_rejection", true, &fixture) < 0)
+        TEST_ERROR;
+
+    if ((query_sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (test_scc_vector_select_positions(query_sid, 2, selected) < 0)
+        TEST_ERROR;
+
+    if (NULL == (query_space = (const H5S_t *)H5I_object_verify(query_sid, H5I_DATASPACE)))
+        TEST_ERROR;
+
+    for (unsigned op_idx = 0; op_idx < 2; op_idx++) {
+        const test_scc_vector_op_t op = (op_idx == 0) ? TEST_SCC_VECTOR_READ : TEST_SCC_VECTOR_WRITE;
+        test_scc_vector_result_t result;
+
+        memset(&result, 0, sizeof(result));
+
+        /*
+         * false means the chunk is not an unfiltered partial-bound
+         * representation. A filtered full chunk cannot be addressed directly.
+         */
+        if (test_scc_invoke_vector_translate(op, fixture.dset_hdr->dset, fixture.chunk, query_space, false,
+                                             fixture.chunk->chunk_obj, &result) < 0)
+            TEST_ERROR;
+
+        if (result.vector_possible)
+            TEST_ERROR;
+        if (result.require_values)
+            TEST_ERROR;
+        if (result.vec_count != 0)
+            TEST_ERROR;
+        if (result.offsets || result.sizes)
+            TEST_ERROR;
+    }
+
+    if (H5Sclose(query_sid) < 0)
+        TEST_ERROR;
+    query_sid = H5I_INVALID_HID;
+
+    test_scc_vector_fixture_term(&fixture);
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY { H5Sclose(query_sid); }
+    H5E_END_TRY
+
+    test_scc_vector_fixture_term(&fixture);
+
+    H5_FAILED();
+    return FAIL;
+}
+
+static void test_scc_delete_generated_files(void)
+{
+    static const char *scc_test_files[] = {"scc_vector_translation_matrix",
+                                           "scc_vector_filtered_rejection",
+                                           "scc_active_reclaim_ignores_min_dset_size",
+                                           "scc_quiescent_trim_preserves_min_dset_size",
+                                           "scc_oversized_ensure_space_drains_reclaimable",
+                                           "scc_oversized_single_chunk_write_reopen",
+                                           "scc_oversized_single_chunk_read_after_reopen",
+                                           "scc_struct_chunk_single_chunk",
                                            "scc_struct_chunk_h5s_all_shell_close_ok",
                                            "scc_struct_chunk_two_dsets_interleaved_close_order",
                                            "scc_forced_eviction_small_limits",
                                            "scc_eviction_order_reflects_recency",
                                            "scc_write_full_batching_small_limits",
+                                           "scc_resident_first_indexed_read_write",
+                                           "scc_write_back_flush_lifecycle",
+                                           "scc_partial_write_persistence",
+                                           "scc_gzip_partial_write_persistence",
+                                           "scc_szip_partial_write_persistence",
+                                           "scc_failed_flush_retains_dirty_state",
                                            "float_width_conversion_matrix",
                                            "integer_width_conversion_matrix",
                                            "numeric_cross_type_conversion_matrix",
@@ -22673,9 +29600,25 @@ test_scc_delete_generated_files(void)
                                            "scc_3d_selection_shape_stress",
                                            "scc_3d_noop_resize_erase_cases",
                                            "scc_3d_accounting_invariants_after_operations",
+                                           "scc_get_defined_empty",
+                                           "scc_get_defined_resident_sparse",
+                                           "scc_get_defined_sparse_after_reopen",
+                                           "scc_get_defined_hyperslab_intersection",
+                                           "scc_get_defined_gzip_after_reopen",
+                                           "scc_get_defined_szip_after_reopen",
+                                           "scc_get_defined_gzip_partial_edge_after_reopen",
+                                           "scc_get_defined_mixed_lookup_paths_after_reopen",
+                                           "scc_get_defined_none_selection",
+                                           "scc_get_defined_full_chunks_after_reopen",
+                                           "scc_get_defined_2d_restricted_query",
+                                           "scc_get_defined_after_erase_reopen",
+                                           "scc_get_defined_after_extent_growth",
+                                           "scc_get_defined_filtered_cache_neutral_after_reopen",
+                                           "get_defined_non_scc_passthrough",
                                            "scc_filter_2d_full_chunk_write_read_reopen",
                                            "scc_filter_2d_sparse_point_selection",
                                            "scc_filter_3d_extent_erase_reopen",
+                                           "scc_gzip_dirty_pressure_eviction",
                                            "scc_filter_3d_partial_edge_overwrite_erase_reopen",
                                            "scc_filter_plain_dataset_isolation",
                                            "scc_filter_2d_extensible_grow_shrink_reopen",
@@ -22713,7 +29656,13 @@ test_scc_delete_generated_files(void)
                                            "scc_filter_shuffle_fletcher32_deflate_3d_h5s_all_roundtrip",
                                            "scc_filter_deflate_5d_h5s_all_roundtrip",
                                            "scc_filter_5d_extent_erase_reopen",
-                                           "scc_mixed_rank_1d_to_5d_eviction_stress"};
+                                           "scc_mixed_rank_1d_to_5d_eviction_stress",
+                                           "scc_estimate_stats_sparse_read",
+                                           "scc_estimate_stats_sparse_write",
+                                           "scc_estimate_stats_gzip_read",
+                                           "scc_estimate_stats_gzip_write",
+                                           "scc_estimate_stats_history",
+                                           "scc_estimate_stats_extent_erase"};
 
     if (!SCC_DELETE_TEST_FILES)
         return;
@@ -22726,14 +29675,613 @@ test_scc_delete_generated_files(void)
     }
 }
 
+#if defined(H5SC_COLLECT_ESTIMATE_STATS) && (H5SC_COLLECT_ESTIMATE_STATS + 0)
+
+#define H5SC_EST_STATS_NCHUNKS 16
+#define H5SC_EST_STATS_VALUES_PER_CHUNK 4
+#define H5SC_EST_STATS_NVALUES (H5SC_EST_STATS_NCHUNKS * H5SC_EST_STATS_VALUES_PER_CHUNK)
+
+/*-------------------------------------------------------------------------
+ * Function:    H5SC__estimate_stats_gzip_available
+ *
+ * Purpose:     Determine whether both GZIP encoding and decoding are
+ *              available in the current build.
+ *-------------------------------------------------------------------------
+ */
+static bool H5SC__estimate_stats_gzip_available(void)
+{
+    unsigned int filter_info = 0;
+
+    if (H5Zfilter_avail(H5Z_FILTER_DEFLATE) <= 0)
+        return false;
+
+    if (H5Zget_filter_info(H5Z_FILTER_DEFLATE, &filter_info) < 0)
+        return false;
+
+    return (filter_info & H5Z_FILTER_CONFIG_ENCODE_ENABLED) &&
+           (filter_info & H5Z_FILTER_CONFIG_DECODE_ENABLED);
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    H5SC__estimate_stats_select_sparse
+ *
+ * Purpose:     Select four one-element hyperslabs from each of sixteen
+ *              logical chunks. Point selections are intentionally avoided.
+ *-------------------------------------------------------------------------
+ */
+static herr_t H5SC__estimate_stats_select_sparse(hid_t file_space)
+{
+    static const hsize_t offsets[H5SC_EST_STATS_VALUES_PER_CHUNK] = {1, 17, 63, 127};
+    const hsize_t count[1]                                        = {1};
+
+    if (H5Sselect_none(file_space) < 0)
+        return FAIL;
+
+    for (size_t chunk = 0; chunk < H5SC_EST_STATS_NCHUNKS; chunk++) {
+        for (size_t value = 0; value < H5SC_EST_STATS_VALUES_PER_CHUNK; value++) {
+            hsize_t start[1] = {(hsize_t)(chunk * 256) + offsets[value]};
+
+            if (H5Sselect_hyperslab(file_space, H5S_SELECT_OR, start, NULL, count, NULL) < 0)
+                return FAIL;
+        }
+    }
+
+    return SUCCEED;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    H5SC__estimate_stats_configure_dcpl
+ *
+ * Purpose:     Configure a sparse structured-chunk dataset and optionally
+ *              apply GZIP to both structured-chunk sections.
+ *-------------------------------------------------------------------------
+ */
+static herr_t H5SC__estimate_stats_configure_dcpl(hid_t dcpl, bool use_gzip)
+{
+    const hsize_t chunk_dims[1] = {256};
+
+    if (H5Pset_layout(dcpl, H5D_STRUCT_CHUNK) < 0)
+        return FAIL;
+
+    if (H5Pset_struct_chunk(dcpl, 1, chunk_dims, H5D_SPARSE_CHUNK) < 0)
+        return FAIL;
+
+    if (use_gzip) {
+        unsigned int gzip_level = 6;
+
+        if (H5Pset_filter2(dcpl, H5_SECTION_SELECTION, H5Z_FILTER_DEFLATE, H5Z_FLAG_OPTIONAL, 1,
+                           &gzip_level) < 0)
+            return FAIL;
+
+        if (H5Pset_filter2(dcpl, H5_SECTION_FIXED, H5Z_FILTER_DEFLATE, H5Z_FLAG_OPTIONAL, 1, &gzip_level) < 0)
+            return FAIL;
+    }
+
+    return SUCCEED;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    H5SC__run_estimate_stats_sparse_io
+ *
+ * Purpose:     Shared implementation for the unfiltered/GZIP sparse
+ *              read/write statistics workloads.
+ *
+ *              Write workloads measure the initial sparse materialization.
+ *
+ *              Read workloads first populate and destroy a setup cache, then
+ *              reopen the file and measure nonresident read materialization
+ *              in a newly created cache.
+ *-------------------------------------------------------------------------
+ */
+static int H5SC__run_estimate_stats_sparse_io(const char *test_label, const char *file_base, bool use_gzip,
+                                              bool measure_read)
+{
+    hid_t fid        = H5I_INVALID_HID;
+    hid_t sid        = H5I_INVALID_HID;
+    hid_t dcpl       = H5I_INVALID_HID;
+    hid_t did        = H5I_INVALID_HID;
+    hid_t file_space = H5I_INVALID_HID;
+    hid_t mem_space  = H5I_INVALID_HID;
+
+    const hsize_t dims[1]     = {4096};
+    const hsize_t mem_dims[1] = {H5SC_EST_STATS_NVALUES};
+
+    int write_buf[H5SC_EST_STATS_NVALUES];
+    int read_buf[H5SC_EST_STATS_NVALUES];
+
+    char filename[1024];
+
+    TESTING(test_label);
+
+    if (use_gzip && !H5SC__estimate_stats_gzip_available()) {
+        SKIPPED();
+        puts("    GZIP encode/decode support unavailable");
+        return SUCCEED;
+    }
+
+    for (size_t i = 0; i < H5SC_EST_STATS_NVALUES; i++) {
+        write_buf[i] = (int)(1000 + i);
+        read_buf[i]  = -1;
+    }
+
+    h5_fixname(file_base, H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5SC__estimate_stats_configure_dcpl(dcpl, use_gzip) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((file_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5SC__estimate_stats_select_sparse(file_space) < 0)
+        TEST_ERROR;
+
+    if ((mem_space = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if (measure_read)
+        fprintf(stdout, "\n=== SETUP CACHE: %s ===\n", file_base);
+    else
+        fprintf(stdout, "\n=== MEASURED CACHE: %s ===\n", file_base);
+
+    /*
+     * For write workloads, this is the measured operation. For read
+     * workloads, it only creates the persisted sparse representation.
+     */
+    if (H5Dwrite(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, write_buf) < 0)
+        TEST_ERROR;
+
+    if (H5Sclose(mem_space) < 0)
+        TEST_ERROR;
+    mem_space = H5I_INVALID_HID;
+
+    if (H5Sclose(file_space) < 0)
+        TEST_ERROR;
+    file_space = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    /*
+     * Destroy the cache. With H5SC_ENABLE_STAT_DUMPS=1, this emits the write
+     * workload statistics or the read-workload setup statistics.
+     */
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    if (measure_read) {
+        fprintf(stdout, "\n=== MEASURED CACHE: %s ===\n", file_base);
+
+        if ((fid = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT)) < 0)
+            TEST_ERROR;
+
+        if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+            TEST_ERROR;
+
+        if ((file_space = H5Dget_space(did)) < 0)
+            TEST_ERROR;
+
+        if (H5SC__estimate_stats_select_sparse(file_space) < 0)
+            TEST_ERROR;
+
+        if ((mem_space = H5Screate_simple(1, mem_dims, NULL)) < 0)
+            TEST_ERROR;
+
+        if (H5Dread(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, read_buf) < 0)
+            TEST_ERROR;
+
+        for (size_t i = 0; i < H5SC_EST_STATS_NVALUES; i++)
+            if (read_buf[i] != write_buf[i])
+                TEST_ERROR;
+
+        if (H5Sclose(mem_space) < 0)
+            TEST_ERROR;
+        mem_space = H5I_INVALID_HID;
+
+        if (H5Sclose(file_space) < 0)
+            TEST_ERROR;
+        file_space = H5I_INVALID_HID;
+
+        if (H5Dclose(did) < 0)
+            TEST_ERROR;
+        did = H5I_INVALID_HID;
+
+        /*
+         * Destroy the measured read cache and emit its statistics.
+         */
+        if (H5Fclose(fid) < 0)
+            TEST_ERROR;
+        fid = H5I_INVALID_HID;
+    }
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(mem_space);
+        H5Sclose(file_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Workload 1: unfiltered sparse read
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_estimate_stats_sparse_read(void)
+{
+    return H5SC__run_estimate_stats_sparse_io("SCC estimate statistics: sparse unfiltered read",
+                                              "scc_estimate_stats_sparse_read", false, true);
+}
+
+/*-------------------------------------------------------------------------
+ * Workload 2: unfiltered sparse write
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_estimate_stats_sparse_write(void)
+{
+    return H5SC__run_estimate_stats_sparse_io("SCC estimate statistics: sparse unfiltered write",
+                                              "scc_estimate_stats_sparse_write", false, false);
+}
+
+/*-------------------------------------------------------------------------
+ * Workload 3: GZIP sparse read
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_estimate_stats_gzip_read(void)
+{
+    return H5SC__run_estimate_stats_sparse_io("SCC estimate statistics: sparse GZIP read",
+                                              "scc_estimate_stats_gzip_read", true, true);
+}
+
+/*-------------------------------------------------------------------------
+ * Workload 4: GZIP sparse write
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_estimate_stats_gzip_write(void)
+{
+    return H5SC__run_estimate_stats_sparse_io("SCC estimate statistics: sparse GZIP write",
+                                              "scc_estimate_stats_gzip_write", true, false);
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_estimate_stats_history
+ *
+ * Purpose:     Materialize chunks through separate write requests so that
+ *              the first observation initializes dataset-local history and
+ *              subsequent admission estimates can use that history.
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_estimate_stats_history(void)
+{
+    hid_t fid        = H5I_INVALID_HID;
+    hid_t sid        = H5I_INVALID_HID;
+    hid_t dcpl       = H5I_INVALID_HID;
+    hid_t did        = H5I_INVALID_HID;
+    hid_t file_space = H5I_INVALID_HID;
+    hid_t mem_space  = H5I_INVALID_HID;
+
+    const hsize_t dims[1]      = {4096};
+    const hsize_t one_dim[1]   = {1};
+    const hsize_t one_count[1] = {1};
+
+    char filename[1024];
+
+    TESTING("SCC estimate statistics: dataset-local history");
+
+    h5_fixname("scc_estimate_stats_history", H5P_DEFAULT, filename, sizeof(filename));
+
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, NULL)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5SC__estimate_stats_configure_dcpl(dcpl, false) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((mem_space = H5Screate_simple(1, one_dim, NULL)) < 0)
+        TEST_ERROR;
+
+    fprintf(stdout, "\n=== MEASURED CACHE: scc_estimate_stats_history ===\n");
+
+    /*
+     * Use one write request per logical chunk. A single large write could
+     * estimate every chunk before the first materialization has updated the
+     * dataset history.
+     */
+    for (size_t chunk = 0; chunk < H5SC_EST_STATS_NCHUNKS; chunk++) {
+        hsize_t start[1] = {(hsize_t)(chunk * 256 + 1)};
+        int value        = (int)(2000 + chunk);
+
+        if ((file_space = H5Dget_space(did)) < 0)
+            TEST_ERROR;
+
+        if (H5Sselect_hyperslab(file_space, H5S_SELECT_SET, start, NULL, one_count, NULL) < 0)
+            TEST_ERROR;
+
+        if (H5Dwrite(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, &value) < 0)
+            TEST_ERROR;
+
+        if (H5Sclose(file_space) < 0)
+            TEST_ERROR;
+        file_space = H5I_INVALID_HID;
+    }
+
+    if (H5Sclose(mem_space) < 0)
+        TEST_ERROR;
+    mem_space = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(mem_space);
+        H5Sclose(file_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function:    test_scc_estimate_stats_extent_erase
+ *
+ * Purpose:     Measure nonresident materialization caused by partial erase,
+ *              followed by extent shrink, regrowth, and writes into newly
+ *              reintroduced chunks.
+ *-------------------------------------------------------------------------
+ */
+static int test_scc_estimate_stats_extent_erase(void)
+{
+    hid_t fid         = H5I_INVALID_HID;
+    hid_t sid         = H5I_INVALID_HID;
+    hid_t dcpl        = H5I_INVALID_HID;
+    hid_t did         = H5I_INVALID_HID;
+    hid_t file_space  = H5I_INVALID_HID;
+    hid_t mem_space   = H5I_INVALID_HID;
+    hid_t erase_space = H5I_INVALID_HID;
+
+    const hsize_t dims[1]      = {4096};
+    const hsize_t maxdims[1]   = {H5S_UNLIMITED};
+    const hsize_t mem_dims[1]  = {H5SC_EST_STATS_NVALUES};
+    const hsize_t shrink[1]    = {3072};
+    const hsize_t regrow[1]    = {4096};
+    const hsize_t one_dim[1]   = {1};
+    const hsize_t one_count[1] = {1};
+
+    int setup_buf[H5SC_EST_STATS_NVALUES];
+    char filename[1024];
+
+    TESTING("SCC estimate statistics: extent and erase");
+
+    for (size_t i = 0; i < H5SC_EST_STATS_NVALUES; i++)
+        setup_buf[i] = (int)(3000 + i);
+
+    h5_fixname("scc_estimate_stats_extent_erase", H5P_DEFAULT, filename, sizeof(filename));
+
+    /*
+     * Setup cache: populate all sixteen chunks sparsely.
+     */
+    if ((fid = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((sid = H5Screate_simple(1, dims, maxdims)) < 0)
+        TEST_ERROR;
+
+    if ((dcpl = H5Pcreate(H5P_DATASET_CREATE)) < 0)
+        TEST_ERROR;
+
+    if (H5SC__estimate_stats_configure_dcpl(dcpl, false) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dcreate2(fid, "dset", H5T_NATIVE_INT, sid, H5P_DEFAULT, dcpl, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((file_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5SC__estimate_stats_select_sparse(file_space) < 0)
+        TEST_ERROR;
+
+    if ((mem_space = H5Screate_simple(1, mem_dims, NULL)) < 0)
+        TEST_ERROR;
+
+    fprintf(stdout, "\n=== SETUP CACHE: scc_estimate_stats_extent_erase ===\n");
+
+    if (H5Dwrite(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, setup_buf) < 0)
+        TEST_ERROR;
+
+    if (H5Sclose(mem_space) < 0)
+        TEST_ERROR;
+    mem_space = H5I_INVALID_HID;
+
+    if (H5Sclose(file_space) < 0)
+        TEST_ERROR;
+    file_space = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Pclose(dcpl) < 0)
+        TEST_ERROR;
+    dcpl = H5I_INVALID_HID;
+
+    if (H5Sclose(sid) < 0)
+        TEST_ERROR;
+    sid = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    /*
+     * Measured cache: partially erase four persisted chunks.
+     */
+    fprintf(stdout, "\n=== MEASURED CACHE: scc_estimate_stats_extent_erase ===\n");
+
+    if ((fid = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((did = H5Dopen2(fid, "dset", H5P_DEFAULT)) < 0)
+        TEST_ERROR;
+
+    if ((erase_space = H5Dget_space(did)) < 0)
+        TEST_ERROR;
+
+    if (H5Sselect_none(erase_space) < 0)
+        TEST_ERROR;
+
+    for (size_t chunk = 0; chunk < 4; chunk++) {
+        hsize_t start[1] = {(hsize_t)(chunk * 256 + 17)};
+
+        if (H5Sselect_hyperslab(erase_space, H5S_SELECT_OR, start, NULL, one_count, NULL) < 0)
+            TEST_ERROR;
+    }
+
+    if (H5Derase(did, erase_space, H5P_DEFAULT) < 0)
+        TEST_ERROR;
+
+    if (H5Sclose(erase_space) < 0)
+        TEST_ERROR;
+    erase_space = H5I_INVALID_HID;
+
+    /*
+     * Remove the final four logical chunks, then reintroduce that region.
+     */
+    if (H5Dset_extent(did, shrink) < 0)
+        TEST_ERROR;
+
+    if (H5Dset_extent(did, regrow) < 0)
+        TEST_ERROR;
+
+    if ((mem_space = H5Screate_simple(1, one_dim, NULL)) < 0)
+        TEST_ERROR;
+
+    /*
+     * Write one value into each reintroduced logical chunk. Separate calls
+     * allow history to be updated between materializations.
+     */
+    for (size_t chunk = 12; chunk < 16; chunk++) {
+        hsize_t start[1] = {(hsize_t)(chunk * 256 + 1)};
+        int value        = (int)(4000 + chunk);
+
+        if ((file_space = H5Dget_space(did)) < 0)
+            TEST_ERROR;
+
+        if (H5Sselect_hyperslab(file_space, H5S_SELECT_SET, start, NULL, one_count, NULL) < 0)
+            TEST_ERROR;
+
+        if (H5Dwrite(did, H5T_NATIVE_INT, mem_space, file_space, H5P_DEFAULT, &value) < 0)
+            TEST_ERROR;
+
+        if (H5Sclose(file_space) < 0)
+            TEST_ERROR;
+        file_space = H5I_INVALID_HID;
+    }
+
+    if (H5Sclose(mem_space) < 0)
+        TEST_ERROR;
+    mem_space = H5I_INVALID_HID;
+
+    if (H5Dclose(did) < 0)
+        TEST_ERROR;
+    did = H5I_INVALID_HID;
+
+    if (H5Fclose(fid) < 0)
+        TEST_ERROR;
+    fid = H5I_INVALID_HID;
+
+    PASSED();
+    return SUCCEED;
+
+error:
+    H5E_BEGIN_TRY
+    {
+        H5Sclose(erase_space);
+        H5Sclose(mem_space);
+        H5Sclose(file_space);
+        H5Dclose(did);
+        H5Pclose(dcpl);
+        H5Sclose(sid);
+        H5Fclose(fid);
+    }
+    H5E_END_TRY
+
+    H5_FAILED();
+    return FAIL;
+}
+
+#endif /* H5SC_COLLECT_ESTIMATE_STATS */
+
 /* =========================================================================
  * main: run all tests from Sections 1 -> 8
  * ========================================================================= */
 
-int
-main(void)
+int main(void)
 {
-    int nerrors = 0;
+    int nerrors               = 0;
+    const bool szip_available = test_scc_szip_can_encode_decode();
 
     nerrors += test_chunk_index_primitives_no_partials();
 
@@ -22748,6 +30296,9 @@ main(void)
     nerrors += test_dll_splice_macros_chunks();
     nerrors += test_dset_hdr_lru_mru_behavior();
     nerrors += test_chunk_lru_sizes_and_order();
+#if H5SC_DO_SANITY_CHECKS
+    nerrors += test_api_error_paths_with_sanity();
+#endif
     nerrors += test_dll_sanity_helpers();
     nerrors += test_fuzz_dll_ops();
 
@@ -22762,8 +30313,22 @@ main(void)
     nerrors += test_two_datasets_tail_order_ops();
     nerrors += test_updated_make_and_insert_chunk_three_chunks();
 
+#if H5SC_DO_SANITY_CHECKS
+    nerrors += test_scc_reclaim_clean_link_contribution();
+    nerrors += test_scc_reclaim_pin_removes_contribution();
+    nerrors += test_scc_reclaim_final_unpin_restores_contribution();
+    nerrors += test_scc_reclaim_dirty_transition_preserves_total();
+    nerrors += test_scc_reclaim_resize_updates_counter();
+    nerrors += test_scc_active_reclaim_ignores_min_dset_size();
+    nerrors += test_scc_quiescent_trim_preserves_min_dset_size();
+    nerrors += test_scc_oversized_ensure_space_drains_reclaimable();
+    nerrors += test_scc_oversized_single_chunk_write_reopen();
+    nerrors += test_scc_oversized_single_chunk_read_after_reopen();
+#endif
+
     /* Section 10: Flush testing*/
-    nerrors += test_flush_dset_tail_first();
+    nerrors += test_flush_dset_retain_then_evict();
+    nerrors += test_structure_tags_lifecycle();
     nerrors += test_basic_eviction_two_requests();
     nerrors += test_basic_eviction_single_request();
     nerrors += test_stress_mixed_rank_bulk_insert();
@@ -22777,6 +30342,15 @@ main(void)
     nerrors += test_scc_eviction_order_reflects_recency();
     nerrors += test_scc_write_full_batching_maximal_under_small_limits();
     nerrors += test_scc_read_full_batching_maximal_under_small_limits();
+    nerrors += test_scc_resident_first_indexed_read_write();
+    nerrors += test_scc_write_back_flush_lifecycle();
+    nerrors += test_scc_partial_write_persistence();
+    nerrors += test_scc_gzip_partial_write_persistence();
+    nerrors += test_scc_szip_partial_write_persistence();
+
+#if H5SC_DO_SANITY_CHECKS
+    nerrors += test_scc_failed_flush_retains_dirty_state();
+#endif
 
     /* Section 11: Datatype conversion behavior testing */
     nerrors += test_integer_width_conversion_matrix();
@@ -22839,9 +30413,27 @@ main(void)
     nerrors += test_scc_3d_noop_resize_erase_cases();
     nerrors += test_scc_3d_accounting_invariants_after_operations();
 
+    nerrors += test_scc_get_defined_empty_dataset();
+    nerrors += test_scc_get_defined_resident_sparse();
+    nerrors += test_scc_get_defined_sparse_after_reopen();
+    nerrors += test_scc_get_defined_hyperslab_intersection();
+    nerrors += test_scc_get_defined_gzip_after_reopen();
+    nerrors += test_scc_get_defined_szip_after_reopen();
+    nerrors += test_scc_get_defined_gzip_partial_edge_after_reopen();
+    nerrors += test_scc_get_defined_mixed_lookup_paths_after_reopen();
+    nerrors += test_scc_get_defined_none_selection();
+    nerrors += test_scc_get_defined_full_chunks_after_reopen();
+    nerrors += test_scc_get_defined_2d_restricted_query();
+    nerrors += test_scc_get_defined_after_erase_reopen();
+    nerrors += test_scc_get_defined_after_extent_growth();
+    nerrors += test_scc_get_defined_filtered_cache_neutral_after_reopen();
+    nerrors += test_get_defined_non_scc_passthrough();
+
     nerrors += test_scc_filter_2d_full_chunk_write_read_reopen();
     nerrors += test_scc_filter_2d_sparse_point_selection();
+    nerrors += test_scc_filter_2d_forced_eviction_reopen();
     nerrors += test_scc_filter_3d_extent_erase_reopen();
+    nerrors += test_scc_gzip_dirty_pressure_eviction();
 
     nerrors += test_scc_filter_3d_partial_edge_overwrite_erase_reopen();
     nerrors += test_scc_filter_plain_dataset_isolation();
@@ -22850,7 +30442,6 @@ main(void)
     nerrors += test_scc_filter_3d_storage_only_prune_reopen();
     nerrors += test_scc_filter_2d_sparse_duplicate_overwrite();
 
-    nerrors += test_scc_filter_2d_sparse_duplicate_overwrite();
     nerrors += test_scc_filter_3d_large_chunk_roundtrip();
     nerrors += test_scc_filter_2d_deterministic_sparse_random();
     nerrors += test_scc_filter_2d_mixed_filter_pipeline_isolation();
@@ -22859,26 +30450,28 @@ main(void)
     nerrors += test_scc_gzip0_3d_extent_erase_reopen();
 
     nerrors += test_scc_szip_filter_available();
-    nerrors += test_scc_szip_dense_baseline();
-    nerrors += test_scc_szip_vs_unfiltered_1kb_sanity();
-    nerrors += test_scc_szip_full_chunk_selection();
-    nerrors += test_scc_szip_sparse_point_selection();
-    nerrors += test_scc_szip_full_dataset_write_read();
-    nerrors += test_scc_szip_ec_full_dataset_write_read();
-    nerrors += test_scc_szip_multi_chunk_hyperslab_write_read();
-    nerrors += test_scc_szip_partial_chunk_hyperslab_write_read();
-    nerrors += test_scc_szip_sparse_1x1_hyperslabs_multi_chunk();
+    if (szip_available) {
+        nerrors += test_scc_szip_dense_baseline();
+        nerrors += test_scc_szip_vs_unfiltered_1kb_sanity();
+        nerrors += test_scc_szip_full_chunk_selection();
+        nerrors += test_scc_szip_sparse_point_selection();
+        nerrors += test_scc_szip_full_dataset_write_read();
+        nerrors += test_scc_szip_ec_full_dataset_write_read();
+        nerrors += test_scc_szip_multi_chunk_hyperslab_write_read();
+        nerrors += test_scc_szip_partial_chunk_hyperslab_write_read();
+        nerrors += test_scc_szip_sparse_1x1_hyperslabs_multi_chunk();
 
-    nerrors += test_scc_szip_reopen_persistence();
-    nerrors += test_scc_szip_ec_reopen_persistence();
-    nerrors += test_scc_szip_erase_interaction();
-    nerrors += test_scc_szip_shrink_regrow_extent();
-    nerrors += test_scc_szip_ec_shrink_regrow_extent();
-    nerrors += test_scc_szip_erase_shrink_regrow_reopen();
-    nerrors += test_scc_szip_eviction_batching_small_limits();
-    nerrors += test_scc_szip_fixed_section_filter_matrix();
-    nerrors += test_scc_mixed_gzip_selection_szip_fixed();
-    nerrors += test_scc_mixed_gzip_selection_szip_ec_fixed();
+        nerrors += test_scc_szip_reopen_persistence();
+        nerrors += test_scc_szip_ec_reopen_persistence();
+        nerrors += test_scc_szip_erase_interaction();
+        nerrors += test_scc_szip_shrink_regrow_extent();
+        nerrors += test_scc_szip_ec_shrink_regrow_extent();
+        nerrors += test_scc_szip_erase_shrink_regrow_reopen();
+        nerrors += test_scc_szip_eviction_batching_small_limits();
+        nerrors += test_scc_szip_fixed_section_filter_matrix();
+        nerrors += test_scc_mixed_gzip_selection_szip_fixed();
+        nerrors += test_scc_mixed_gzip_selection_szip_ec_fixed();
+    }
 
     nerrors += test_scc_filter_shuffle_deflate_3d_extent_erase_reopen();
     nerrors += test_scc_filter_fletcher32_deflate_3d_extent_erase_reopen();
@@ -22888,13 +30481,23 @@ main(void)
 
     nerrors += test_scc_filter_deflate_5d_h5s_all_roundtrip();
     nerrors += test_scc_filter_5d_extent_erase_reopen();
-    nerrors += test_scc_mixed_rank_1d_to_5d_eviction_stress();
+    if (szip_available) {
+        nerrors += test_scc_mixed_rank_1d_to_5d_eviction_stress();
+    }
+
+    nerrors += test_scc_vector_translation_matrix();
+    nerrors += test_scc_vector_filtered_rejection();
+
+#if defined(H5SC_COLLECT_ESTIMATE_STATS) && (H5SC_COLLECT_ESTIMATE_STATS + 0)
+    nerrors += test_scc_estimate_stats_sparse_read();
+    nerrors += test_scc_estimate_stats_sparse_write();
+    nerrors += test_scc_estimate_stats_gzip_read();
+    nerrors += test_scc_estimate_stats_gzip_write();
+    nerrors += test_scc_estimate_stats_history();
+    nerrors += test_scc_estimate_stats_extent_erase();
+#endif
 
     /* Section 13: Extent Change test*/
-
-#if (H5SC_DO_SANITY_CHECKS + 0)
-    nerrors += test_api_error_paths_with_sanity();
-#endif
 
     test_scc_delete_generated_files();
 

@@ -303,6 +303,7 @@ MINOR, SCC, H5E_CANNOTDESTROY, Failed to destroy internal structure
 MINOR, SCC, H5E_CANNOTEVICT, Failed to evict chunk
 MINOR, SCC, H5E_CANNOTFLUSH, Failed to flush dataset properly
 MINOR, SCC, H5E_CANNOTGET, Failed to fetch queried element
+MINOR, SCC, H5E_CANNOTGET_SELECTION, Failed to get defined falue selection
 MINOR, SCC, H5E_CANNOTFREE, Failed to free structure
 MINOR, SCC, H5E_CANNOTINSERT, Failed to insert element
 MINOR, SCC, H5E_CANNOTPREPEND, Failed to prepend element to DLL

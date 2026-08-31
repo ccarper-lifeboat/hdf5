@@ -41,16 +41,41 @@
 /* Local Typedefs */
 /******************/
 
+typedef enum H5SC_reclaim_policy_t { H5SC_RECLAIM_ACTIVE = 0, H5SC_RECLAIM_QUIESCENT } H5SC_reclaim_policy_t;
+
+typedef struct H5SC_reclaim_contrib_t {
+    size_t clean_bytes;
+    size_t dirty_bytes;
+} H5SC_reclaim_contrib_t;
+
 /********************/
 /* Local Prototypes */
 /********************/
 
 /* I/O initialization related functions */
 static inline void H5SC__io_sel_chunk_init(H5SC_io_sel_chunk_t *chunk);
-static herr_t      H5SC__io_info_init(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info);
-static herr_t      H5SC__erase_io_info_init(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space);
-static herr_t      H5SC__io_info_reset(H5SC_io_info_t *sc_io_info);
-static herr_t      H5SC__io_info_term(H5SC_io_info_t *sc_io_info);
+
+static inline H5SC_io_sel_chunk_t *H5SC__io_sel_at(const H5SC_io_info_t *io, size_t relative_idx);
+
+static herr_t H5SC__selection_io_info_init(H5D_t *dset, const H5S_t *file_space, H5SC_io_info_t *sc_io_info);
+
+static herr_t H5SC__build_resident_first_order(H5SC_io_info_t *sc_io_info);
+
+static herr_t H5SC__merge_defined_chunk_selection(H5S_t *defined, const H5S_t *chunk_defined,
+                                                  const H5SC_io_sel_chunk_t *sel, unsigned ndims,
+                                                  const hsize_t *dset_dims, const hsize_t *chunk_dims);
+
+static herr_t H5SC__io_info_init(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info);
+static herr_t H5SC__erase_io_info_init(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space);
+static herr_t H5SC__io_info_reset(H5SC_io_info_t *sc_io_info);
+static herr_t H5SC__io_info_term(H5SC_io_info_t *sc_io_info);
+
+static void H5SC__io_scratch_free_storage(H5SC_io_scratch_t *scratch);
+static herr_t H5SC__io_scratch_ensure(H5SC_io_info_t *sc_io_info, size_t needed);
+
+static herr_t H5SC__get_defined_chunk(H5D_t *dset, const H5SC_io_sel_chunk_t *sel, H5SC_chunk_t *cached_chk,
+                                      bool filtered, bool partial_bound_chunks_different_encoding,
+                                      H5S_t **chunk_defined);
 
 static herr_t H5SC__chunk_teardown_resident(H5D_t *dset, H5SC_chunk_t *chunk);
 
@@ -72,12 +97,12 @@ static herr_t H5SC__erase_chunk_invalid_extent_region(H5D_t *dset, const hsize_t
                                                       const hsize_t *old_dims, H5SC_chunk_t *chk,
                                                       size_t *nbytes, size_t *alloc_size, bool *delete_chunk);
 
-static herr_t H5SC__compute_logical_chunk_index(unsigned ndims, const hsize_t *dset_dims, hsize_t *chunk_dims,
-                                                const hsize_t *elem_coord, hsize_t *log_chk_idx);
+static herr_t H5SC__compute_logical_chunk_index(unsigned ndims, const hsize_t *dset_dims,
+                                                const hsize_t *chunk_dims, const hsize_t *elem_coord,
+                                                hsize_t *log_chk_idx);
 
-static inline void H5SC__set_interleave_bit(H5SC_chunk_key_t *chunk_key, unsigned bit_position);
-
-static herr_t H5SC__compute_chunk_key(haddr_t *dset_object_header_addr /*in*/, hsize_t *log_chk_coord /*in*/,
+static herr_t H5SC__compute_chunk_key(const haddr_t *dset_object_header_addr /*in*/,
+                                      const hsize_t *log_chk_coord /*in*/,
                                       H5SC_chunk_key_t *chunk_key /*in,out*/);
 
 /* Cache sizing / eviction helpers */
@@ -88,18 +113,7 @@ static herr_t H5SC__account_dset_size_change(H5SC_t *cache, H5SC_dset_header_t *
 static herr_t H5SC__account_chunk_link_change(H5SC_t *cache, H5SC_dset_header_t *dset_hdr,
                                               size_t old_dset_size);
 
-/* Freeable-bytes query for two-stage eviction */
-static size_t H5SC__calc_freeable_clean_bytes(const H5SC_t *cache);
-
-/* Freeable-bytes query for dirty eviction (flush+evict), bounded by min_dset_size */
-static size_t H5SC__calc_freeable_dirty_bytes(const H5SC_t *cache);
-
-/* Verify eviction order reflects true recency (tailmost-eligible policy) */
-static herr_t H5SC__verify_candidate_is_tailmost_eligible(const H5SC_dset_header_t *curr_hdr,
-                                                          const H5SC_chunk_t *cand_chk, bool allow_dirty);
-
-static bool H5SC__select_evict_candidate_in_dset(H5SC_dset_header_t *dset_hdr, H5SC_chunk_t **cand_chk,
-                                                 H5SC_evict_mode_t mode);
+static void H5SC__update_resident_estimate_history(H5SC_dset_header_t *dset_hdr, size_t actual);
 
 /* Enforce cache retention between I/O requests */
 static herr_t H5SC__trim_to_quiescent_limit(H5SC_t *cache);
@@ -112,7 +126,7 @@ static herr_t H5SC__lookup_chunk_for_prune(H5D_t *dset, const hsize_t *scaled, h
 
 static herr_t H5SC__rekey_dset_chunks_after_extent_change(H5SC_t *cache, H5D_t *dset,
                                                           H5SC_dset_header_t *dset_hdr,
-                                                          const hsize_t      *chunk_dims);
+                                                          const hsize_t *chunk_dims);
 
 static herr_t H5SC__prune_one_scaled_coord_outside_extent(H5SC_t *cache, H5D_t *dset, const hsize_t *scaled);
 
@@ -121,7 +135,9 @@ static herr_t H5SC__for_each_scaled_coord_outside_extent(H5SC_t *cache, H5D_t *d
                                                          const hsize_t *new_nchunks);
 
 /* Space-making entry point (enforced against cache->SCC_active_limit during I/O) */
-static herr_t H5SC__ensure_space(H5SC_t *cache, size_t bytes_needed);
+static herr_t H5SC__ensure_space(H5SC_t *cache, size_t bytes_needed, bool allow_oversized_single_chunk);
+
+static inline bool H5SC__active_reclaim_required(const H5SC_t *cache, size_t bytes_needed, bool oversized);
 
 static size_t H5SC__calc_inc_for_chunk(const H5D_t *dset, const H5SC_chunk_t *chk, size_t desired);
 
@@ -132,26 +148,77 @@ static herr_t H5SC__invoke_write_dset_batched(H5SC_t *cache, H5D_dset_io_info_t 
 
 /* Dataset specific helper functions */
 
-static herr_t H5SC__dset_exhausted_restore_to_global_lru(H5SC_t *cache, H5SC_exhausted_list_t *exh);
-static herr_t H5SC__dset_exhausted_lru_prepend(H5SC_exhausted_list_t     *exh,
-                                               struct H5SC_dset_header_t *dset_hdr);
-static herr_t H5SC__dset_exhausted_remove(H5SC_exhausted_list_t *exh, struct H5SC_dset_header_t *dset_hdr);
+static inline H5SC_reclaim_contrib_t H5SC__chunk_reclaim_contribution(const H5SC_dset_header_t *dset_hdr,
+                                                                      const H5SC_chunk_t *chunk);
+
+static inline herr_t H5SC__apply_reclaim_transition(H5SC_t *cache, H5SC_dset_header_t *dset_hdr,
+                                                    H5SC_reclaim_contrib_t before,
+                                                    H5SC_reclaim_contrib_t after);
+
+static inline herr_t H5SC__chunk_set_dirty(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk,
+                                           bool dirty);
+
+static bool H5SC__candidate_is_reclaimable(const H5SC_dset_header_t *dset_hdr, const H5SC_chunk_t *chunk,
+                                           H5SC_reclaim_policy_t policy);
+
+static bool H5SC__select_clean_candidate(H5SC_dset_header_t *dset_hdr, H5SC_reclaim_policy_t policy,
+                                         H5SC_chunk_t **candidate);
+
+static bool H5SC__select_dirty_candidate(H5SC_dset_header_t *dset_hdr, H5SC_reclaim_policy_t policy,
+                                         H5SC_chunk_t **candidate);
+
+static bool H5SC__space_exceeded(size_t current, size_t additional, size_t limit);
+
+static void H5SC__saturating_add_size(size_t *total, size_t amount);
+
+static inline size_t H5SC__cached_active_reclaimable(const H5SC_t *cache);
+static inline size_t H5SC__effective_budget(const H5SC_t *cache);
+
+static inline herr_t H5SC__chunk_pin(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk);
+static inline herr_t H5SC__chunk_unpin(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk);
+
+#if H5SC_DO_SANITY_CHECKS
+static size_t H5SC__calc_reclaimable_bytes(const H5SC_t *cache, H5SC_reclaim_policy_t policy);
+
+static herr_t H5SC__verify_cached_reclaimability(const H5SC_t *cache);
+
+static herr_t H5SC__verify_clean_candidate(H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *candidate,
+                                           H5SC_reclaim_policy_t policy);
+
+static herr_t H5SC__verify_dirty_candidate(H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *candidate,
+                                           H5SC_reclaim_policy_t policy);
+#endif
 
 /* Stat-specific functions */
-static void   H5SC__stats_reset(H5SC_t *cache);
-static void   H5SC__stats_record_lookup(H5SC_t *cache, hbool_t hit);
-static void   H5SC__stats_record_insert(H5SC_t *cache);
-static void   H5SC__stats_record_delete(H5SC_t *cache);
-static void   H5SC__stats_record_chunk_flush(H5SC_t *cache);
-static void   H5SC__stats_record_dset_flush(H5SC_t *cache);
-static void   H5SC__stats_record_batch_read(H5SC_t *cache);
-static void   H5SC__stats_record_batch_write(H5SC_t *cache);
-static void   H5SC__stats_record_batch_read_len(H5SC_t *cache, size_t batch_len);
-static void   H5SC__stats_record_batch_write_len(H5SC_t *cache, size_t batch_len);
-static void   H5SC__stats_record_eviction(H5SC_t *cache);
+static void H5SC__stats_reset(H5SC_t *cache);
+static void H5SC__stats_record_lookup(H5SC_t *cache, hbool_t hit);
+static void H5SC__stats_record_insert(H5SC_t *cache);
+static void H5SC__stats_record_delete(H5SC_t *cache);
+static void H5SC__stats_record_chunk_flush(H5SC_t *cache);
+static void H5SC__stats_record_dset_flush(H5SC_t *cache);
+static void H5SC__stats_record_batch_read(H5SC_t *cache);
+static void H5SC__stats_record_batch_write(H5SC_t *cache);
+static void H5SC__stats_record_batch_read_len(H5SC_t *cache, size_t batch_len);
+static void H5SC__stats_record_batch_write_len(H5SC_t *cache, size_t batch_len);
+static void H5SC__stats_record_eviction(H5SC_t *cache);
+
+static herr_t H5SC__estimate_resident_size(const H5SC_dset_header_t *dset_hdr, const H5D_t *dset,
+                                           const H5SC_io_sel_chunk_t *sel, bool is_write, size_t write_bytes,
+                                           H5SC_size_est_source_t *source, size_t *estimate);
+
+static void H5SC__report_oversized_admission(H5SC_t *cache, size_t estimated_bytes);
+
+#if defined(H5SC_ENABLE_STAT_DUMPS) && (H5SC_ENABLE_STAT_DUMPS + 0)
+
 static double H5SC__stats_get_hit_rate(const H5SC_t *cache);
-static double H5SC_stats_get_miss_rate(const H5SC_t *cache);
+static double H5SC__stats_get_miss_rate(const H5SC_t *cache);
 static herr_t H5SC__stats_dump(const H5SC_t *cache);
+#endif
+
+#if defined(H5SC_COLLECT_ESTIMATE_STATS) && (H5SC_COLLECT_ESTIMATE_STATS + 0)
+static void H5SC__stats_record_size_estimate(H5SC_t *cache, H5SC_size_est_source_t source, size_t estimate,
+                                             size_t actual);
+#endif
 
 /*****************************/
 /* Library Private Variables */
@@ -194,8 +261,7 @@ bool H5_PKG_INIT_VAR = false;
  * Return:   Pointer to newly created cache on success, NULL on failure
  *-------------------------------------------------------------------------
  */
-H5SC_t *
-H5SC_create(H5F_t *file, H5P_genplist_t *fa_plist, H5SC__cache_config_t *config_ptr)
+H5SC_t *H5SC_create(H5F_t *file, H5P_genplist_t *fa_plist, H5SC__cache_config_t *config_ptr)
 {
     H5SC_t *cache     = NULL;
     H5SC_t *ret_value = NULL;
@@ -206,7 +272,7 @@ H5SC_create(H5F_t *file, H5P_genplist_t *fa_plist, H5SC__cache_config_t *config_
     assert(fa_plist);
     assert(config_ptr);
     /*
-    #ifdef H5SC_DO_SANITY_CHECKS
+    #if H5SC_DO_SANITY_CHECKS
 
         fprintf(stdout, "\n\nH5SC_create(): config_ptr->version = %d.\n", config_ptr->version);
         fprintf(stdout, "               config_ptr->max_q_size = 0x%zu.\n\n",
@@ -216,7 +282,7 @@ H5SC_create(H5F_t *file, H5P_genplist_t *fa_plist, H5SC__cache_config_t *config_
     */
 
     /* Allocated cache struct */
-    if (NULL == (cache = H5MM_malloc(sizeof(H5SC_t)))) {
+    if (NULL == (cache = H5MM_calloc(sizeof(H5SC_t)))) {
         HGOTO_ERROR(H5E_SCC, H5E_CANNOTALLOC, NULL, "unable to allocate buffer for shared chunk cache");
     }
 
@@ -225,19 +291,22 @@ H5SC_create(H5F_t *file, H5P_genplist_t *fa_plist, H5SC__cache_config_t *config_
      * SCC_quiescent_limit - Set by FAPL; if zero, it is set to be 1 GB by default
      * SCC_active_limit - Set by FAPL; if zero, it is set to be 2 GB by default
      */
-    cache->SCC_quiescent_size  = (size_t)0;
-    cache->SCC_quiescent_limit = config_ptr->max_q_size;
-    // cache->SCC_quiescent_limit = (size_t)(1000ULL * 1024ULL * 1024ULL); /* 1 GiB limit by default */
-    // cache->SCC_quiescent_limit = (size_t)(1 * 5 * 5 * sizeof(int) + 64); /* DEBUG LIMIT */
-    cache->SCC_active_size  = (size_t)0;
-    cache->SCC_active_limit = config_ptr->max_a_size;
-    // cache->SCC_active_limit = (size_t)(4ULL * cache->SCC_quiescent_limit); /* 4 GiB  limit by default*/
-    // cache->SCC_active_limit          = (size_t)(2 * cache->SCC_quiescent_limit); /* DEBUG LIMIT */
+    cache->SCC_magic                 = H5SC_MAIN_MAGIC;
+    cache->SCC_quiescent_size        = (size_t)0;
+    cache->SCC_quiescent_limit       = config_ptr->max_q_size;
+    cache->SCC_active_size           = (size_t)0;
+    cache->SCC_active_limit          = config_ptr->max_a_size;
     cache->dset_lru_len              = (size_t)0;
+    cache->reclaimable_clean_bytes   = (size_t)0;
+    cache->reclaimable_dirty_bytes   = (size_t)0;
     cache->dset_lru_head_ptr         = NULL;
     cache->dset_lru_tail_ptr         = NULL;
     cache->chunk_hash_table_head_ptr = NULL;
     cache->dset_hash_table_head_ptr  = NULL;
+
+#if H5SC_DO_SANITY_CHECKS
+    cache->test_fail_next_chunk_flush = false;
+#endif
 
     /* Success */
     H5SC__stats_reset(cache);
@@ -250,34 +319,48 @@ done:
 /*-------------------------------------------------------------------------
  * Function: H5SC_destroy
  *
- * Purpose:  Destroys a shared chunk cache, freeing all data used.
- * Does not flush chunks.
+ * Purpose:
+ *   Destroy an already-empty shared chunk cache and release its allocation.
+ *
+ *   This function does not flush or evict dataset chunks. Dataset close or
+ *   higher-level cache teardown must first flush-and-evict all dataset state.
+ *   Destruction fails if dataset headers, chunk entries, or accounted resident
+ *   bytes remain.
  *
  * Return:   SUCCEED on success, FAIL on failure
  *-------------------------------------------------------------------------
  */
-herr_t
-H5SC_destroy(H5SC_t *cache)
+herr_t H5SC_destroy(H5SC_t *cache)
 {
     herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_NOAPI(FAIL)
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
-#ifdef H5SC_PRINT_STATS
-    /* Dump stats before they are reset */
+#if defined(H5SC_ENABLE_STAT_DUMPS) && (H5SC_ENABLE_STAT_DUMPS + 0)
+    {
+        bool have_stats = (cache->stats.scc_lookups != 0);
 
-    if (cache->stats.scc_lookups != 0) {
-        fprintf(stdout, "\n=== SCC Stats Prior to Cache Destruction ===\n");
-        H5SC__stats_dump(cache);
+#if defined(H5SC_COLLECT_ESTIMATE_STATS) && (H5SC_COLLECT_ESTIMATE_STATS + 0)
+        have_stats = have_stats || (cache->stats.size_estimate_count != 0);
+#endif
+
+        /* Dump stats before they are reset. */
+        if (have_stats) {
+            fprintf(stdout, "\n=== SCC Stats Prior to Cache Destruction ===\n");
+
+            if (H5SC__stats_dump(cache) < 0)
+                printf("unable to dump SCC statistics\n");
+        }
     }
-
 #endif
 
     H5SC__stats_reset(cache);
 
-    if (cache->dset_lru_len == 0 && cache->SCC_quiescent_size == 0) {
+    if (cache->dset_lru_len == 0 && cache->SCC_quiescent_size == 0 && cache->reclaimable_clean_bytes == 0 &&
+        cache->reclaimable_dirty_bytes == 0) {
 
         H5SC__reset_hash_tables(cache);
 
@@ -295,38 +378,737 @@ done:
 /*-------------------------------------------------------------------------
  * Function: H5SC_flush
  *
- * Purpose:  Flushes all cached data from a shared chunk
- * cache.
+ * Purpose:  Writes all dirty chunks in a shared chunk cache to disk while
+ * retaining the chunks and dataset headers in the cache.
  *
  * Return:   SUCCEED on success, FAIL on failure
  *-------------------------------------------------------------------------
  */
-herr_t
-H5SC_flush(H5SC_t *cache)
+herr_t H5SC_flush(H5SC_t *cache)
 {
     herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_NOAPI(FAIL)
 
-    while (cache->dset_lru_tail_ptr) {
+    assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
-        H5SC_dset_header_t *dset_header = cache->dset_lru_tail_ptr;
+    for (H5SC_dset_header_t *dset_hdr = cache->dset_lru_tail_ptr; dset_hdr;
+         dset_hdr                     = dset_hdr->prev_dset_ptr) {
+        if (!dset_hdr->dset)
+            HGOTO_ERROR(H5E_SCC, H5E_BADVALUE, FAIL, "unable to flush SCC dataset without dataset state");
 
-        if (H5SC__dset_lru_remove(cache, dset_header) < 0) {
-            /* Throw an error on fail */
-            HGOTO_ERROR(H5E_SCC, H5E_CANNOTREMOVE, FAIL,
-                        "Failed to remove dataset from the LRU during flush");
-        }
-        if (H5SC__ht_dset_delete(cache, dset_header->dset_addr) < 0) {
-            /* Throw an error on fail */
-            HGOTO_ERROR(H5E_SCC, H5E_CANNOTREMOVE, FAIL,
-                        "Failed to remove dataset from the hash table during flush");
-        }
+        if (H5SC_flush_dset(cache, dset_hdr->dset, false) < 0)
+            HGOTO_ERROR(H5E_SCC, H5E_CANNOTFLUSH, FAIL, "unable to flush SCC dataset");
     }
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5SC_flush() */
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__io_scratch_free_storage
+ *
+ * Purpose:
+ *   Release all backing allocations owned directly by an
+ *     H5SC_io_scratch_t structure without freeing the structure itself.
+ *
+ *   Pointer-valued entries stored within the scratch vectors are treated as
+ *     non-owning aliases. In particular, this function does not release
+ *     layout-specific udata objects, resident chunk objects, encoded write
+ *     or H5SC_chunk_t objects referenced by chunk[].
+ *
+ *   After all owned backing allocations are released, the structure is
+ *     reset to an empty state with alloced == 0 and all pointer fields NULL.
+ *
+ * Inputs:
+ *   H5SC_io_scratch_t *scratch:
+ *     Scratch structure whose directly owned backing storage is to be
+ *     released. May be NULL.
+ *
+ * Return:
+ *   None.
+ *-------------------------------------------------------------------------
+ */
+static void H5SC__io_scratch_free_storage(H5SC_io_scratch_t *scratch)
+{
+    if (!scratch)
+        return;
+
+    scratch->scaled = (const hsize_t **)H5MM_xfree((void *)scratch->scaled);
+
+    scratch->addr                     = (haddr_t **)H5MM_xfree(scratch->addr);
+    scratch->size                     = (hsize_t **)H5MM_xfree(scratch->size);
+    scratch->defined_values_size      = (hsize_t **)H5MM_xfree(scratch->defined_values_size);
+    scratch->size_hint                = (size_t **)H5MM_xfree(scratch->size_hint);
+    scratch->defined_values_size_hint = (size_t **)H5MM_xfree(scratch->defined_values_size_hint);
+    scratch->udata                    = (void **)H5MM_xfree(scratch->udata);
+
+    scratch->addr_values                     = (haddr_t *)H5MM_xfree(scratch->addr_values);
+    scratch->size_values                     = (hsize_t *)H5MM_xfree(scratch->size_values);
+    scratch->defined_values_size_values      = (hsize_t *)H5MM_xfree(scratch->defined_values_size_values);
+    scratch->size_hint_values                = (size_t *)H5MM_xfree(scratch->size_hint_values);
+    scratch->defined_values_size_hint_values = (size_t *)H5MM_xfree(scratch->defined_values_size_hint_values);
+
+    scratch->miss_idx = (size_t *)H5MM_xfree(scratch->miss_idx);
+    scratch->hit_idx  = (size_t *)H5MM_xfree(scratch->hit_idx);
+    scratch->chunk    = (void **)H5MM_xfree(scratch->chunk);
+
+    scratch->lookup_scaled              = (const hsize_t **)H5MM_xfree((void *)scratch->lookup_scaled);
+    scratch->lookup_addr                = (haddr_t **)H5MM_xfree(scratch->lookup_addr);
+    scratch->lookup_size                = (hsize_t **)H5MM_xfree(scratch->lookup_size);
+    scratch->lookup_defined_values_size = (hsize_t **)H5MM_xfree(scratch->lookup_defined_values_size);
+    scratch->lookup_size_hint           = (size_t **)H5MM_xfree(scratch->lookup_size_hint);
+    scratch->lookup_defined_values_size_hint =
+        (size_t **)H5MM_xfree(scratch->lookup_defined_values_size_hint);
+    scratch->lookup_udata = (void **)H5MM_xfree(scratch->lookup_udata);
+    scratch->lookup_idx   = (size_t *)H5MM_xfree(scratch->lookup_idx);
+    scratch->order_idx    = (size_t *)H5MM_xfree(scratch->order_idx);
+
+    scratch->alloced = 0;
+} /* end H5SC__io_scratch_free_storage */
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__io_scratch_ensure
+ *
+ * Purpose:
+ *   Ensure that the reusable scratch storage associated with an
+ *     H5SC_io_info_t structure can represent at least "needed" chunk
+ *     entries.
+ *
+ *   Scratch storage is allocated lazily. When additional capacity is
+ *     required, this function allocates a complete replacement set of
+ *     callback pointer vectors, contiguous callback scalar backing arrays,
+ *     and general per-chunk read/write working vectors. The replacement is
+ *     committed only after every allocation succeeds, so an allocation
+ *     failure leaves any previously existing scratch storage unchanged.
+ *
+ *   The callback-facing pointer vectors are bound to their corresponding
+ *     contiguous backing arrays before the new storage is committed:
+ *
+ *       addr[i]                     -> &addr_values[i]
+ *       size[i]                     -> &size_values[i]
+ *       defined_values_size[i]      -> &defined_values_size_values[i]
+ *       size_hint[i]                -> &size_hint_values[i]
+ *       defined_values_size_hint[i] -> &defined_values_size_hint_values[i]
+ *
+ *   This function manages capacity only. Callers must initialize the values
+ *     they intend to use before invoking a layout callback.
+ *
+ *   Additional scratch vectors provide reusable per-chunk storage for
+ *     scaled-coordinate references, layout udata references, miss/hit
+ *     indices and resident/decoded chunk pointers. These vectors own only their backing allocations;
+ *     pointer-valued entries do not imply ownership of the objects to which
+ *     they refer.
+ *
+ *   The lookup_* vectors provide a reusable compact callback workspace.
+ *     They are populated only over the prefix required by the current
+ *     callback invocation and may alias fields in H5SC_io_sel_chunk_t or
+ *     entries in the primary per-chunk scratch vectors. The same workspace
+ *     may be reused sequentially for cache-miss lookup and resident-hit
+ *     metadata refresh; its contents have no validity between callback
+ *     invocations.
+ *
+ * Inputs:
+ *   H5SC_io_info_t *sc_io_info:
+ *     Dataset-owned SCC I/O state whose scratch storage is to be allocated
+ *     or enlarged.
+ *
+ *   size_t needed:
+ *     Minimum number of scratch entries required by the caller.
+ *
+ * Return:
+ *   SUCCEED on success;
+ *   FAIL on failure.
+ *-------------------------------------------------------------------------
+ */
+static herr_t H5SC__io_scratch_ensure(H5SC_io_info_t *sc_io_info, size_t needed)
+{
+    H5SC_io_scratch_t *scratch = NULL;
+
+    H5SC_io_scratch_t new_scratch = {0};
+
+    size_t new_alloc;
+    herr_t ret_value = SUCCEED;
+
+    FUNC_ENTER_PACKAGE
+
+    assert(sc_io_info);
+
+    if (needed == 0)
+        HGOTO_DONE(SUCCEED);
+
+    /*
+     * Allocate the scratch descriptor lazily. H5MM_calloc() is intentional:
+     * scratch fields not yet converted to reusable storage remain NULL.
+     */
+    if (!sc_io_info->scratch) {
+        if (NULL == (sc_io_info->scratch = H5MM_calloc(sizeof(H5SC_io_scratch_t))))
+            HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate SCC I/O scratch structure");
+    }
+
+    scratch = sc_io_info->scratch;
+
+    if (scratch->alloced >= needed)
+        HGOTO_DONE(SUCCEED);
+
+    /*
+     * Grow geometrically to reduce the number of future allocation events.
+     * Begin with the same baseline currently used by sel_chunks.
+     */
+    new_alloc = scratch->alloced ? scratch->alloced : H5SC_INIT_CHUNK_LIST_SIZE;
+
+    while (new_alloc < needed) {
+        if (new_alloc > (SIZE_MAX / 2)) {
+            new_alloc = needed;
+            break;
+        }
+
+        new_alloc *= 2;
+    }
+
+    if (new_alloc < needed)
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL, "unable to represent requested SCC scratch capacity");
+
+    /*
+     * Allocate a complete replacement set. Do not modify scratch until every
+     * allocation succeeds.
+     */
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.addr)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL, "SCC scratch address-vector allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.size)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL, "SCC scratch size-vector allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.defined_values_size)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch defined-values size-vector allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.size_hint)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch size-hint vector allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.defined_values_size_hint)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch defined-values size-hint vector allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.addr_values)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch address backing-storage allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.size_values)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch size backing-storage allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.defined_values_size_values)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch defined-values backing-storage allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.size_hint_values)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch size-hint backing-storage allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.defined_values_size_hint_values)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch defined-values size-hint backing-storage allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.scaled)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL, "SCC scratch scaled-vector allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.udata)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL, "SCC scratch udata-vector allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.miss_idx)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL, "SCC scratch miss-index allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.hit_idx)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL, "SCC scratch hit-index allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.chunk)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL, "SCC scratch chunk-vector allocation size overflow");
+
+    if (NULL == (new_scratch.addr = H5MM_malloc(new_alloc * sizeof(*new_scratch.addr))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate SCC scratch address vector");
+
+    if (NULL == (new_scratch.size = H5MM_malloc(new_alloc * sizeof(*new_scratch.size))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate SCC scratch size vector");
+
+    if (NULL ==
+        (new_scratch.defined_values_size = H5MM_malloc(new_alloc * sizeof(*new_scratch.defined_values_size))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL,
+                    "unable to allocate SCC scratch defined-values size vector");
+
+    if (NULL == (new_scratch.size_hint = H5MM_malloc(new_alloc * sizeof(*new_scratch.size_hint))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate SCC scratch size-hint vector");
+
+    if (NULL == (new_scratch.defined_values_size_hint =
+                     H5MM_malloc(new_alloc * sizeof(*new_scratch.defined_values_size_hint))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL,
+                    "unable to allocate SCC scratch defined-values size-hint vector");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.lookup_scaled)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch lookup-scaled vector allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.lookup_addr)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch lookup-address vector allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.lookup_size)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch lookup-size vector allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.lookup_defined_values_size)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch lookup-defined-values-size vector allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.lookup_size_hint)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch lookup-size-hint vector allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.lookup_defined_values_size_hint)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch lookup-defined-values-size-hint vector allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.lookup_udata)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch lookup-udata vector allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.lookup_idx)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch lookup-index vector allocation size overflow");
+
+    if (new_alloc > (SIZE_MAX / sizeof(*new_scratch.order_idx)))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_OVERFLOW, FAIL,
+                    "SCC scratch order-index vector allocation size overflow");
+
+    /*
+     * Backing arrays are zero-initialized because zero is the normal default
+     * for all scalar outputs except the chunk address.
+     */
+
+    if (NULL == (new_scratch.addr_values = H5MM_malloc(new_alloc * sizeof(*new_scratch.addr_values))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL,
+                    "unable to allocate SCC scratch address backing storage");
+
+    if (NULL == (new_scratch.size_values = H5MM_calloc(new_alloc * sizeof(*new_scratch.size_values))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate SCC scratch size backing storage");
+
+    if (NULL == (new_scratch.defined_values_size_values =
+                     H5MM_calloc(new_alloc * sizeof(*new_scratch.defined_values_size_values))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL,
+                    "unable to allocate SCC scratch defined-values size backing storage");
+
+    if (NULL ==
+        (new_scratch.size_hint_values = H5MM_calloc(new_alloc * sizeof(*new_scratch.size_hint_values))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL,
+                    "unable to allocate SCC scratch size-hint backing storage");
+
+    if (NULL == (new_scratch.defined_values_size_hint_values =
+                     H5MM_calloc(new_alloc * sizeof(*new_scratch.defined_values_size_hint_values))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL,
+                    "unable to allocate SCC scratch defined-values size-hint backing storage");
+
+    if (NULL == (new_scratch.scaled = H5MM_malloc(new_alloc * sizeof(*new_scratch.scaled))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate SCC scratch scaled vector");
+
+    if (NULL == (new_scratch.udata = H5MM_calloc(new_alloc * sizeof(*new_scratch.udata))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate SCC scratch udata vector");
+
+    if (NULL == (new_scratch.miss_idx = H5MM_malloc(new_alloc * sizeof(*new_scratch.miss_idx))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate SCC scratch miss-index vector");
+
+    if (NULL == (new_scratch.hit_idx = H5MM_malloc(new_alloc * sizeof(*new_scratch.hit_idx))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate SCC scratch hit-index vector");
+
+    if (NULL == (new_scratch.chunk = H5MM_calloc(new_alloc * sizeof(*new_scratch.chunk))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate SCC scratch chunk vector");
+
+    if (NULL == (new_scratch.lookup_scaled = H5MM_malloc(new_alloc * sizeof(*new_scratch.lookup_scaled))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate SCC scratch lookup-scaled vector");
+
+    if (NULL == (new_scratch.lookup_addr = H5MM_malloc(new_alloc * sizeof(*new_scratch.lookup_addr))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate SCC scratch lookup-address vector");
+
+    if (NULL == (new_scratch.lookup_size = H5MM_malloc(new_alloc * sizeof(*new_scratch.lookup_size))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate SCC scratch lookup-size vector");
+
+    if (NULL == (new_scratch.lookup_defined_values_size =
+                     H5MM_malloc(new_alloc * sizeof(*new_scratch.lookup_defined_values_size))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL,
+                    "unable to allocate SCC scratch lookup-defined-values-size vector");
+
+    if (NULL ==
+        (new_scratch.lookup_size_hint = H5MM_malloc(new_alloc * sizeof(*new_scratch.lookup_size_hint))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL,
+                    "unable to allocate SCC scratch lookup-size-hint vector");
+
+    if (NULL == (new_scratch.lookup_defined_values_size_hint =
+                     H5MM_malloc(new_alloc * sizeof(*new_scratch.lookup_defined_values_size_hint))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL,
+                    "unable to allocate SCC scratch lookup-defined-values-size-hint vector");
+
+    if (NULL == (new_scratch.lookup_udata = H5MM_calloc(new_alloc * sizeof(*new_scratch.lookup_udata))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate SCC scratch lookup-udata vector");
+
+    if (NULL == (new_scratch.lookup_idx = H5MM_malloc(new_alloc * sizeof(*new_scratch.lookup_idx))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate SCC scratch lookup-index vector");
+
+    if (NULL == (new_scratch.order_idx = H5MM_malloc(new_alloc * sizeof(*new_scratch.order_idx))))
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate SCC scratch order-index vector");
+
+    /* miss_idx and hit_idx do not need initialization; every valid entry is explicitly assigned before
+     * being read.
+     */
+
+    /*
+     * Bind the callback-facing vector entries to the contiguous scalar
+     * backing arrays.
+     */
+
+    for (size_t i = 0; i < new_alloc; i++) {
+        new_scratch.addr_values[i] = HADDR_UNDEF;
+
+        new_scratch.addr[i] = &new_scratch.addr_values[i];
+
+        new_scratch.size[i] = &new_scratch.size_values[i];
+
+        new_scratch.defined_values_size[i] = &new_scratch.defined_values_size_values[i];
+
+        new_scratch.size_hint[i] = &new_scratch.size_hint_values[i];
+
+        new_scratch.defined_values_size_hint[i] = &new_scratch.defined_values_size_hint_values[i];
+    }
+
+    /*
+     * Record the capacity represented by the replacement storage.
+     */
+    new_scratch.alloced = new_alloc;
+
+    /*
+     * All replacement allocations succeeded. The old scratch values are
+     * transient and do not need to be copied.
+     */
+    H5SC__io_scratch_free_storage(scratch);
+
+    *scratch = new_scratch;
+
+#if H5SC_DO_SANITY_CHECKS
+    assert(scratch->alloced == new_alloc);
+#endif
+
+    /*
+     * Ownership has moved into *scratch. Clear the local descriptor so the
+     * done: cleanup cannot release the committed storage.
+     */
+    memset(&new_scratch, 0, sizeof(new_scratch));
+
+done:
+    /*
+     * These pointers are non-NULL only if replacement construction failed
+     * before ownership was transferred.
+     */
+
+    H5SC__io_scratch_free_storage(&new_scratch);
+
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5SC__io_scratch_ensure() */
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__get_defined_chunk
+ *
+ * Purpose:
+ *   Determine which elements selected from one logical structured chunk are
+ *     currently defined.
+ *
+ *   Resident SCC state is authoritative. If cached_chk contains a decoded
+ *     chunk object, the layout client's defined_values callback is applied
+ *     directly to that resident object so that dirty or otherwise unflushed
+ *     in-memory defined-value state is reflected in the result.
+ *
+ *   If no resident decoded object is available, the function performs a
+ *     cache-neutral layout lookup:
+ *
+ *       - an undefined on-disk chunk address means that no selected values
+ *         from the chunk are defined;
+ *
+ *       - an allocated chunk with defined_values_size == 0 is treated as
+ *         fully defined, allowing sel->file_space to be returned without an
+ *         on-disk metadata read;
+ *
+ *       - otherwise, only the encoded defined-value metadata is read and
+ *         decoded.
+ *
+ *   Metadata-only decoded chunk objects are temporary. They are never added
+ *     to SCC and are released through the layout client's evict callback.
+ *     The returned dataspace is explicitly copied before that temporary
+ *     object is released so its lifetime is independent of the decoded
+ *     layout representation.
+ *
+ *   This function does not create H5SC_chunk_t entries, insert chunks into
+ *     SCC, modify either LRU, pin chunks, or alter SCC cache accounting.
+ *
+ * Inputs:
+ *   H5D_t *dset:
+ *     Pointer to the dataset whose structured-chunk layout callbacks and
+ *     file storage are queried.
+ *
+ *   const H5SC_io_sel_chunk_t *sel:
+ *     Selected-chunk information. sel->file_space contains the query
+ *     selection in logical chunk coordinates and sel->scaled identifies
+ *     the chunk within the dataset.
+ *
+ *   H5SC_chunk_t *cached_chk:
+ *     Existing SCC chunk entry, if one is present. May be NULL. A non-NULL
+ *     entry with a resident chunk_obj is queried directly and takes
+ *     precedence over the on-disk representation.
+ *
+ *   bool filtered:
+ *     True when the dataset has a structured-chunk filter pipeline.
+ *
+ *   bool partial_bound_chunks_different_encoding:
+ *     True when partial-edge chunks use encoding behavior different from
+ *     complete chunks. Used when determining how metadata-only disk state
+ *     must be decoded.
+ *
+ * Outputs:
+ *   H5S_t **chunk_defined:
+ *     On success, receives a newly allocated dataspace containing the
+ *     intersection of sel->file_space and the currently defined values in
+ *     the logical chunk.
+ *
+ *     The output may be NULL on successful return when neither a resident
+ *     nor an allocated on-disk representation exists for the chunk. A
+ *     non-NULL returned dataspace is owned by the caller and must be closed
+ *     with H5S_close().
+ *
+ * Return:
+ *   SUCCEED on success;
+ *   FAIL on failure.
+ *-------------------------------------------------------------------------
+ */
+static herr_t H5SC__get_defined_chunk(H5D_t *dset, const H5SC_io_sel_chunk_t *sel, H5SC_chunk_t *cached_chk,
+                                      bool filtered, bool partial_bound_chunks_different_encoding,
+                                      H5S_t **chunk_defined)
+{
+    const hsize_t *scaled_arr[1];
+    haddr_t *addr_arr[1];
+    hsize_t *size_arr[1];
+    hsize_t *def_size_arr[1];
+    size_t *size_hint_arr[1];
+    size_t *def_hint_arr[1];
+    void *udata_arr[1] = {NULL};
+
+    haddr_t addr_local     = HADDR_UNDEF;
+    hsize_t size_local     = 0;
+    hsize_t def_size_local = 0;
+    size_t size_hint_local = 0;
+    size_t def_hint_local  = 0;
+
+    void *tmp_chunk  = NULL;
+    bool tmp_decoded = false;
+    herr_t ret_value = SUCCEED;
+
+    FUNC_ENTER_PACKAGE
+
+    assert(dset);
+    assert(dset->shared);
+    assert(dset->shared->layout.sc_ops);
+    assert(sel);
+    assert(sel->file_space);
+    assert(chunk_defined);
+
+    *chunk_defined = NULL;
+
+    /*
+     * Resident SCC state is authoritative. This is particularly important
+     * for dirty chunks whose current defined-value selection may not yet
+     * match the on-disk representation.
+     */
+    if (cached_chk && cached_chk->chunk_obj) {
+        if (dset->shared->layout.sc_ops->defined_values) {
+            if (dset->shared->layout.sc_ops->defined_values(dset, sel->file_space, cached_chk->chunk_obj,
+                                                            chunk_defined, cached_chk->udata) < 0)
+                HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "unable to query resident chunk defined values");
+        }
+        else {
+            /*
+             * A missing defined_values callback means that all values in the
+             * resident chunk are defined.
+             */
+            if (NULL == (*chunk_defined = H5S_copy(sel->file_space, false, true)))
+                HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCOPY, FAIL, "unable to copy resident chunk selection");
+        }
+
+        HGOTO_DONE(SUCCEED);
+    }
+
+    /*
+     * The remaining paths require an on-disk lookup, but do not create or
+     * attach an SCC entry.
+     */
+    if (!dset->shared->layout.sc_ops->lookup)
+        HGOTO_ERROR(H5E_DATASET, H5E_UNSUPPORTED, FAIL, "layout does not provide a chunk lookup callback");
+
+    scaled_arr[0] = sel->scaled;
+
+    addr_arr[0]      = &addr_local;
+    size_arr[0]      = &size_local;
+    def_size_arr[0]  = &def_size_local;
+    size_hint_arr[0] = &size_hint_local;
+    def_hint_arr[0]  = &def_hint_local;
+
+    if (dset->shared->layout.sc_ops->lookup(dset, 1, scaled_arr, addr_arr, size_arr, def_size_arr,
+                                            size_hint_arr, def_hint_arr, udata_arr) < 0)
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "unable to look up chunk for defined-value query");
+
+    /*
+     * Sparse miss: no on-disk chunk exists and there is no resident decoded
+     * chunk, so nothing from this logical chunk is defined.
+     */
+    if (!H5_addr_defined(addr_local))
+        HGOTO_DONE(SUCCEED);
+
+    /*
+     * Fast path: for an allocated chunk, defined_values_size == 0 means all
+     * values are defined. The selected portion of the logical chunk can be
+     * returned directly without reading or decoding metadata.
+     */
+    if (def_size_local == 0) {
+        if (NULL == (*chunk_defined = H5S_copy(sel->file_space, false, true)))
+            HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCOPY, FAIL, "unable to copy fully defined chunk selection");
+
+        HGOTO_DONE(SUCCEED);
+    }
+
+    /*
+     * A nonzero defined-value metadata section must be read and decoded.
+     */
+    if (!dset->shared->layout.sc_ops->decode_defined_values)
+        HGOTO_ERROR(H5E_DATASET, H5E_UNSUPPORTED, FAIL, "layout does not provide defined-value decoding");
+
+    if (!dset->shared->layout.sc_ops->defined_values)
+        HGOTO_ERROR(H5E_DATASET, H5E_UNSUPPORTED, FAIL,
+                    "layout does not provide a defined-values query callback");
+
+    if (!dset->shared->layout.sc_ops->evict)
+        HGOTO_ERROR(H5E_DATASET, H5E_UNSUPPORTED, FAIL, "layout does not provide temporary chunk cleanup");
+
+    {
+        bool partial_bound = false;
+        size_t read_size;
+        size_t decode_nbytes;
+        size_t decode_alloc;
+
+        if (filtered && partial_bound_chunks_different_encoding &&
+            H5D__chunk_is_partial_edge_chunk(dset->shared->ndims, dset->shared->layout.u.struct_chunk.dim,
+                                             sel->scaled, dset->shared->curr_dims))
+            partial_bound = true;
+
+        H5_CHECK_OVERFLOW(def_size_local, hsize_t, size_t);
+        read_size = (size_t)def_size_local;
+
+        decode_nbytes = read_size;
+        decode_alloc  = MAX(def_hint_local, read_size);
+
+        if (decode_alloc == 0)
+            HGOTO_ERROR(H5E_DATASET, H5E_BADVALUE, FAIL, "invalid defined-value metadata allocation size");
+
+        if (NULL == (tmp_chunk = H5MM_malloc(decode_alloc)))
+            HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate defined-value metadata buffer");
+
+        if (H5F_block_read(dset->oloc.file, H5FD_MEM_DRAW, addr_local, read_size, tmp_chunk) < 0)
+            HGOTO_ERROR(H5E_DATASET, H5E_READERROR, FAIL, "unable to read defined-value metadata");
+
+        /*
+         * On failure, the hardened decode_defined_values callback leaves
+         * tmp_chunk referring to the original raw buffer. On success it
+         * replaces tmp_chunk with the layout-specific decoded object.
+         */
+        if (dset->shared->layout.sc_ops->decode_defined_values(dset, &decode_nbytes, &decode_alloc,
+                                                               partial_bound, &tmp_chunk, udata_arr[0]) < 0)
+            HGOTO_ERROR(H5E_DATASET, H5E_CANTDECODE, FAIL, "unable to decode defined-value metadata");
+
+        tmp_decoded = true;
+
+        {
+            H5S_t *tmp_defined = NULL;
+
+            /*
+             * Query the layout-specific temporary decoded representation.
+             *
+             * Do not expose this returned dataspace beyond the lifetime of
+             * tmp_chunk. Depending on the internal selection representation,
+             * selection state returned by the callback may retain references to
+             * the decoded chunk's sel_space.
+             */
+            if (dset->shared->layout.sc_ops->defined_values(dset, sel->file_space, tmp_chunk, &tmp_defined,
+                                                            udata_arr[0]) < 0)
+                HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "unable to query decoded defined values");
+
+            assert(tmp_defined);
+
+            /*
+             * Create a fully detached dataspace that remains valid after the
+             * metadata-only decoded chunk is evicted below.
+             */
+            if (NULL == (*chunk_defined = H5S_copy(tmp_defined, false, true))) {
+                if (H5S_close(tmp_defined) < 0)
+                    HDONE_ERROR(H5E_DATASPACE, H5E_CANTRELEASE, FAIL,
+                                "unable to close temporary defined-value selection");
+
+                HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCOPY, FAIL, "unable to detach defined-value selection");
+            }
+
+            if (H5S_close(tmp_defined) < 0)
+                HGOTO_ERROR(H5E_DATASPACE, H5E_CANTRELEASE, FAIL,
+                            "unable to close temporary defined-value selection");
+        }
+    }
+
+done:
+    /*
+     * Release temporary disk-query state. A successfully decoded
+     * metadata-only chunk is owned by the layout implementation and must be
+     * released through its evict callback.
+     */
+    if (tmp_chunk) {
+        if (tmp_decoded) {
+            herr_t evict_ret;
+
+            evict_ret = dset->shared->layout.sc_ops->evict(dset, tmp_chunk, udata_arr[0]);
+
+            /*
+             * Ownership has been handed to the callback regardless of its
+             * return value. Do not attempt generic cleanup afterward.
+             */
+            tmp_chunk    = NULL;
+            udata_arr[0] = NULL;
+
+            if (evict_ret < 0)
+                HDONE_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL, "unable to release temporary decoded chunk");
+        }
+        else
+            tmp_chunk = H5MM_xfree(tmp_chunk);
+    }
+
+    /*
+     * If no decoded object consumed udata, it remains caller-owned lookup
+     * scratch and can be released directly.
+     */
+    if (udata_arr[0])
+        udata_arr[0] = H5MM_xfree(udata_arr[0]);
+
+    if (ret_value < 0 && *chunk_defined) {
+        if (H5S_close(*chunk_defined) < 0)
+            HDONE_ERROR(H5E_DATASPACE, H5E_CANTRELEASE, FAIL,
+                        "unable to release defined-value selection after error");
+
+        *chunk_defined = NULL;
+    }
+
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5SC__get_defined_chunk() */
 
 /*-------------------------------------------------------------------------
  * Function: H5SC__chunk_teardown_resident
@@ -358,8 +1140,7 @@ done:
  *   FAIL on failure.
  *-------------------------------------------------------------------------
  */
-static herr_t
-H5SC__chunk_teardown_resident(H5D_t *dset, H5SC_chunk_t *chunk)
+static herr_t H5SC__chunk_teardown_resident(H5D_t *dset, H5SC_chunk_t *chunk)
 {
     herr_t ret_value = SUCCEED;
 
@@ -385,6 +1166,11 @@ H5SC__chunk_teardown_resident(H5D_t *dset, H5SC_chunk_t *chunk)
             chunk->udata     = H5MM_xfree(chunk->udata);
         }
 
+        /*
+         * The caller must remove the chunk from its dataset LRU and reconcile cache
+         * accounting before invoking this helper. Resident teardown therefore does
+         * not independently update dataset size or reclaimability counters.
+         */
         chunk->cached_chunk_size = 0;
     }
 
@@ -432,38 +1218,42 @@ done:
  *-------------------------------------------------------------------------
  */
 
-static herr_t
-H5SC__flush_one_chunk(H5SC_t *cache, H5D_t *dset, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chk)
+static herr_t H5SC__flush_one_chunk(H5SC_t *cache, H5D_t *dset, H5SC_dset_header_t *dset_hdr,
+                                    H5SC_chunk_t *chk)
 {
     herr_t ret_value = SUCCEED;
 
     /* Callback scratch */
     const hsize_t *scaled_arr[1];
-    haddr_t       *addr_arr[1];
-    hsize_t       *size_arr[1];
-    hsize_t       *def_sz_arr[1];
-    size_t        *size_hint_arr[1];
-    size_t        *def_sz_hint_arr[1];
-    void          *udata_arr[1] = {NULL};
-    haddr_t        addr_local;
-    hsize_t        size_local;
-    hsize_t        def_local;
-    size_t         hint_local;
-    size_t         def_hint_local;
+    haddr_t *addr_arr[1];
+    hsize_t *size_arr[1];
+    hsize_t *def_sz_arr[1];
+    size_t *size_hint_arr[1];
+    size_t *def_sz_hint_arr[1];
+    void *udata_arr[1] = {NULL};
+    haddr_t addr_local;
+    hsize_t size_local;
+    hsize_t def_local;
+    size_t hint_local;
+    size_t def_hint_local;
+
+    haddr_t md_tag  = HADDR_UNDEF;
+    bool md_tag_set = false;
 
     /* Encode/insert scratch */
-    hsize_t          old_disk_size[1];
-    void            *write_buf                               = NULL;
-    hsize_t          write_size                              = 0;
-    hsize_t          write_alloc                             = 0;
-    bool             partial_bound                           = false;
-    bool             partial_bound_chunks_different_encoding = false;
-    H5O_stc_pline_t *pline                                   = NULL;
-    hbool_t          filtered                                = false;
+    hsize_t old_disk_size[1];
+    void *write_buf                              = NULL;
+    hsize_t write_size                           = 0;
+    hsize_t write_alloc                          = 0;
+    bool partial_bound                           = false;
+    bool partial_bound_chunks_different_encoding = false;
+    H5O_stc_pline_t *pline                       = NULL;
+    hbool_t filtered                             = false;
 
     FUNC_ENTER_PACKAGE
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset);
     assert(dset_hdr);
     assert(chk);
@@ -472,18 +1262,24 @@ H5SC__flush_one_chunk(H5SC_t *cache, H5D_t *dset, H5SC_dset_header_t *dset_hdr, 
     assert(dset->shared->layout.sc_ops->encode);
     assert(dset->shared->layout.sc_ops->insert);
 
-    /* Shell chunks (non-resident and not on disk) must never be flushed. */
-    if (!chk->chunk_obj && !H5_addr_defined(chk->disk_addr)) {
-#ifdef H5SC_DO_SANITY_CHECKS
-        assert(!chk->dirty_flag);
-        assert(chk->cached_chunk_size == 0);
-#endif
+    /*
+     * This helper persists dirty resident state only. Clean chunks and empty
+     * shell entries require no layout lookup, encoding, insertion, or I/O.
+     */
+    if (!chk->dirty_flag)
         HGOTO_DONE(SUCCEED);
-    }
 
-    /* A dirty chunk must be resident. */
-    if (chk->dirty_flag && !chk->chunk_obj)
+    if (!chk->chunk_obj)
         HGOTO_ERROR(H5E_SCC, H5E_BADVALUE, FAIL, "flush: dirty chunk has no resident object");
+
+#if H5SC_DO_SANITY_CHECKS
+    if (cache->test_fail_next_chunk_flush)
+        HGOTO_ERROR(H5E_SCC, H5E_WRITEERROR, FAIL, "injected dirty-chunk flush failure");
+#endif
+
+    /* Only dirty resident chunks reach metadata operations. */
+    H5AC_tag(dset->oloc.addr, &md_tag);
+    md_tag_set = true;
 
     /* Determine partial-boundary encoding behavior. */
     if (dset->shared->layout.sc_ops->layout_query(dset, NULL, NULL,
@@ -537,15 +1333,26 @@ H5SC__flush_one_chunk(H5SC_t *cache, H5D_t *dset, H5SC_dset_header_t *dset_hdr, 
     /* Commit on-disk metadata, mark clean */
     chk->disk_addr   = addr_local;
     chk->disk_nbytes = (size_t)write_size;
-    chk->dirty_flag  = false;
+
+    if (H5SC__chunk_set_dirty(cache, dset_hdr, chk, false) < 0)
+        HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "unable to update reclaimability after chunk flush");
+
     H5SC__stats_record_chunk_flush(cache);
     chk->last_op = H5SC_TAG_FLUSH_DIRTY;
+
+#if H5SC_DO_SANITY_CHECKS
+    if (H5SC__verify_cached_reclaimability(cache) < 0)
+        HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "cached reclaimability mismatch after chunk flush");
+#endif
 
 done:
     if (write_buf)
         write_buf = H5MM_xfree(write_buf);
     if (udata_arr[0])
         udata_arr[0] = H5MM_xfree(udata_arr[0]);
+
+    if (md_tag_set)
+        H5AC_tag(md_tag, NULL);
 
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5SC__flush_one_chunk() */
@@ -589,8 +1396,8 @@ done:
  *-------------------------------------------------------------------------
  */
 
-static herr_t
-H5SC__evict_one_chunk(H5SC_t *cache, H5D_t *dset, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chk)
+static herr_t H5SC__evict_one_chunk(H5SC_t *cache, H5D_t *dset, H5SC_dset_header_t *dset_hdr,
+                                    H5SC_chunk_t *chk)
 {
     herr_t ret_value     = SUCCEED;
     size_t old_dset_size = 0;
@@ -598,6 +1405,7 @@ H5SC__evict_one_chunk(H5SC_t *cache, H5D_t *dset, H5SC_dset_header_t *dset_hdr, 
     FUNC_ENTER_PACKAGE
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset);
     assert(dset_hdr);
     assert(chk);
@@ -614,7 +1422,7 @@ H5SC__evict_one_chunk(H5SC_t *cache, H5D_t *dset, H5SC_dset_header_t *dset_hdr, 
     old_dset_size = dset_hdr->curr_dset_size;
 
     /* Remove the chunk from the dataset-local LRU. */
-    if (H5SC__chunk_lru_remove(dset_hdr, chk) < 0) {
+    if (H5SC__chunk_lru_remove(cache, dset_hdr, chk) < 0) {
         HGOTO_ERROR(H5E_SCC, H5E_CANNOTREMOVE, FAIL, "failed to remove chunk from dataset LRU");
     }
 
@@ -637,6 +1445,11 @@ H5SC__evict_one_chunk(H5SC_t *cache, H5D_t *dset, H5SC_dset_header_t *dset_hdr, 
 
     chk = H5MM_xfree(chk);
 
+#if H5SC_DO_SANITY_CHECKS
+    if (H5SC__verify_cached_reclaimability(cache) < 0)
+        HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "cached reclaimability mismatch after chunk eviction");
+#endif
+
 done:
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5SC__evict_one_chunk() */
@@ -653,26 +1466,33 @@ done:
  *
  *  H5D_t *dset:
  *      Pointer to the dataset that will be operated on.
- * Assumed to be present within the SCC.
+ *      Assumed to be present within the SCC.
  *
- * bool evict:
- *      Boolean used to toggle whether data will be be
- * evicted from the cache. This quantity is will be user
- * configurable.
+ * bool evict_after_flush:
+ *      Boolean used to toggle whether data will be be evicted from the cache.
+ *
+ *      evict_after_flush == false:
+ *          Flush every dirty resident chunk and retain all entries without
+ *          changing dataset-local LRU ordering.
+ *
+ *      evict_after_flush == true:
+ *          Flush every dirty resident chunk first, then evict every resident,
+ *          clean, and zero-byte shell entry. On success the dataset chunk LRU
+ *          and corresponding chunk hash entries are empty.
  *
  * Return:   SUCCEED on success, FAIL on failure
  *-------------------------------------------------------------------------
  */
-herr_t
-H5SC_flush_dset(H5SC_t *cache, H5D_t *dset, bool evict)
+herr_t H5SC_flush_dset(H5SC_t *cache, H5D_t *dset, bool evict_after_flush)
 {
-    herr_t              ret_value = SUCCEED;
-    H5SC_dset_header_t *dset_hdr  = NULL;
-    H5SC_chunk_t       *chk       = NULL;
+    herr_t ret_value             = SUCCEED;
+    H5SC_dset_header_t *dset_hdr = NULL;
+    H5SC_chunk_t *chk            = NULL;
 
     FUNC_ENTER_NOAPI(FAIL)
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset);
     assert(dset->shared->layout.sc_ops);
 
@@ -706,15 +1526,16 @@ H5SC_flush_dset(H5SC_t *cache, H5D_t *dset, bool evict)
     while (chk) {
         H5SC_chunk_t *prev = chk->prev_ptr;
 
+#if H5SC_DO_SANITY_CHECKS
         assert(chk->magic == H5SC_CHUNK_MAGIC);
+#endif
 
         /* Enforce shell-chunk invariants (H5S_ALL-created, fill-only shells). */
         if (!chk->chunk_obj && !H5_addr_defined(chk->disk_addr)) {
-#ifdef H5SC_DO_SANITY_CHECKS
             assert(!chk->dirty_flag);
             assert(chk->cached_chunk_size == 0);
-#endif
-            if (evict) {
+
+            if (evict_after_flush) {
                 if (H5SC__evict_one_chunk(cache, dset, dset_hdr, chk) < 0)
                     HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL, "failed to evict shell chunk (SCC)");
             }
@@ -724,16 +1545,18 @@ H5SC_flush_dset(H5SC_t *cache, H5D_t *dset, bool evict)
 
         /* Flush if dirty */
         if (chk->dirty_flag) {
-            if (H5SC__flush_one_chunk(cache, dset, dset_hdr, chk) < 0)
+            if (H5SC__flush_one_chunk(cache, dset, dset_hdr, chk) < 0) {
+                chk->last_op = H5SC_TAG_FLUSH;
                 HGOTO_ERROR(H5E_SCC, H5E_CANNOTFLUSH, FAIL, "failed to flush dirty chunk (SCC)");
+            }
         }
 
         chk->last_op = H5SC_TAG_FLUSH;
 
         /* Evict after flushing (or immediately if already clean) */
-        if (evict) {
-            /* Must be clean to evict */
-            chk->dirty_flag = false;
+        if (evict_after_flush) {
+            if (chk->dirty_flag)
+                HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL, "chunk remained dirty after dataset flush");
 
             if (H5SC__evict_one_chunk(cache, dset, dset_hdr, chk) < 0)
                 HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL, "failed to evict chunk during flush (SCC)");
@@ -782,8 +1605,8 @@ done:
  *-------------------------------------------------------------------------
  */
 
-static herr_t
-H5SC__account_dset_size_change(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, size_t old_size, size_t new_size)
+static herr_t H5SC__account_dset_size_change(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, size_t old_size,
+                                             size_t new_size)
 {
     size_t delta     = 0;
     herr_t ret_value = SUCCEED;
@@ -791,6 +1614,7 @@ H5SC__account_dset_size_change(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, size
     FUNC_ENTER_PACKAGE
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset_hdr);
 
     /* Only tracked datasets contribute to global quiescent-size accounting. */
@@ -799,7 +1623,7 @@ H5SC__account_dset_size_change(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, size
             cache->SCC_quiescent_size += (new_size - old_size);
         else {
             delta = old_size - new_size;
-#ifdef H5SC_DO_SANITY_CHECKS
+#if H5SC_DO_SANITY_CHECKS
             if (delta > cache->SCC_quiescent_size)
                 HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "global quiescent size underflow");
 #endif
@@ -846,8 +1670,8 @@ done:
  *-------------------------------------------------------------------------
  */
 
-static herr_t
-H5SC__account_chunk_link_change(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, size_t old_dset_size)
+static herr_t H5SC__account_chunk_link_change(H5SC_t *cache, H5SC_dset_header_t *dset_hdr,
+                                              size_t old_dset_size)
 {
     size_t new_dset_size;
     herr_t ret_value = SUCCEED;
@@ -855,6 +1679,7 @@ H5SC__account_chunk_link_change(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, siz
     FUNC_ENTER_PACKAGE
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset_hdr);
 
     /* The caller is expected to have already updated curr_dset_size. */
@@ -869,576 +1694,809 @@ done:
 } /* end H5SC__account_chunk_link_change() */
 
 /*-------------------------------------------------------------------------
- * Function: H5SC__calc_freeable_clean_bytes
+ * Function: H5SC__update_resident_estimate_history
  *
  * Purpose:
- *   Function that computes the maximum number of bytes that could be freed
- *     by evicting clean SCC chunks without reducing any dataset below its
- *     configured minimum retained size (min_dset_size).
+ *   Incorporate a successfully observed final resident allocation into the
+ *   dataset-local adaptive estimate.
  *
- *   The function walks datasets in global LRU order and, within each
- *     dataset, walks chunks in dataset-local LRU order, accumulating the
- *     sizes of evictable clean chunks while enforcing per-dataset minimum
- *     size constraints. Chunks pinned for in-flight I/O are excluded from
- *     the total.
+ *   The function maintains an integer exponential moving average with
+ *   alpha = 1/8 and a decaying high-water observation. Growth updates the
+ *   high-water value immediately; downward decay is considered once every
+ *   32 observations. The sample counter saturates at UINT64_MAX.
  *
- *   This function is used as the first-stage feasibility check in the
- *     two-stage eviction model, where SCC first determines how much space
- *     can be reclaimed through clean eviction before considering dirty
- *     flush-and-evict candidates.
- *
- * Inputs:
- *   const H5SC_t *cache:
- *     Pointer to the SCC cache state containing the global dataset LRU.
- *
- * Return:
- *   The maximum number of bytes that could be freed by clean eviction
- *   under the current cache and dataset-size constraints.
+ *   ACTUAL must be the complete layout-reported resident allocation after
+ *   successful materialization or mutation, not an encoded on-disk size.
  *-------------------------------------------------------------------------
  */
-
-static size_t
-H5SC__calc_freeable_clean_bytes(const H5SC_t *cache)
+static void H5SC__update_resident_estimate_history(H5SC_dset_header_t *dset_hdr, size_t actual)
 {
-    size_t freeable = 0;
-
-    assert(cache);
-
-    for (const H5SC_dset_header_t *dset_hdr = cache->dset_lru_tail_ptr; dset_hdr;
-         dset_hdr                           = dset_hdr->prev_dset_ptr) {
-        size_t cur = dset_hdr->curr_dset_size;
-        size_t min = dset_hdr->min_dset_size;
-
-        if (cur <= min)
-            continue;
-
-        /* Walk chunks from LRU tail, counting only clean chunks until reaching min */
-        for (const H5SC_chunk_t *chk = dset_hdr->lru_tail_ptr; chk; chk = chk->prev_ptr) {
-            size_t csz = chk->cached_chunk_size;
-
-            /* Chunks pinned for in-flight I/O are not freeable. */
-            if (chk->chunk_counter > 0)
-                continue;
-
-            /* Placeholder chunks are not freeable */
-            if (!chk->chunk_obj && !H5_addr_defined(chk->disk_addr) && chk->cached_chunk_size == 0)
-                continue;
-
-            if (chk->dirty_flag)
-                continue;
-            if (csz > cur)
-                continue;
-            if (cur - csz < min)
-                continue;
-            freeable += csz;
-            cur -= csz;
-            if (cur <= min)
-                break;
-        }
-    }
-
-    return freeable;
-} /* end H5SC__calc_freeable_clean_bytes() */
-
-/*-------------------------------------------------------------------------
- * Function: H5SC__calc_freeable_dirty_bytes
- *
- * Purpose:
- *   Function that computes the maximum number of additional bytes that
- *     could be freed by flushing and evicting dirty SCC chunks without
- *     reducing any dataset below its configured minimum retained size
- *     (min_dset_size).
- *
- *   The function walks datasets in global LRU order and, within each
- *     dataset, walks chunks in dataset-local LRU order while enforcing
- *     per-dataset minimum size constraints. Pinned chunks are excluded.
- *     As the walk consumes evictable chunk sizes against the dataset's
- *     current accounted size, only dirty chunk sizes are accumulated in
- *     the returned total.
- *
- *   This function is used as the second-stage feasibility check in the
- *     two-stage eviction model, after SCC has already determined how much
- *     space can be reclaimed through clean eviction alone.
- *
- * Inputs:
- *   const H5SC_t *cache:
- *     Pointer to the SCC cache state containing the global dataset LRU.
- *
- * Return:
- *   The maximum number of additional bytes that could be freed by
- *   flushing and evicting dirty chunks under the current cache and
- *   dataset-size constraints.
- *-------------------------------------------------------------------------
- */
-
-static size_t
-H5SC__calc_freeable_dirty_bytes(const H5SC_t *cache)
-{
-    size_t freeable = 0;
-
-    assert(cache);
-
-    for (const H5SC_dset_header_t *dset_hdr = cache->dset_lru_tail_ptr; dset_hdr;
-         dset_hdr                           = dset_hdr->prev_dset_ptr) {
-        size_t cur = dset_hdr->curr_dset_size;
-        size_t min = dset_hdr->min_dset_size;
-
-        if (cur <= min)
-            continue;
-
-        /* Walk dataset-local LRU from tail while enforcing min_dset_size. */
-        for (const H5SC_chunk_t *chk = dset_hdr->lru_tail_ptr; chk; chk = chk->prev_ptr) {
-            size_t csz = chk->cached_chunk_size;
-
-            /* Chunks pinned for in-flight I/O are not freeable. */
-            if (chk->chunk_counter > 0)
-                continue;
-
-            /* Placeholder chunks are not freeable. */
-            if (!chk->chunk_obj && !H5_addr_defined(chk->disk_addr) && chk->cached_chunk_size == 0)
-                continue;
-
-            if (csz > cur)
-                continue;
-            if (cur - csz < min)
-                continue;
-
-            /* Consume evictable bytes against the dataset minimum regardless of cleanliness. */
-            cur -= csz;
-
-            /* Count only dirty bytes as additional reclaimable space. */
-            if (chk->dirty_flag) {
-                freeable += csz;
-            }
-
-            if (cur <= min)
-                break;
-        }
-    }
-
-    return freeable;
-} /* end H5SC__calc_freeable_dirty_bytes() */
-
-/*-------------------------------------------------------------------------
- * Function: H5SC__select_evict_candidate_in_dset
- *
- * Purpose:
- *   Select the tailmost eligible eviction candidate from a single dataset.
- *   The search walks the dataset-local chunk LRU from tail to head and
- *   returns the first chunk that satisfies the requested eviction mode and
- *   the dataset's min_dset_size constraint.
- *
- * Inputs:
- *   H5SC_dset_header_t *dset_hdr:
- *     Dataset whose chunk LRU is to be searched.
- *
- *   H5SC_chunk_t **cand_chk:
- *     Output pointer for the selected chunk candidate. Set to NULL if no
- *     eligible chunk is found.
- *
- *   H5SC_evict_mode_t mode:
- *     Eviction mode specifying whether to search for a clean-only or
- *     dirty-only candidate.
- *
- * Return:
- *   true if a matching chunk is found;
- *   false otherwise.
- *-------------------------------------------------------------------------
- */
-static bool
-H5SC__select_evict_candidate_in_dset(H5SC_dset_header_t *dset_hdr, H5SC_chunk_t **cand_chk,
-                                     H5SC_evict_mode_t mode)
-{
-    size_t cur;
-    size_t min;
+    size_t ema;
+    size_t delta;
 
     assert(dset_hdr);
-    assert(cand_chk);
 
-    *cand_chk = NULL;
+    if (dset_hdr->resident_estimate_samples == 0) {
+        dset_hdr->resident_estimate_ema     = actual;
+        dset_hdr->resident_estimate_high    = actual;
+        dset_hdr->resident_estimate_samples = 1;
+        return;
+    }
 
-    /* Dataset must be evictable by callback-driven SCC paths */
+    /*
+     * Integer EMA with alpha = 1/8. Perform the subtraction form carefully
+     * to avoid unsigned underflow.
+     */
+    ema = dset_hdr->resident_estimate_ema;
+
+    if (actual >= ema) {
+        delta = actual - ema;
+        ema += (delta + 7) / 8;
+    }
+    else {
+        delta = ema - actual;
+        ema -= (delta + 7) / 8;
+    }
+
+    dset_hdr->resident_estimate_ema = ema;
+
+    /*
+     * Retain a decaying high-water estimate. Update immediately on growth;
+     * decay only once every 32 observations.
+     */
+    if (actual >= dset_hdr->resident_estimate_high)
+        dset_hdr->resident_estimate_high = actual;
+    else if ((dset_hdr->resident_estimate_samples % 32) == 0) {
+        size_t high  = dset_hdr->resident_estimate_high;
+        size_t decay = high / 32;
+
+        if (decay == 0 && high > actual)
+            decay = 1;
+
+        high -= MIN(decay, high - actual);
+        dset_hdr->resident_estimate_high = MAX(high, actual);
+    }
+
+    if (dset_hdr->resident_estimate_samples < UINT64_MAX)
+        dset_hdr->resident_estimate_samples++;
+} /* end H5SC__update_resident_estimate_history() */
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__chunk_reclaim_contribution
+ *
+ * Purpose:
+ *   Compute CHUNK's current contribution to the dataset-local and cache-wide
+ *   active-pressure reclaimability counters.
+ *
+ *   Only linked, unpinned chunks with a nonzero cached resident size
+ *   contribute. Clean and dirty resident bytes are returned separately.
+ *   Dataset-local min_dset_size is intentionally not applied because stored
+ *   reclaimability counters represent active-pressure policy.
+ *-------------------------------------------------------------------------
+ */
+static inline H5SC_reclaim_contrib_t H5SC__chunk_reclaim_contribution(const H5SC_dset_header_t *dset_hdr,
+                                                                      const H5SC_chunk_t *chunk)
+{
+    H5SC_reclaim_contrib_t contribution = {0, 0};
+    bool linked;
+
+    assert(dset_hdr);
+    assert(chunk);
+
+    linked = chunk->next_ptr || chunk->prev_ptr || dset_hdr->lru_head_ptr == chunk;
+
+    if (!linked)
+        return contribution;
+
+    if (chunk->chunk_counter > 0)
+        return contribution;
+
+    if (chunk->cached_chunk_size == 0)
+        return contribution;
+
+    if (chunk->dirty_flag)
+        contribution.dirty_bytes = chunk->cached_chunk_size;
+    else
+        contribution.clean_bytes = chunk->cached_chunk_size;
+
+    return contribution;
+} /* end H5SC__chunk_reclaim_contribution() */
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__apply_reclaim_transition
+ *
+ * Purpose:
+ *   Apply the difference between a chunk's BEFORE and AFTER reclaimability
+ *   contributions to both dataset-local and cache-wide stored counters.
+ *
+ *   Callers must capture BEFORE prior to mutating linkage, pin, dirty, or
+ *   resident-size state and capture AFTER after completing that mutation.
+ *   In sanity-check builds, removal of an unaccounted contribution fails
+ *   before counters are modified.
+ *
+ * Return:
+ *   SUCCEED when both counter levels are updated;
+ *   FAIL when sanity checking detects inconsistent prior accounting.
+ *-------------------------------------------------------------------------
+ */
+static inline herr_t H5SC__apply_reclaim_transition(H5SC_t *cache, H5SC_dset_header_t *dset_hdr,
+                                                    H5SC_reclaim_contrib_t before,
+                                                    H5SC_reclaim_contrib_t after)
+{
+    assert(cache);
+    assert(dset_hdr);
+
+#if H5SC_DO_SANITY_CHECKS
+    if (before.clean_bytes > dset_hdr->reclaimable_clean_bytes ||
+        before.clean_bytes > cache->reclaimable_clean_bytes)
+        return FAIL;
+
+    if (before.dirty_bytes > dset_hdr->reclaimable_dirty_bytes ||
+        before.dirty_bytes > cache->reclaimable_dirty_bytes)
+        return FAIL;
+#endif
+
+    dset_hdr->reclaimable_clean_bytes -= before.clean_bytes;
+    dset_hdr->reclaimable_dirty_bytes -= before.dirty_bytes;
+
+    cache->reclaimable_clean_bytes -= before.clean_bytes;
+    cache->reclaimable_dirty_bytes -= before.dirty_bytes;
+
+    H5SC__saturating_add_size(&dset_hdr->reclaimable_clean_bytes, after.clean_bytes);
+    H5SC__saturating_add_size(&dset_hdr->reclaimable_dirty_bytes, after.dirty_bytes);
+
+    H5SC__saturating_add_size(&cache->reclaimable_clean_bytes, after.clean_bytes);
+    H5SC__saturating_add_size(&cache->reclaimable_dirty_bytes, after.dirty_bytes);
+
+    return SUCCEED;
+} /* end H5SC__apply_reclaim_transition() */
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__chunk_set_dirty
+ *
+ * Purpose:
+ *   Change a resident chunk's dirty state while maintaining dataset-local
+ *   and cache-wide active-pressure reclaimability counters.
+ *
+ *   Pinned chunks make no current reclaimability contribution, but their
+ *   dirty state is still changed so that the correct contribution is added
+ *   when the final request pin is released.
+ *-------------------------------------------------------------------------
+ */
+static inline herr_t H5SC__chunk_set_dirty(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk,
+                                           bool dirty)
+{
+    H5SC_reclaim_contrib_t before;
+    H5SC_reclaim_contrib_t after;
+    bool old_dirty;
+
+    assert(cache);
+    assert(dset_hdr);
+    assert(chunk);
+
+    if (chunk->dirty_flag == dirty)
+        return SUCCEED;
+
+    before    = H5SC__chunk_reclaim_contribution(dset_hdr, chunk);
+    old_dirty = chunk->dirty_flag;
+
+    chunk->dirty_flag = dirty;
+
+    after = H5SC__chunk_reclaim_contribution(dset_hdr, chunk);
+
+    if (H5SC__apply_reclaim_transition(cache, dset_hdr, before, after) < 0) {
+        chunk->dirty_flag = old_dirty;
+        return FAIL;
+    }
+
+    return SUCCEED;
+} /* end H5SC__chunk_set_dirty() */
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__candidate_is_reclaimable
+ *
+ * Purpose:
+ *   Determine whether CHUNK can contribute resident bytes to a reclamation
+ *   operation under POLICY.
+ *
+ *   Both policies reject pinned chunks, zero-byte shells, and chunks whose
+ *   recorded size exceeds their dataset's total resident accounting.
+ *
+ *   H5SC_RECLAIM_ACTIVE treats SCC_active_limit as a hard operational
+ *   ceiling and therefore permits reclaiming a chunk even when doing so
+ *   reduces the dataset below min_dset_size.
+ *
+ *   H5SC_RECLAIM_QUIESCENT treats min_dset_size as a steady-state retention
+ *   target and rejects a chunk when reclaiming it would reduce the dataset
+ *   below that target.
+ *
+ * Return:
+ *   true if the chunk is eligible under POLICY; otherwise false.
+ *-------------------------------------------------------------------------
+ */
+static bool H5SC__candidate_is_reclaimable(const H5SC_dset_header_t *dset_hdr, const H5SC_chunk_t *chunk,
+                                           H5SC_reclaim_policy_t policy)
+{
+    size_t chunk_size;
+
+    assert(dset_hdr);
+    assert(chunk);
+    assert(policy == H5SC_RECLAIM_ACTIVE || policy == H5SC_RECLAIM_QUIESCENT);
+
+    if (chunk->chunk_counter > 0)
+        return false;
+
+    chunk_size = chunk->cached_chunk_size;
+
+    /* Removing a shell does not satisfy a byte-reclamation request. */
+    if (chunk_size == 0)
+        return false;
+
+    if (chunk_size > dset_hdr->curr_dset_size)
+        return false;
+
+    if (policy == H5SC_RECLAIM_ACTIVE)
+        return true;
+
+    if (dset_hdr->curr_dset_size <= dset_hdr->min_dset_size)
+        return false;
+
+    return dset_hdr->curr_dset_size - chunk_size >= dset_hdr->min_dset_size;
+} /* end H5SC__candidate_is_reclaimable() */
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__select_clean_candidate
+ *
+ * Purpose:
+ *   Select the tailmost clean chunk from DSET_HDR that is reclaimable under
+ *   POLICY. Active-pressure selection may reduce the dataset below
+ *   min_dset_size; quiescent selection preserves that retention target.
+ *
+ * Return:
+ *   true and sets *CANDIDATE when an eligible chunk is found;
+ *   false and sets *CANDIDATE to NULL otherwise.
+ *-------------------------------------------------------------------------
+ */
+static bool H5SC__select_clean_candidate(H5SC_dset_header_t *dset_hdr, H5SC_reclaim_policy_t policy,
+                                         H5SC_chunk_t **candidate)
+{
+    assert(dset_hdr);
+    assert(candidate);
+    assert(policy == H5SC_RECLAIM_ACTIVE || policy == H5SC_RECLAIM_QUIESCENT);
+
+    *candidate = NULL;
+
     if (!dset_hdr->dset)
         return false;
 
-    if (!dset_hdr->lru_tail_ptr)
-        return false;
-
-    cur = dset_hdr->curr_dset_size;
-    min = dset_hdr->min_dset_size;
-
-    if (cur <= min)
-        return false;
-
-    for (H5SC_chunk_t *chk = dset_hdr->lru_tail_ptr; chk; chk = chk->prev_ptr) {
-        size_t csz = chk->cached_chunk_size;
-
-        /* Skip pinned/in-flight chunks */
-        if (chk->chunk_counter > 0)
+    for (H5SC_chunk_t *chunk = dset_hdr->lru_tail_ptr; chunk; chunk = chunk->prev_ptr) {
+        if (chunk->dirty_flag)
             continue;
 
-        /* Skip placeholder/nonresident chunks */
-        if (!chk->chunk_obj && !H5_addr_defined(chk->disk_addr) && chk->cached_chunk_size == 0)
+        if (!H5SC__candidate_is_reclaimable(dset_hdr, chunk, policy))
             continue;
 
-        if (mode == H5SC_EVICT_CLEAN_ONLY) {
-            if (chk->dirty_flag)
-                continue;
-        }
-        else if (mode == H5SC_EVICT_DIRTY_ONLY) {
-            if (!chk->dirty_flag)
-                continue;
-        }
-        else {
-            /* Unsupported mode => treat as no candidate */
-            return false;
-        }
-
-        if (csz > cur)
-            continue;
-
-        if ((cur - csz) < min)
-            continue;
-
-        *cand_chk = chk;
+        *candidate = chunk;
         return true;
     }
 
     return false;
-} /* end H5SC__select_evict_candidate_in_dset() */
+}
 
 /*-------------------------------------------------------------------------
- * Function: H5SC__verify_candidate_is_tailmost_eligible
+ * Function: H5SC__select_dirty_candidate
  *
  * Purpose:
- *   Debug-time verification function that checks whether a selected SCC
- *     eviction candidate matches the first eligible chunk that would be
- *     found by scanning datasets from the tail of the global dataset LRU
- *     and scanning chunks from the tail of each dataset-local chunk LRU.
- *
- *   Eligibility is recomputed using the same dataset-size and chunk-level
- *     constraints applied during candidate selection. The function is
- *     intended to validate that the chosen candidate is the tailmost
- *     eligible chunk under the current eviction policy.
- *
- * Inputs:
- *   const H5SC_t *cache:
- *     Pointer to the SCC cache state containing the global dataset LRU.
- *
- *   const H5SC_dset_header_t *cand_hdr:
- *     Pointer to the dataset header owning the candidate being verified.
- *
- *   const H5SC_chunk_t *cand_chk:
- *     Pointer to the chunk candidate being verified.
- *
- *   bool allow_dirty:
- *     Flag indicating whether dirty chunks are considered eligible during
- *     verification. If false, only clean chunks are eligible. Should be
- *     changed to an enum if/when H5SC_evict_mode_t supports more than
- *     the current two modes.
+ *   Select the tailmost dirty chunk from DSET_HDR that may be reclaimed by
+ *   flush-and-evict under POLICY. Active-pressure selection may reduce the
+ *   dataset below min_dset_size; quiescent selection preserves that target.
  *
  * Return:
- *   SUCCEED if the supplied candidate matches the first eligible chunk
- *   under the current scan order and eligibility rules;
- *   FAIL otherwise.
+ *   true and sets *CANDIDATE when an eligible chunk is found;
+ *   false and sets *CANDIDATE to NULL otherwise.
  *-------------------------------------------------------------------------
  */
-
-static herr_t
-H5SC__verify_candidate_is_tailmost_eligible(const H5SC_dset_header_t *curr_hdr, const H5SC_chunk_t *cand_chk,
-                                            bool allow_dirty)
+static bool H5SC__select_dirty_candidate(H5SC_dset_header_t *dset_hdr, H5SC_reclaim_policy_t policy,
+                                         H5SC_chunk_t **candidate)
 {
+    assert(dset_hdr);
+    assert(candidate);
+    assert(policy == H5SC_RECLAIM_ACTIVE || policy == H5SC_RECLAIM_QUIESCENT);
 
-    herr_t              ret_value = SUCCEED;
-    const H5SC_chunk_t *exp_chk   = NULL;
-    size_t              cur;
-    size_t              min;
+    *candidate = NULL;
 
-    FUNC_ENTER_PACKAGE
+    if (!dset_hdr->dset)
+        return false;
 
-    assert(curr_hdr);
-    assert(cand_chk);
-
-    cur = curr_hdr->curr_dset_size;
-    min = curr_hdr->min_dset_size;
-
-    if (cur <= min)
-        HGOTO_DONE(FAIL);
-
-    if (!curr_hdr->lru_tail_ptr)
-        HGOTO_DONE(FAIL);
-
-    for (const H5SC_chunk_t *chk = curr_hdr->lru_tail_ptr; chk; chk = chk->prev_ptr) {
-        size_t csz = chk->cached_chunk_size;
-
-        if (chk->chunk_counter > 0)
+    for (H5SC_chunk_t *chunk = dset_hdr->lru_tail_ptr; chunk; chunk = chunk->prev_ptr) {
+        if (!chunk->dirty_flag)
             continue;
 
-        if (!chk->chunk_obj && !H5_addr_defined(chk->disk_addr) && chk->cached_chunk_size == 0)
+        if (!H5SC__candidate_is_reclaimable(dset_hdr, chunk, policy))
             continue;
 
-        if (!allow_dirty && chk->dirty_flag)
-            continue;
-        if (allow_dirty && !chk->dirty_flag)
-            continue;
-        if (csz > cur)
-            continue;
-        if ((cur - csz) < min)
-            continue;
-
-        exp_chk = chk;
-        break;
+        *candidate = chunk;
+        return true;
     }
 
-    if (!exp_chk)
-        HGOTO_ERROR(H5E_SCC, H5E_NOT_TAILMOST, FAIL,
-                    "the expected chunk was not found eligible for eviction");
+    return false;
+}
 
-    if (exp_chk != cand_chk)
-        HGOTO_ERROR(H5E_SCC, H5E_NOT_TAILMOST, FAIL, "the expected chunk did not match the candidate chunk");
+#if H5SC_DO_SANITY_CHECKS
+/*-------------------------------------------------------------------------
+ * Function: H5SC__calc_reclaimable_bytes
+ *
+ * Purpose:
+ *   Independently recompute resident bytes reclaimable under POLICY by
+ *   scanning dataset and chunk LRUs.
+ *
+ *   This function is a sanity-check oracle only. Production admission and
+ *   active-pressure feasibility decisions use the stored cache-wide clean
+ *   and dirty reclaimability counters.
+ *
+ *   H5SC_RECLAIM_ACTIVE ignores min_dset_size and counts all unpinned,
+ *   nonzero resident chunks. H5SC_RECLAIM_QUIESCENT simulates clean-first,
+ *   dirty-second reclamation while preserving min_dset_size.
+ *
+ * Return:
+ *   Recomputed reclaimable resident bytes, saturating at SIZE_MAX.
+ *-------------------------------------------------------------------------
+ */
+static size_t H5SC__calc_reclaimable_bytes(const H5SC_t *cache, H5SC_reclaim_policy_t policy)
+{
+    size_t reclaimable = 0;
 
-done:
-    FUNC_LEAVE_NOAPI(ret_value)
-} /* end H5SC__verify_candidate_is_tailmost_eligible() */
+    assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
+    assert(policy == H5SC_RECLAIM_ACTIVE || policy == H5SC_RECLAIM_QUIESCENT);
+
+    for (const H5SC_dset_header_t *dset_hdr = cache->dset_lru_tail_ptr; dset_hdr;
+         dset_hdr                           = dset_hdr->prev_dset_ptr) {
+        size_t remaining = dset_hdr->curr_dset_size;
+
+        /*
+         * Active-pressure reclamation ignores min_dset_size and counts every
+         * eligible clean or dirty resident chunk.
+         */
+        if (policy == H5SC_RECLAIM_ACTIVE) {
+            for (const H5SC_chunk_t *chunk = dset_hdr->lru_tail_ptr; chunk; chunk = chunk->prev_ptr) {
+                size_t chunk_size = chunk->cached_chunk_size;
+
+                if (chunk->chunk_counter > 0)
+                    continue;
+
+                if (chunk_size == 0)
+                    continue;
+
+                if (chunk_size > dset_hdr->curr_dset_size)
+                    continue;
+
+                H5SC__saturating_add_size(&reclaimable, chunk_size);
+            }
+
+            continue;
+        }
+
+        /*
+         * Quiescent reclamation preserves the dataset-local retention target.
+         */
+        if (remaining <= dset_hdr->min_dset_size)
+            continue;
+
+        /* Simulate clean eviction first. */
+        for (const H5SC_chunk_t *chunk = dset_hdr->lru_tail_ptr; chunk; chunk = chunk->prev_ptr) {
+            size_t chunk_size = chunk->cached_chunk_size;
+
+            if (chunk->chunk_counter > 0 || chunk->dirty_flag || chunk_size == 0)
+                continue;
+
+            if (chunk_size > remaining)
+                continue;
+
+            if (remaining - chunk_size < dset_hdr->min_dset_size)
+                continue;
+
+            remaining -= chunk_size;
+
+            H5SC__saturating_add_size(&reclaimable, chunk_size);
+        }
+
+        /* Then simulate dirty flush-and-evict. */
+        for (const H5SC_chunk_t *chunk = dset_hdr->lru_tail_ptr; chunk; chunk = chunk->prev_ptr) {
+            size_t chunk_size = chunk->cached_chunk_size;
+
+            if (chunk->chunk_counter > 0 || !chunk->dirty_flag || chunk_size == 0)
+                continue;
+
+            if (chunk_size > remaining)
+                continue;
+
+            if (remaining - chunk_size < dset_hdr->min_dset_size)
+                continue;
+
+            remaining -= chunk_size;
+
+            H5SC__saturating_add_size(&reclaimable, chunk_size);
+        }
+    }
+
+    return reclaimable;
+} /* end H5SC__calc_reclaimable_bytes() */
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__verify_cached_reclaimability
+ *
+ * Purpose:
+ *   Independently recompute dataset-local and cache-wide active-pressure
+ *   reclaimability and compare those values with the stored counters.
+ *
+ *   This function is a sanity-check oracle only. Production admission uses
+ *   the stored counters and does not perform this full-cache scan.
+ *-------------------------------------------------------------------------
+ */
+static herr_t H5SC__verify_cached_reclaimability(const H5SC_t *cache)
+{
+    size_t cached_total;
+    size_t recomputed_total;
+    size_t cache_clean = 0;
+    size_t cache_dirty = 0;
+
+    assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
+
+    for (const H5SC_dset_header_t *dset_hdr = cache->dset_lru_head_ptr; dset_hdr;
+         dset_hdr                           = dset_hdr->next_dset_ptr) {
+        size_t dset_clean = 0;
+        size_t dset_dirty = 0;
+
+        for (const H5SC_chunk_t *chunk = dset_hdr->lru_head_ptr; chunk; chunk = chunk->next_ptr) {
+            if (chunk->chunk_counter > 0 || chunk->cached_chunk_size == 0)
+                continue;
+
+            if (chunk->dirty_flag)
+                H5SC__saturating_add_size(&dset_dirty, chunk->cached_chunk_size);
+            else
+                H5SC__saturating_add_size(&dset_clean, chunk->cached_chunk_size);
+        }
+
+        if (dset_clean != dset_hdr->reclaimable_clean_bytes)
+            return FAIL;
+
+        if (dset_dirty != dset_hdr->reclaimable_dirty_bytes)
+            return FAIL;
+
+        H5SC__saturating_add_size(&cache_clean, dset_clean);
+        H5SC__saturating_add_size(&cache_dirty, dset_dirty);
+    }
+
+    if (cache_clean != cache->reclaimable_clean_bytes || cache_dirty != cache->reclaimable_dirty_bytes)
+        return FAIL;
+
+    cached_total     = H5SC__cached_active_reclaimable(cache);
+    recomputed_total = H5SC__calc_reclaimable_bytes(cache, H5SC_RECLAIM_ACTIVE);
+
+    if (cached_total != recomputed_total)
+        return FAIL;
+
+    return SUCCEED;
+} /* end H5SC__verify_cached_reclaimability() */
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__verify_clean_candidate
+ *
+ * Purpose:
+ *   Verify that CANDIDATE is the clean chunk that would be selected from
+ *   DSET_HDR under the same reclamation POLICY used by the caller.
+ *-------------------------------------------------------------------------
+ */
+static herr_t H5SC__verify_clean_candidate(H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *candidate,
+                                           H5SC_reclaim_policy_t policy)
+{
+    H5SC_chunk_t *expected = NULL;
+
+    assert(dset_hdr);
+    assert(candidate);
+
+    if (!H5SC__select_clean_candidate(dset_hdr, policy, &expected))
+        return FAIL;
+
+    return expected == candidate ? SUCCEED : FAIL;
+}
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__verify_dirty_candidate
+ *
+ * Purpose:
+ *   Verify that CANDIDATE is the dirty chunk that would be selected from
+ *   DSET_HDR under the same reclamation POLICY used by the caller.
+ *-------------------------------------------------------------------------
+ */
+static herr_t H5SC__verify_dirty_candidate(H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *candidate,
+                                           H5SC_reclaim_policy_t policy)
+{
+    H5SC_chunk_t *expected = NULL;
+
+    assert(dset_hdr);
+    assert(candidate);
+
+    if (!H5SC__select_dirty_candidate(dset_hdr, policy, &expected))
+        return FAIL;
+
+    return expected == candidate ? SUCCEED : FAIL;
+}
+#endif
 
 /*-------------------------------------------------------------------------
  * Function: H5SC__trim_to_quiescent_limit
  *
  * Purpose:
- *   Function that reduces SCC quiescent cache usage until
- *     SCC_quiescent_size is less than or equal to
- *     SCC_quiescent_limit. The function repeatedly selects the
- *     tailmost eligible eviction candidate under the current SCC
- *     eviction policy, preferring clean eviction and falling back to
- *     flush-and-evict of dirty chunks when no clean candidate is
- *     available.
+ *   Reduce SCC_quiescent_size until it is no greater than
+ *   SCC_quiescent_limit.
  *
- *   Candidate selection respects dataset-local minimum retained size
- *     constraints and dataset/chunk LRU ordering. When a dirty chunk
- *     must be reclaimed, the function first flushes the chunk to disk
- *     and then evicts it from SCC.
+ *   This is a steady-state reclamation operation. Candidate selection uses
+ *   H5SC_RECLAIM_QUIESCENT and therefore preserves each dataset's
+ *   min_dset_size retention target. Clean chunks are evicted before dirty
+ *   chunks; a dirty candidate is flushed before eviction.
  *
- * Inputs:
- *   H5SC_t *cache:
- *     Pointer to the SCC cache state whose quiescent usage is to be
- *     reduced.
+ *   The function does not perform a preliminary full-cache reclaimability
+ *   scan. It traverses quiescent-policy candidates directly and returns FAIL
+ *   if the cache remains above the limit after all eligible candidates have
+ *   been exhausted.
+ *
+ *   Because quiescent candidate selection preserves min_dset_size, the cache
+ *   may remain above its quiescent limit when aggregate dataset retention
+ *   targets exceed that limit.
  *
  * Return:
- *   SUCCEED on success;
- *   FAIL on failure.
+ *   SUCCEED when the cache reaches the quiescent limit;
+ *   FAIL when the target cannot be reached or flush/eviction fails.
  *-------------------------------------------------------------------------
  */
-
-static herr_t
-H5SC__trim_to_quiescent_limit(H5SC_t *cache)
+static herr_t H5SC__trim_to_quiescent_limit(H5SC_t *cache)
 {
     herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
-    H5SC_exhausted_list_t exh = {0};
+    if (cache->SCC_quiescent_size <= cache->SCC_quiescent_limit)
+        HGOTO_DONE(SUCCEED);
 
-    while (cache->SCC_quiescent_size > cache->SCC_quiescent_limit) {
-        H5SC_dset_header_t *curr_hdr  = cache->dset_lru_tail_ptr;
-        bool                freed_any = false;
+    for (H5SC_dset_header_t *hdr                                            = cache->dset_lru_tail_ptr;
+         hdr && cache->SCC_quiescent_size > cache->SCC_quiescent_limit; hdr = hdr->prev_dset_ptr) {
+        H5SC_chunk_t *candidate = NULL;
 
-        while (curr_hdr && cache->SCC_quiescent_size > cache->SCC_quiescent_limit) {
-            H5SC_dset_header_t *next_hdr = curr_hdr->prev_dset_ptr;
-            H5SC_chunk_t       *cand_chk = NULL;
+        if (!hdr->dset)
+            continue;
 
-            if (!curr_hdr->dset) {
-                curr_hdr = next_hdr;
-                continue;
-            }
+        while (cache->SCC_quiescent_size > cache->SCC_quiescent_limit &&
+               H5SC__select_clean_candidate(hdr, H5SC_RECLAIM_QUIESCENT, &candidate)) {
+            candidate->last_op = H5SC_TAG_EVICT;
 
-            while (cache->SCC_quiescent_size > cache->SCC_quiescent_limit) {
-                if (!H5SC__select_evict_candidate_in_dset(curr_hdr, &cand_chk, H5SC_EVICT_CLEAN_ONLY))
-                    break;
-
-                cand_chk->last_op = H5SC_TAG_EVICT;
-                if (H5SC__evict_one_chunk(cache, curr_hdr->dset, curr_hdr, cand_chk) < 0)
-                    HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL,
-                                "failed to evict chunk during quiescent purge (SCC)");
-
-                freed_any = true;
-            }
-
-            while (cache->SCC_quiescent_size > cache->SCC_quiescent_limit) {
-                if (!H5SC__select_evict_candidate_in_dset(curr_hdr, &cand_chk, H5SC_EVICT_DIRTY_ONLY))
-                    break;
-
-                cand_chk->last_op = H5SC_TAG_FLUSH_DIRTY;
-                if (H5SC__flush_one_chunk(cache, curr_hdr->dset, curr_hdr, cand_chk) < 0)
-                    HGOTO_ERROR(H5E_SCC, H5E_CANNOTFLUSH, FAIL,
-                                "failed to flush chunk while quiescent purge (SCC)");
-
-                cand_chk->last_op = H5SC_TAG_EVICT;
-                if (H5SC__evict_one_chunk(cache, curr_hdr->dset, curr_hdr, cand_chk) < 0)
-                    HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL,
-                                "failed to evict chunk during quiescent purge (SCC)");
-
-                freed_any = true;
-            }
-
-            if (H5SC__dset_lru_remove(cache, curr_hdr) < 0)
-                HGOTO_ERROR(H5E_SCC, H5E_CANNOTREMOVE, FAIL,
-                            "failed to remove exhausted dataset from global LRU");
-
-            if (H5SC__dset_exhausted_lru_prepend(&exh, curr_hdr) < 0)
-                HGOTO_ERROR(H5E_SCC, H5E_CANTINSERT, FAIL,
-                            "failed to add exhausted dataset to exhausted list");
-
-            curr_hdr = next_hdr;
+            if (H5SC__evict_one_chunk(cache, hdr->dset, hdr, candidate) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL, "failed clean SCC quiescent eviction");
         }
 
-        if (!freed_any)
-            HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL, "unable to trim quiescent cache further");
+        while (cache->SCC_quiescent_size > cache->SCC_quiescent_limit &&
+               H5SC__select_dirty_candidate(hdr, H5SC_RECLAIM_QUIESCENT, &candidate)) {
+            candidate->last_op = H5SC_TAG_FLUSH_DIRTY;
 
-        if (H5SC__dset_exhausted_restore_to_global_lru(cache, &exh) < 0)
-            HGOTO_ERROR(H5E_SCC, H5E_CANNOTINSERT, FAIL, "failed to restore exhausted datasets");
+            if (H5SC__flush_one_chunk(cache, hdr->dset, hdr, candidate) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_CANNOTFLUSH, FAIL, "failed dirty SCC quiescent flush");
+
+            candidate->last_op = H5SC_TAG_EVICT;
+
+            if (H5SC__evict_one_chunk(cache, hdr->dset, hdr, candidate) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL, "failed dirty SCC quiescent eviction");
+        }
     }
+
+    if (cache->SCC_quiescent_size > cache->SCC_quiescent_limit)
+        HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL, "SCC remains above quiescent limit");
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5SC__trim_to_quiescent_limit() */
 
 /*-------------------------------------------------------------------------
+ * Function: H5SC__active_reclaim_required
+ *
+ * Purpose:
+ *   Determine whether active-pressure reclamation should continue while
+ *   preparing an SCC admission.
+ *
+ *   For an ordinary admission, reclamation remains necessary while admitting
+ *   BYTES_NEEDED additional resident bytes would cause the cache's current
+ *   resident size to exceed SCC_active_limit.
+ *
+ *   For an oversized single-chunk admission, the normal active limit is
+ *   temporarily bypassed because the indivisible chunk cannot fit within the
+ *   effective budget. In this mode, reclamation continues until no clean or
+ *   dirty resident bytes remain reclaimable under H5SC_RECLAIM_ACTIVE.
+ *
+ *   This helper does not mutate cache state and does not authorize an
+ *   oversized admission. The caller is responsible for establishing that the
+ *   current operation contains exactly one indivisible chunk and for restoring
+ *   ordinary active-limit enforcement after that chunk is unpinned.
+ *
+ * Return:
+ *   true if active-pressure reclamation should continue;
+ *   false otherwise.
+ *-------------------------------------------------------------------------
+ */
+static inline bool H5SC__active_reclaim_required(const H5SC_t *cache, size_t bytes_needed, bool oversized)
+{
+    assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
+
+    if (oversized)
+        return H5SC__cached_active_reclaimable(cache) > 0;
+
+    return H5SC__space_exceeded(cache->SCC_quiescent_size, bytes_needed, cache->SCC_active_limit);
+} /* end H5SC__active_reclaim_required() */
+
+/*-------------------------------------------------------------------------
  * Function: H5SC__ensure_space
  *
  * Purpose:
- *   Function that ensures sufficient SCC cache space is available for a
- *     pending allocation or growth request under SCC_active_limit. If the
- *     request would exceed the active cache limit, the function first
- *     performs a feasibility check and then evicts eligible chunks until
- *     the requested space fits within the limit.
+ *   Ensure that BYTES_NEEDED additional resident bytes can be admitted under
+ *   the active SCC policy.
  *
- *   The function follows the SCC two-stage eviction model. First, it
- *     determines whether enough space could be reclaimed to satisfy the
- *     request, preferring clean eviction and considering dirty
- *     flush-and-evict capacity only if clean eviction alone is
- *     insufficient. If the request is feasible, the function then evicts
- *     tailmost eligible chunks in LRU order, preferring clean candidates
- *     and falling back to flushing and evicting dirty candidates when no
- *     clean candidate is available.
+ *   During ordinary admission, SCC_active_limit remains a hard operational
+ *   ceiling. Candidate selection uses H5SC_RECLAIM_ACTIVE and may therefore
+ *   reduce a dataset below min_dset_size. The latter is a quiescent-retention
+ *   preference rather than an active-pressure reservation.
  *
- * Inputs:
- *   H5SC_t *cache:
- *     Pointer to the SCC cache state whose active/quiescent accounting is
- *     used for eviction feasibility and space reclamation.
+ *   For an ordinary admission, the function first determines whether enough
+ *   active-policy bytes are reclaimable to satisfy the request. It then walks
+ *   datasets from the global LRU tail, evicting eligible clean chunks before
+ *   flushing and evicting eligible dirty chunks.
  *
- *   size_t bytes_needed:
- *     Number of additional bytes that must fit within SCC_active_limit.
+ *   When ALLOW_OVERSIZED_SINGLE_CHUNK is true, the caller has established
+ *   that the current batch contains exactly one indivisible chunk. If that
+ *   chunk's incremental resident-size estimate exceeds the current effective
+ *   budget, the function enables the oversized exception. In that mode, all
+ *   currently reclaimable active-policy bytes are reclaimed before the chunk
+ *   is admitted, even though the resulting temporary working set may exceed
+ *   SCC_active_limit.
+ *
+ *   The exception does not modify SCC_active_limit. The caller must process
+ *   only the single oversized chunk and must restore ordinary active-limit
+ *   enforcement immediately after that chunk is unpinned.
  *
  * Return:
- *   SUCCEED on success;
- *   FAIL on failure.
+ *   SUCCEED when the requested bytes may be admitted;
+ *   FAIL when ordinary admission is infeasible, active-pressure reclamation
+ *   fails, or an oversized request cannot be prepared safely.
  *-------------------------------------------------------------------------
  */
-
-static herr_t
-H5SC__ensure_space(H5SC_t *cache, size_t bytes_needed)
+static herr_t H5SC__ensure_space(H5SC_t *cache, size_t bytes_needed, bool allow_oversized_single_chunk)
 {
-
-    herr_t                ret_value = SUCCEED;
-    H5SC_exhausted_list_t exh       = {0};
+    bool oversized = false;
+    size_t reclaimable;
+    size_t required  = 0;
+    herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
-    while (cache->SCC_quiescent_size + bytes_needed > cache->SCC_active_limit) {
-        H5SC_dset_header_t *curr_hdr  = cache->dset_lru_tail_ptr;
-        bool                freed_any = false;
+    assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
-#ifdef H5SC_DO_SANITY_CHECKS
-        printf("Quiescent size: %zu; bytes needed: %zu; active limit: %zu\n", cache->SCC_quiescent_size,
-               bytes_needed, cache->SCC_active_limit);
-#endif
+    /*
+     * The caller authorizes the exception, but it is needed only when this
+     * admission cannot fit within the current effective budget.
+     */
+    oversized = allow_oversized_single_chunk && bytes_needed > H5SC__effective_budget(cache);
+
+    /*
+     * A request larger than the configured active limit is invalid unless it
+     * is the explicitly authorized one-chunk oversized admission.
+     */
+    if (bytes_needed > cache->SCC_active_limit && !oversized)
+        HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL, "single SCC request exceeds active limit");
+
+    /*
+     * Ordinary admission can return immediately when the requested
+     * incremental bytes fit without reclamation.
+     *
+     * Oversized admission deliberately does not return here. It must reclaim
+     * every currently reclaimable active-policy byte before dispatch.
+     */
+    if (!oversized && !H5SC__space_exceeded(cache->SCC_quiescent_size, bytes_needed, cache->SCC_active_limit))
+        HGOTO_DONE(SUCCEED);
+
+    reclaimable = H5SC__cached_active_reclaimable(cache);
+
+    if (!oversized) {
+        /*
+         * At this point:
+         *
+         *     SCC_quiescent_size + bytes_needed > SCC_active_limit
+         *
+         * and bytes_needed <= SCC_active_limit, so the subtraction below is
+         * well-defined.
+         */
+        required = cache->SCC_quiescent_size - (cache->SCC_active_limit - bytes_needed);
 
         /*
-         * Stage 2: drain one dataset at a time.
-         * For each dataset, evict all eligible clean chunks first, then
-         * eligible dirty chunks, before advancing to the next dataset.
+         * Reject an infeasible ordinary admission before mutating cache
+         * topology or flushing dirty chunks.
          */
-        while (curr_hdr && (cache->SCC_quiescent_size + bytes_needed > cache->SCC_active_limit)) {
-            H5SC_dset_header_t *next_hdr = curr_hdr->prev_dset_ptr;
-            H5SC_chunk_t       *cand_chk = NULL;
+        if (reclaimable < required)
+            HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL, "insufficient reclaimable SCC space");
+    }
 
-            if (!curr_hdr->dset) {
-                curr_hdr = next_hdr;
-                continue;
-            }
+    /*
+     * Drain one dataset at a time, beginning with the global LRU tail.
+     * Preserve global dataset-LRU topology throughout.
+     *
+     * Ordinary mode stops after sufficient space has been recovered.
+     * Oversized mode continues until no active-policy bytes remain
+     * reclaimable.
+     */
+    for (H5SC_dset_header_t *hdr                                                   = cache->dset_lru_tail_ptr;
+         hdr && H5SC__active_reclaim_required(cache, bytes_needed, oversized); hdr = hdr->prev_dset_ptr) {
+        H5SC_chunk_t *candidate = NULL;
 
-            /* Phase 1: drain clean candidates from this dataset. */
-            while (cache->SCC_quiescent_size + bytes_needed > cache->SCC_active_limit) {
-                if (!H5SC__select_evict_candidate_in_dset(curr_hdr, &cand_chk, H5SC_EVICT_CLEAN_ONLY))
-                    break;
+        if (!hdr->dset)
+            continue;
 
-#ifdef H5SC_DO_SANITY_CHECKS
-                if (H5SC__verify_candidate_is_tailmost_eligible(curr_hdr, cand_chk, false) < 0)
-                    HGOTO_ERROR(H5E_SCC, H5E_BADVALUE, FAIL,
-                                "clean candidate is not tailmost eligible within dataset");
+        /*
+         * Phase 1: evict eligible clean candidates from this dataset.
+         */
+        while (H5SC__active_reclaim_required(cache, bytes_needed, oversized) &&
+               H5SC__select_clean_candidate(hdr, H5SC_RECLAIM_ACTIVE, &candidate)) {
+#if H5SC_DO_SANITY_CHECKS
+            if (H5SC__verify_clean_candidate(hdr, candidate, H5SC_RECLAIM_ACTIVE) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_NOT_TAILMOST, FAIL, "incorrect clean eviction candidate");
 #endif
 
-                cand_chk->last_op = H5SC_TAG_EVICT;
-                if (H5SC__evict_one_chunk(cache, curr_hdr->dset, curr_hdr, cand_chk) < 0)
-                    HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL,
-                                "failed to evict clean chunk while draining dataset");
+            candidate->last_op = H5SC_TAG_EVICT;
 
-                freed_any = true;
-            }
-
-            /* Phase 2: if more space is needed, drain dirty candidates from the same dataset. */
-            while (cache->SCC_quiescent_size + bytes_needed > cache->SCC_active_limit) {
-                if (!H5SC__select_evict_candidate_in_dset(curr_hdr, &cand_chk, H5SC_EVICT_DIRTY_ONLY))
-                    break;
-
-#ifdef H5SC_DO_SANITY_CHECKS
-                if (H5SC__verify_candidate_is_tailmost_eligible(curr_hdr, cand_chk, true) < 0)
-                    HGOTO_ERROR(H5E_SCC, H5E_BADVALUE, FAIL,
-                                "dirty candidate is not tailmost eligible within dataset");
-#endif
-
-                cand_chk->last_op = H5SC_TAG_FLUSH_DIRTY;
-                if (H5SC__flush_one_chunk(cache, curr_hdr->dset, curr_hdr, cand_chk) < 0)
-                    HGOTO_ERROR(H5E_SCC, H5E_CANNOTFLUSH, FAIL,
-                                "failed to flush dirty chunk while draining dataset");
-
-                cand_chk->last_op = H5SC_TAG_EVICT;
-                if (H5SC__evict_one_chunk(cache, curr_hdr->dset, curr_hdr, cand_chk) < 0)
-                    HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL,
-                                "failed to evict dirty chunk while draining dataset");
-
-                freed_any = true;
-            }
-
-            /* This dataset cannot contribute more during this pass. */
-            if (H5SC__dset_lru_remove(cache, curr_hdr) < 0)
-                HGOTO_ERROR(H5E_SCC, H5E_CANNOTREMOVE, FAIL,
-                            "failed to remove exhausted dataset from global LRU");
-
-            if (H5SC__dset_exhausted_lru_prepend(&exh, curr_hdr) < 0)
-                HGOTO_ERROR(H5E_SCC, H5E_CANTINSERT, FAIL,
-                            "failed to add exhausted dataset to exhausted list");
-
-            curr_hdr = next_hdr;
+            if (H5SC__evict_one_chunk(cache, hdr->dset, hdr, candidate) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL, "failed to evict clean SCC chunk");
         }
 
-        if (!freed_any)
-            HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL, "no eviction progress possible while ensuring space");
+        /*
+         * Phase 2: flush and evict eligible dirty candidates from this
+         * dataset before advancing to the next dataset.
+         */
+        while (H5SC__active_reclaim_required(cache, bytes_needed, oversized) &&
+               H5SC__select_dirty_candidate(hdr, H5SC_RECLAIM_ACTIVE, &candidate)) {
+#if H5SC_DO_SANITY_CHECKS
+            if (H5SC__verify_dirty_candidate(hdr, candidate, H5SC_RECLAIM_ACTIVE) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_NOT_TAILMOST, FAIL, "incorrect dirty eviction candidate");
+#endif
 
-        if (H5SC__dset_exhausted_restore_to_global_lru(cache, &exh) < 0)
-            HGOTO_ERROR(H5E_SCC, H5E_CANTINSERT, FAIL, "failed to restore exhausted datasets to global LRU");
+            candidate->last_op = H5SC_TAG_FLUSH_DIRTY;
+
+            if (H5SC__flush_one_chunk(cache, hdr->dset, hdr, candidate) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_CANNOTFLUSH, FAIL, "failed to flush dirty SCC chunk");
+
+            candidate->last_op = H5SC_TAG_EVICT;
+
+            if (H5SC__evict_one_chunk(cache, hdr->dset, hdr, candidate) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL, "failed to evict flushed SCC chunk");
+        }
+    }
+
+    if (oversized) {
+        /*
+         * Cached reclaimability must agree with candidate traversal. Any
+         * remaining contribution means the SCC failed to prepare the minimum
+         * resident working set for the oversized chunk.
+         */
+        if (H5SC__cached_active_reclaimable(cache) != 0)
+            HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL,
+                        "unable to reclaim available SCC space before oversized admission");
+    }
+    else if (H5SC__space_exceeded(cache->SCC_quiescent_size, bytes_needed, cache->SCC_active_limit)) {
+        HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL, "SCC reclamation did not produce sufficient space");
     }
 
 done:
-    if (ret_value < 0) {
-        if (exh.head || exh.tail || exh.len > 0) {
-            if (H5SC__dset_exhausted_restore_to_global_lru(cache, &exh) < 0) {
-                /* Best effort only on error path */
-            }
-        }
-    }
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5SC__ensure_space() */
 
@@ -1457,8 +2515,9 @@ done:
  *
  *   where desired is the target resident size for the operation. If the
  *     caller supplies desired == 0, the function falls back to the
- *     dataset's chunk size as a conservative upper bound on the required
- *     resident allocation.
+ *     dataset's dense logical chunk size as the cold-dataset fallback
+ *     estimate. This fallback is an admission heuristic and is not a formal
+ *     upper bound on decoded resident allocation.
  *
  * Inputs:
  *   const H5D_t *dset:
@@ -1479,8 +2538,7 @@ done:
  *-------------------------------------------------------------------------
  */
 
-static size_t
-H5SC__calc_inc_for_chunk(const H5D_t *dset, const H5SC_chunk_t *chk, size_t desired)
+static size_t H5SC__calc_inc_for_chunk(const H5D_t *dset, const H5SC_chunk_t *chk, size_t desired)
 {
     size_t fallback = 0;
 
@@ -1488,7 +2546,7 @@ H5SC__calc_inc_for_chunk(const H5D_t *dset, const H5SC_chunk_t *chk, size_t desi
     assert(chk);
 
     if (desired == 0) {
-        /* Use dataset chunk size as a conservative resident-size fallback. */
+        /* Use dense logical chunk size as the cold-dataset fallback estimate. */
         fallback = (size_t)dset->shared->layout.u.struct_chunk.size;
         desired  = fallback;
     }
@@ -1550,28 +2608,33 @@ H5SC__calc_inc_for_chunk(const H5D_t *dset, const H5SC_chunk_t *chk, size_t desi
  *-------------------------------------------------------------------------
  */
 
-static herr_t
-H5SC__invoke_read_dset_batched(H5SC_t *cache, H5D_dset_io_info_t *dset_info, H5SC_dset_header_t *dset_hdr)
+static herr_t H5SC__invoke_read_dset_batched(H5SC_t *cache, H5D_dset_io_info_t *dset_info,
+                                             H5SC_dset_header_t *dset_hdr)
 {
-    H5SC_io_info_t      *io;
+    H5SC_io_info_t *io;
     H5SC_io_sel_chunk_t *saved_sel;
-    size_t               saved_start;
-    size_t               saved_n;
-    size_t               processed = 0;
+    size_t saved_start;
+    size_t saved_n;
+    const size_t *saved_order;
+    size_t saved_resident_n;
+    size_t processed = 0;
 
     herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset_info);
     assert(dset_hdr);
     io = dset_hdr->io_info;
     assert(io);
 
-    saved_sel   = io->sel_chunks;
-    saved_start = io->sel_start;
-    saved_n     = io->num_sel_chunks;
+    saved_sel        = io->sel_chunks;
+    saved_order      = io->sel_order;
+    saved_start      = io->sel_start;
+    saved_n          = io->num_sel_chunks;
+    saved_resident_n = io->num_resident_sel_chunks;
 
     if (saved_n == 0)
         HGOTO_DONE(SUCCEED);
@@ -1580,8 +2643,9 @@ H5SC__invoke_read_dset_batched(H5SC_t *cache, H5D_dset_io_info_t *dset_info, H5S
     /* Process each selected chunk individually (debugging mode). */
     size_t i = 0;
     for (i = 0; i < saved_n; i++) {
-        io->sel_chunks     = saved_sel;       /* keep base pointer stable */
-        io->sel_start      = saved_start + i; /* select subrange start */
+        io->sel_chunks     = saved_sel;
+        io->sel_order      = saved_order ? &saved_order[i] : NULL;
+        io->sel_start      = saved_order ? saved_start : saved_start + i;
         io->num_sel_chunks = 1;
 
 #ifdef DO_SANITY_CHECKS
@@ -1591,44 +2655,12 @@ H5SC__invoke_read_dset_batched(H5SC_t *cache, H5D_dset_io_info_t *dset_info, H5S
             H5SC_test_read_max_batch_len = io->num_sel_chunks;
 #endif
 
-        if (H5SC_read(cache, 1, dset_info) < 0) {
+        if (H5SC_read(cache, dset_info) < 0) {
             HGOTO_ERROR(H5E_SCC, H5E_IOFAIL, FAIL, "failed to process batched SCC read");
         }
 
         H5SC__stats_record_batch_read(cache);
         H5SC__stats_record_batch_read_len(cache, 1);
-
-#ifdef H5SC_BATCH_INTO_SINGLE_CHUNK_AND_EVICT_IMMEDIATELY
-        /* TEMPORARY: immediately evict the chunk we just processed to avoid
-         * eviction pressure / placeholder churn during chunk-by-chunk mode.
-         *
-         * Note: H5SC__evict_one_chunk() does NOT flush dirty chunks; it asserts
-         * clean under sanity checks. H5SC_write() should have already read
-         * and marked the chunk clean, but guard defensively.
-         */
-        {
-            const size_t         idx = saved_start + i;
-            H5SC_io_sel_chunk_t *sel = &saved_sel[idx];
-            H5SC_chunk_t        *chk = sel->cached_chunk;
-
-            if (chk) {
-                /* assert(chk->magic == H5SC_CHUNK_MAGIC); */
-
-                if (chk->dirty_flag) {
-                    /* For now: do not evict dirty chunks.
-                     * Alternative: call your flush helper here, then evict.
-                     */
-                    /* fprintf(stderr, "skip evict: chunk dirty at idx=%zu\n", idx); */
-                }
-                else {
-                    if (H5SC__evict_one_chunk(cache, dset_info->dset, dset_hdr, chk) < 0)
-                        HGOTO_ERROR(H5E_SCC, H5E_CANTREMOVE, FAIL,
-                                    "failed to evict chunk after single-chunk read");
-                    sel->cached_chunk = NULL; /* optional safety: avoid stale pointer use */
-                }
-            }
-        }
-#endif /* H5SC_BATCH_INTO_SINGLE_CHUNK_AND_EVICT_IMMEDIATELY*/
     }
     goto done;
 #endif
@@ -1641,75 +2673,97 @@ H5SC__invoke_read_dset_batched(H5SC_t *cache, H5D_dset_io_info_t *dset_info, H5S
      */
 
     while (processed < saved_n) {
-        size_t freeable_clean = H5SC__calc_freeable_clean_bytes(cache);
-        size_t freeable_dirty = H5SC__calc_freeable_dirty_bytes(cache);
-        size_t freeable       = freeable_clean + freeable_dirty;
-        size_t budget         = 0;
+        size_t budget;
+        size_t phase_end;
 
-        if (cache->SCC_quiescent_size >= cache->SCC_active_limit)
-            budget = freeable;
+        if (processed < saved_resident_n)
+            phase_end = saved_resident_n;
         else
-            budget = (cache->SCC_active_limit - cache->SCC_quiescent_size) + freeable;
+            phase_end = saved_n;
 
-        if (cache->SCC_quiescent_size >= cache->SCC_active_limit)
-            budget = freeable;
-        else
-            budget = (cache->SCC_active_limit - cache->SCC_quiescent_size) + freeable;
-
-        if (budget == 0)
-            HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL, "invoke read: no budget available");
-
-        /* Start a provisional batch window at the next unprocessed selection. */
-        const size_t batch_start = processed;
+        budget = H5SC__effective_budget(cache);
 
         /* Configure io_info to expose this provisional window. */
-        io->sel_chunks     = saved_sel; /* stable base */
-        io->sel_start      = saved_start + batch_start;
-        io->num_sel_chunks = saved_n - batch_start; /* provisional; may shrink below */
+        io->sel_order      = saved_order ? &saved_order[processed] : NULL;
+        io->sel_start      = saved_order ? saved_start : saved_start + processed;
+        io->num_sel_chunks = phase_end - processed;
 
         /* Populate lookup metadata for the provisional window. */
         if (H5SC__lookup_cache_misses(dset_info->dset, io) < 0)
             HGOTO_ERROR(H5E_SCC, H5E_CANTGET, FAIL, "invoke read: miss lookup caching failed");
 
-        H5SC_io_sel_chunk_t *base = saved_sel;
+        /*
+         * Access an entry relative to the current provisional batch.
+         *
+         * sel_chunks/base always points to the beginning of the persistent
+         * H5SC_io_sel_chunk_t allocation. saved_start identifies the beginning
+         * of the caller's original active selection window, while batch_start
+         * identifies the beginning of the current batch relative to that window.
+         *
+         * Therefore:
+         *
+         *     absolute index = saved_start + batch_start + j
+         *
+         * Keep this macro local to this function and undefine it before leaving
+         * its lexical use region so that a different SEL() indexing convention
+         * cannot accidentally be reused elsewhere in this translation unit.
+         */
 
-        /* Window-relevant selection accessor */
-#define SEL(j_) (&base[saved_start + batch_start + (j_)])
-
-        size_t batch_len  = 0;
-        size_t batch_need = 0;
+        size_t batch_len     = 0;
+        size_t batch_need    = 0;
+        bool oversized_batch = false;
 
         /* Greedily extend batch while staying within budget */
-        for (size_t j = 0; (batch_start + j) < saved_n; j++) {
-            H5SC_io_sel_chunk_t *sel     = SEL(j);
-            H5SC_chunk_t        *chk     = sel->cached_chunk;
-            size_t               desired = 0;
-            size_t               inc     = 0;
+        for (size_t j = 0; j < io->num_sel_chunks; j++) {
+            H5SC_io_sel_chunk_t *sel = H5SC__io_sel_at(io, j);
+            H5SC_chunk_t *chk        = sel->cached_chunk;
+            size_t desired           = 0;
+            size_t inc               = 0;
 
             assert(chk);
 
             /* Estimate additional resident bytes needed for this candidate chunk. */
             if (!chk->chunk_obj) {
 
-                if (sel->lookup_valid)
-                    desired = (size_t)sel->lookup_defined_values_size;
+                H5SC_size_est_source_t source;
 
-                if (desired == 0)
-                    desired = (size_t)dset_info->dset->shared->layout.u.struct_chunk.size;
+                if (H5SC__estimate_resident_size(dset_hdr, dset_info->dset, sel, false, 0, &source,
+                                                 &desired) < 0)
+                    HGOTO_ERROR(H5E_SCC, H5E_CANTGETSIZE, FAIL,
+                                "invoke read: unable to estimate resident chunk size");
 
+                sel->estimate_resident_size = desired;
+                sel->estimate_source        = source;
+                sel->estimate_pending       = true;
+
+                /*
+                 * IMPORTANT: keep budget semantics identical to the core SCC code.
+                 * This handles placeholder/shell accounting correctly.
+                 */
                 inc = H5SC__calc_inc_for_chunk(dset_info->dset, chk, desired);
             }
 
-            if (inc > budget)
-                HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL,
-                            "invoke read: single chunk exceeds effective budget; split further upstream");
+            if (inc > budget) {
+                /*
+                 * Dispatch any ordinary batch already under construction. This
+                 * candidate will become the first candidate in the next iteration and
+                 * will then be admitted as an oversized one-chunk batch.
+                 */
+                if (batch_len > 0)
+                    break;
 
-            if (batch_need + inc > budget) {
-                /* Always make forward progress */
-                if (batch_len == 0) {
-                    batch_need = inc;
-                    batch_len  = 1;
-                }
+                /*
+                 * The selection cannot be divided below this one chunk. Admit it as a
+                 * one-entry oversized batch after reclaiming everything currently
+                 * reclaimable under the active policy.
+                 */
+                batch_need      = inc;
+                batch_len       = 1;
+                oversized_batch = true;
+                break;
+            }
+
+            if (batch_need > budget || inc > budget - batch_need) {
                 break;
             }
 
@@ -1721,61 +2775,92 @@ H5SC__invoke_read_dset_batched(H5SC_t *cache, H5D_dset_io_info_t *dset_info, H5S
 
         /* Evict before dispatching the batch. batch_need is incremental only. */
         if (batch_need > 0) {
-            if (H5SC__ensure_space(cache, batch_need) < 0)
+            if (H5SC__ensure_space(cache, batch_need, oversized_batch) < 0)
                 HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL,
-                            "invoke read: unable to evict enough space for batch");
+                            "invoke read: unable to prepare SCC space for batch");
         }
+
+        if (oversized_batch)
+            H5SC__report_oversized_admission(cache, batch_need);
 
         /* Finalize the active window for this batch. */
         io->sel_chunks     = saved_sel;
-        io->sel_start      = saved_start + batch_start;
+        io->sel_order      = saved_order ? &saved_order[processed] : NULL;
+        io->sel_start      = saved_order ? saved_start : saved_start + processed;
         io->num_sel_chunks = batch_len;
 
-        if (H5SC_read(cache, 1, dset_info) < 0)
+        if (H5SC_read(cache, dset_info) < 0)
             HGOTO_ERROR(H5E_SCC, H5E_IOFAIL, FAIL, "invoke read: H5SC_read failed");
+
+        if (oversized_batch) {
+            /*
+             * The oversized chunk is now unpinned. Return to the configured active
+             * limit before constructing another batch.
+             */
+            if (H5SC__ensure_space(cache, 0, false) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL,
+                            "invoke read: unable to restore configured active limit "
+                            "after oversized chunk");
+        }
 
         H5SC__stats_record_batch_read(cache);
         H5SC__stats_record_batch_read_len(cache, batch_len);
 
         processed += batch_len;
-
-#undef SEL
     }
 
 done:
-
-#ifdef H5SC_BATCH_INTO_SINGLE_CHUNK
-    /* Unpin any remaining selections after a chunk-by-chunk failure. */
-    if (ret_value < 0) {
-        size_t start_unpin = (i < saved_n) ? (i + 1) : saved_n;
-        for (size_t k = start_unpin; k < saved_n; k++) {
-            H5SC_chunk_t *chk2 = saved_sel[saved_start + k].cached_chunk;
-            if (chk2 && chk2->chunk_counter > 0) {
-                chk2->chunk_counter--; /* decrement exactly once per selection pin */
-                chk2->last_op = H5SC_TAG_UNPIN_READ_DONE_ERROR;
-            }
-        }
-    }
-#endif
-
-    /* Conservatively unpin any remaining selections after a batched failure. */
-    if (ret_value < 0) {
-        size_t start_unpin = processed;
-        for (size_t k = start_unpin; k < saved_n; k++) {
-            H5SC_chunk_t *chk2 = saved_sel[saved_start + k].cached_chunk;
-            if (chk2 && chk2->chunk_counter > 0) {
-                chk2->chunk_counter--;
-                chk2->last_op = H5SC_TAG_UNPIN_READ_DONE_ERROR;
-            }
-        }
-    }
-
-    /* Restore the original selection window. */
+    /*
+     * Restore the complete request window before inspecting or unwinding
+     * selection-owned pins. This makes H5SC__io_sel_at() resolve indices
+     * against the original selection and ordering arrays rather than the
+     * final active batch.
+     */
     if (dset_hdr && dset_hdr->io_info) {
-        dset_hdr->io_info->sel_chunks     = saved_sel;
-        dset_hdr->io_info->sel_start      = saved_start;
-        dset_hdr->io_info->num_sel_chunks = saved_n;
+        dset_hdr->io_info->sel_chunks              = saved_sel;
+        dset_hdr->io_info->sel_order               = saved_order;
+        dset_hdr->io_info->sel_start               = saved_start;
+        dset_hdr->io_info->num_sel_chunks          = saved_n;
+        dset_hdr->io_info->num_resident_sel_chunks = saved_resident_n;
+
+        /*
+         * A successful batched read must have released every selection-owned
+         * pin. Report an ownership leak instead of silently correcting it.
+         */
+        if (ret_value >= 0) {
+            for (size_t j = 0; j < saved_n; j++) {
+                H5SC_io_sel_chunk_t *sel = H5SC__io_sel_at(dset_hdr->io_info, j);
+
+                if (sel->pin_held) {
+                    HDONE_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL, "batched read completed with an owned pin");
+                    break;
+                }
+            }
+        }
+
+        /*
+         * Unwind pins only after the operation has failed. This includes a
+         * successful processing path converted to failure by the ownership
+         * check above.
+         */
+        if (ret_value < 0) {
+            for (size_t j = 0; j < saved_n; j++) {
+                H5SC_io_sel_chunk_t *sel = H5SC__io_sel_at(dset_hdr->io_info, j);
+                H5SC_chunk_t *chk        = sel->cached_chunk;
+
+                if (sel->pin_held) {
+                    if (!chk || H5SC__chunk_unpin(cache, dset_hdr, chk) < 0)
+                        HDONE_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL,
+                                    "batched read cleanup encountered an invalid owned pin");
+                    else {
+                        sel->pin_held = false;
+                        chk->last_op  = H5SC_TAG_UNPIN_READ_DONE_ERROR;
+                    }
+                }
+            }
+        }
     }
+
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5SC__invoke_read_dset_batched() */
 
@@ -1830,28 +2915,33 @@ done:
  *-------------------------------------------------------------------------
  */
 
-static herr_t
-H5SC__invoke_write_dset_batched(H5SC_t *cache, H5D_dset_io_info_t *dset_info, H5SC_dset_header_t *dset_hdr)
+static herr_t H5SC__invoke_write_dset_batched(H5SC_t *cache, H5D_dset_io_info_t *dset_info,
+                                              H5SC_dset_header_t *dset_hdr)
 {
-    H5SC_io_info_t      *io;
+    H5SC_io_info_t *io;
     H5SC_io_sel_chunk_t *saved_sel;
-    size_t               saved_start;
-    size_t               saved_n;
-    size_t               processed = 0;
+    size_t saved_start;
+    size_t saved_n;
+    const size_t *saved_order;
+    size_t saved_resident_n;
+    size_t processed = 0;
 
     herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset_info);
     assert(dset_hdr);
     io = dset_hdr->io_info;
     assert(io);
 
-    saved_sel   = io->sel_chunks;
-    saved_start = io->sel_start;
-    saved_n     = io->num_sel_chunks;
+    saved_sel        = io->sel_chunks;
+    saved_order      = io->sel_order;
+    saved_start      = io->sel_start;
+    saved_n          = io->num_sel_chunks;
+    saved_resident_n = io->num_resident_sel_chunks;
 
     if (saved_n == 0)
         HGOTO_DONE(SUCCEED);
@@ -1860,8 +2950,9 @@ H5SC__invoke_write_dset_batched(H5SC_t *cache, H5D_dset_io_info_t *dset_info, H5
     /* Process each selected chunk individually (debugging mode). */
     size_t i = 0;
     for (i = 0; i < saved_n; i++) {
-        io->sel_chunks     = saved_sel;       /* keep base pointer stable */
-        io->sel_start      = saved_start + i; /* select subrange start */
+        io->sel_chunks     = saved_sel;
+        io->sel_order      = saved_order ? &saved_order[i] : NULL;
+        io->sel_start      = saved_order ? saved_start : saved_start + i;
         io->num_sel_chunks = 1;
 
 #ifdef DO_SANITY_CHECKS
@@ -1871,48 +2962,12 @@ H5SC__invoke_write_dset_batched(H5SC_t *cache, H5D_dset_io_info_t *dset_info, H5
             H5SC_test_write_max_batch_len = io->num_sel_chunks;
 #endif
 
-        if (H5SC_write(cache, 1, dset_info) < 0) {
+        if (H5SC_write(cache, dset_info) < 0) {
             HGOTO_ERROR(H5E_SCC, H5E_IOFAIL, FAIL, "failed to process batched SCC write");
         }
 
         H5SC__stats_record_batch_write(cache);
-        H5SC__stats_record_batch_read_len(cache, 1);
-
-#ifdef H5SC_BATCH_INTO_SINGLE_CHUNK_AND_EVICT_IMMEDIATELY
-        /* TEMPORARY: immediately evict the chunk we just processed to avoid
-         * eviction pressure / placeholder churn during chunk-by-chunk mode.
-         *
-         * Note: H5SC__evict_one_chunk() does NOT flush dirty chunks; it asserts
-         * clean under sanity checks. H5SC_write() should have already written
-         * and marked the chunk clean, but guard defensively.
-         */
-        {
-            const size_t         idx = saved_start + i;
-            H5SC_io_sel_chunk_t *sel = &saved_sel[idx];
-            H5SC_chunk_t        *chk = sel->cached_chunk;
-
-            if (chk) {
-                /* assert(chk->magic == H5SC_CHUNK_MAGIC); */
-
-                if (chk->dirty_flag) {
-                    /* For now: do not evict dirty chunks.
-                     * Alternative: call your flush helper here, then evict.
-                     */
-                    /* fprintf(stderr, "skip evict: chunk dirty at idx=%zu\n", idx); */
-                }
-                else {
-
-                    if (chk->chunk_counter > 0)
-                        HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL,
-                                    "post-write eviction attempted on a pinned chunk");
-
-                    if (H5SC__evict_one_chunk(cache, dset_info->dset, dset_hdr, chk) < 0)
-                        HGOTO_ERROR(H5E_SCC, H5E_CANTREMOVE, FAIL,
-                                    "failed to evict chunk after single-chunk write");
-                }
-            }
-        }
-#endif /* H5SC_BATCH_INTO_SINGLE_CHUNK_AND_EVICT_IMMEDIATELY */
+        H5SC__stats_record_batch_write_len(cache, 1);
     }
     goto done;
 #endif
@@ -1925,66 +2980,57 @@ H5SC__invoke_write_dset_batched(H5SC_t *cache, H5D_dset_io_info_t *dset_info, H5
      */
 
     while (processed < saved_n) {
-        size_t freeable_clean = H5SC__calc_freeable_clean_bytes(cache);
-        size_t freeable_dirty = H5SC__calc_freeable_dirty_bytes(cache);
-        size_t freeable       = freeable_clean + freeable_dirty;
-        size_t budget         = 0;
+        size_t budget;
+        size_t phase_end;
 
-        if (cache->SCC_quiescent_size >= cache->SCC_active_limit)
-            budget = freeable;
+        if (processed < saved_resident_n)
+            phase_end = saved_resident_n;
         else
-            budget = (cache->SCC_active_limit - cache->SCC_quiescent_size) + freeable;
+            phase_end = saved_n;
 
-        if (cache->SCC_quiescent_size >= cache->SCC_active_limit)
-            budget = freeable;
-        else
-            budget = (cache->SCC_active_limit - cache->SCC_quiescent_size) + freeable;
-
-        if (budget == 0)
-            HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL, "invoke write: no budget available");
-
-        /* Start a provisional batch window at the next unprocessed selection. */
-        const size_t batch_start = processed;
+        budget = H5SC__effective_budget(cache);
 
         /* Configure io_info to expose this provisional window. */
-        io->sel_chunks     = saved_sel; /* stable base */
-        io->sel_start      = saved_start + batch_start;
-        io->num_sel_chunks = saved_n - batch_start; /* provisional; may shrink below */
+        io->sel_order      = saved_order ? &saved_order[processed] : NULL;
+        io->sel_start      = saved_order ? saved_start : saved_start + processed;
+        io->num_sel_chunks = phase_end - processed;
 
         /* Populate lookup metadata for the provisional window. */
         if (H5SC__lookup_cache_misses(dset_info->dset, io) < 0)
             HGOTO_ERROR(H5E_SCC, H5E_CANTGET, FAIL, "invoke write: miss lookup caching failed");
 
-        H5SC_io_sel_chunk_t *base = saved_sel;
-
-        /* Window-relevant selection accessor */
-#define SEL(j_) (&base[saved_start + batch_start + (j_)])
-
-        size_t batch_len  = 0;
-        size_t batch_need = 0;
+        size_t batch_len     = 0;
+        size_t batch_need    = 0;
+        bool oversized_batch = false;
 
         /* Greedily extend batch while staying within budget */
-        for (size_t j = 0; (batch_start + j) < saved_n; j++) {
-            H5SC_io_sel_chunk_t *sel     = SEL(j);
-            H5SC_chunk_t        *chk     = sel->cached_chunk;
-            size_t               desired = 0;
-            size_t               inc     = 0;
+        for (size_t j = 0; j < io->num_sel_chunks; j++) {
+            H5SC_io_sel_chunk_t *sel = H5SC__io_sel_at(io, j);
+            H5SC_chunk_t *chk        = sel->cached_chunk;
+            size_t desired           = 0;
+            size_t inc               = 0;
 
             assert(chk);
 
             /*
-             * We only need additional budget when the chunk has no resident decoded object yet.
-             * Use lookup_size_hint when available; fall back to full chunk size for sparse/unallocated.
-             * NOTE: lookup_size_hint is a very pessimistic estimate and assumes the chunk is dense.
-             *       It may be worth setting the desired size based on the number of points in the dataset,
-             *       and when lookup_valid is false, defaulting to the worst-case estimate.
+             * Estimate the final resident allocation for a nonresident chunk. The
+             * estimator currently considers the lookup allocation hint, dataset-local
+             * observed history, and the dense logical size as a final fallback.
+             *
+             * Conservative write-growth allowance is intentionally disabled during the
+             * initial statistics-gathering phase.
              */
             if (!chk->chunk_obj) {
-                if (sel->lookup_valid)
-                    desired = (size_t)sel->lookup_defined_values_size;
+                H5SC_size_est_source_t source;
 
-                if (desired == 0)
-                    desired = (size_t)dset_info->dset->shared->layout.u.struct_chunk.size;
+                if (H5SC__estimate_resident_size(dset_hdr, dset_info->dset, sel, true, 0, &source, &desired) <
+                    0)
+                    HGOTO_ERROR(H5E_SCC, H5E_CANTGETSIZE, FAIL,
+                                "invoke write: unable to estimate resident chunk size");
+
+                sel->estimate_resident_size = desired;
+                sel->estimate_source        = source;
+                sel->estimate_pending       = true;
 
                 /*
                  * IMPORTANT: keep budget semantics identical to the core SCC code.
@@ -1994,16 +3040,26 @@ H5SC__invoke_write_dset_batched(H5SC_t *cache, H5D_dset_io_info_t *dset_info, H5
             }
 
             if (inc > budget) {
-                HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL,
-                            "invoke write: single chunk exceeds effective budget; split further upstream");
+                /*
+                 * Dispatch any ordinary batch already under construction. This
+                 * candidate will become the first candidate in the next iteration and
+                 * will then be admitted as an oversized one-chunk batch.
+                 */
+                if (batch_len > 0)
+                    break;
+
+                /*
+                 * The selection cannot be divided below this one chunk. Admit it as a
+                 * one-entry oversized batch after reclaiming everything currently
+                 * reclaimable under the active policy.
+                 */
+                batch_need      = inc;
+                batch_len       = 1;
+                oversized_batch = true;
+                break;
             }
 
-            if (batch_need + inc > budget) {
-                /* Always make forward progress (even if it means a 1-chunk batch) */
-                if (batch_len == 0) {
-                    batch_need = inc;
-                    batch_len  = 1;
-                }
+            if (batch_need > budget || inc > budget - batch_need) {
                 break;
             }
 
@@ -2015,14 +3071,18 @@ H5SC__invoke_write_dset_batched(H5SC_t *cache, H5D_dset_io_info_t *dset_info, H5
 
         /* Evict before dispatching the batch. batch_need is incremental only. */
         if (batch_need > 0) {
-            if (H5SC__ensure_space(cache, batch_need) < 0)
+            if (H5SC__ensure_space(cache, batch_need, oversized_batch) < 0)
                 HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL,
-                            "invoke write: unable to evict enough space for batch");
+                            "invoke write: unable to prepare SCC space for batch");
         }
 
-        /* Finalize the active window for this batch. */
-        io->sel_chunks     = saved_sel;                 /* stable base */
-        io->sel_start      = saved_start + batch_start; /* absolute start in base */
+        if (oversized_batch)
+            H5SC__report_oversized_admission(cache, batch_need);
+
+        /* Finalize the indexed active window for this batch. */
+        io->sel_chunks     = saved_sel;
+        io->sel_order      = saved_order ? &saved_order[processed] : NULL;
+        io->sel_start      = saved_order ? saved_start : saved_start + processed;
         io->num_sel_chunks = batch_len;
 
 #ifdef DO_SANITY_CHECKS
@@ -2032,51 +3092,80 @@ H5SC__invoke_write_dset_batched(H5SC_t *cache, H5D_dset_io_info_t *dset_info, H5
             H5SC_test_write_max_batch_len = io->num_sel_chunks;
 #endif
 
-        if (H5SC_write(cache, 1, dset_info) < 0)
+        if (H5SC_write(cache, dset_info) < 0)
             HGOTO_ERROR(H5E_SCC, H5E_IOFAIL, FAIL, "invoke write: H5SC_write failed");
+
+        if (oversized_batch) {
+            /*
+             * This can flush and evict the just-written dirty chunk. That is
+             * intentional: a chunk too large for the active limit must not remain
+             * resident and supply artificial budget to later batches.
+             */
+            if (H5SC__ensure_space(cache, 0, false) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL,
+                            "invoke write: unable to restore configured active limit "
+                            "after oversized chunk");
+        }
 
         H5SC__stats_record_batch_write(cache);
         H5SC__stats_record_batch_write_len(cache, batch_len);
 
         processed += batch_len;
-
-#undef SEL
     }
 
 done:
-
-#ifdef H5SC_BATCH_INTO_SINGLE_CHUNK
-    /* Unpin any remaining selections after a chunk-by-chunk failure. */
-    if (ret_value < 0) {
-        size_t start_unpin = (i < saved_n) ? (i + 1) : saved_n;
-        for (size_t k = start_unpin; k < saved_n; k++) {
-            H5SC_chunk_t *chk2 = saved_sel[saved_start + k].cached_chunk;
-            if (chk2 && chk2->chunk_counter > 0) {
-                chk2->chunk_counter--; /* decrement exactly once per selection pin */
-                chk2->last_op = H5SC_TAG_UNPIN_WRITE_DONE_ERROR;
-            }
-        }
-    }
-#endif
-
-    /* Conservatively unpin any remaining selections after a batched failure. */
-    if (ret_value < 0) {
-        size_t start_unpin = processed;
-        for (size_t k = start_unpin; k < saved_n; k++) {
-            H5SC_chunk_t *chk2 = saved_sel[saved_start + k].cached_chunk;
-            if (chk2 && chk2->chunk_counter > 0) {
-                chk2->chunk_counter--; /* exactly once per selection pin */
-                chk2->last_op = H5SC_TAG_UNPIN_WRITE_DONE_ERROR;
-            }
-        }
-    }
-
-    /* Restore the original selection window. */
+    /*
+     * Restore the complete request window before inspecting or unwinding
+     * selection-owned pins. This makes H5SC__io_sel_at() resolve indices
+     * against the original selection and ordering arrays rather than the
+     * final active batch.
+     */
     if (dset_hdr && dset_hdr->io_info) {
-        dset_hdr->io_info->sel_chunks     = saved_sel;
-        dset_hdr->io_info->sel_start      = saved_start;
-        dset_hdr->io_info->num_sel_chunks = saved_n;
+        dset_hdr->io_info->sel_chunks              = saved_sel;
+        dset_hdr->io_info->sel_order               = saved_order;
+        dset_hdr->io_info->sel_start               = saved_start;
+        dset_hdr->io_info->num_sel_chunks          = saved_n;
+        dset_hdr->io_info->num_resident_sel_chunks = saved_resident_n;
+
+        /*
+         * A successful batched write must have released every
+         * selection-owned pin. Report an ownership leak instead of silently
+         * correcting it.
+         */
+        if (ret_value >= 0) {
+            for (size_t j = 0; j < saved_n; j++) {
+                H5SC_io_sel_chunk_t *sel = H5SC__io_sel_at(dset_hdr->io_info, j);
+
+                if (sel->pin_held) {
+                    HDONE_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL, "batched write completed with an owned pin");
+                    break;
+                }
+            }
+        }
+
+        /*
+         * Unwind pins only after the operation has failed. This includes a
+         * successful processing path converted to failure by the ownership
+         * check above.
+         */
+        if (ret_value < 0) {
+            for (size_t j = 0; j < saved_n; j++) {
+                H5SC_io_sel_chunk_t *sel = H5SC__io_sel_at(dset_hdr->io_info, j);
+                H5SC_chunk_t *chk        = sel->cached_chunk;
+
+                if (sel->pin_held) {
+                    if (!chk || H5SC__chunk_unpin(cache, dset_hdr, chk) < 0)
+                        HDONE_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL,
+                                    "batched write cleanup encountered an invalid owned pin");
+                    else {
+                        sel->pin_held = false;
+                        chk->last_op  = H5SC_TAG_UNPIN_WRITE_DONE_ERROR;
+                    }
+                }
+            }
+        }
     }
+
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5SC__invoke_write_dset_batched()*/
 
@@ -2117,15 +3206,15 @@ done:
  *-------------------------------------------------------------------------
  */
 
-herr_t
-H5SC_invoke_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
+herr_t H5SC_invoke_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
 {
     herr_t ret_value = SUCCEED;
-    bool   io_inited = false;
+    bool io_inited   = false;
 
     FUNC_ENTER_NOAPI(FAIL)
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     assert(count != (size_t)0);
     assert(dset_info);
@@ -2218,15 +3307,15 @@ done:
  *-------------------------------------------------------------------------
  */
 
-herr_t
-H5SC_invoke_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
+herr_t H5SC_invoke_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
 {
     herr_t ret_value = SUCCEED;
-    bool   io_inited = false;
+    bool io_inited   = false;
 
     FUNC_ENTER_NOAPI(FAIL)
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     assert(count != (size_t)0);
     assert(dset_info);
@@ -2304,6 +3393,12 @@ done:
  *     invoke, the function attaches returned udata to the corresponding
  *     cached chunk if that chunk does not already have udata assigned.
  *
+ *   Compact callback argument arrays are obtained from the reusable
+ *     H5SC_io_scratch_t workspace rather than allocated per invocation.
+ *     Only the first miss_count entries are valid for the lookup callback;
+ *     the workspace contents are transient and may be overwritten by later
+ *     SCC processing in the same request.
+ *
  * Inputs:
  *   H5D_t *dset:
  *     Pointer to the dataset whose layout lookup callback is to be used.
@@ -2318,22 +3413,20 @@ done:
  *-------------------------------------------------------------------------
  */
 
-static herr_t
-H5SC__lookup_cache_misses(H5D_t *dset, H5SC_io_info_t *sc_io_info)
+static herr_t H5SC__lookup_cache_misses(H5D_t *dset, H5SC_io_info_t *sc_io_info)
 {
-    H5SC_io_sel_chunk_t *base          = NULL;
-    size_t               miss_count    = 0;
-    size_t               sel_start     = 0;
-    haddr_t              md_tag        = HADDR_UNDEF;
-    herr_t               ret_value     = SUCCEED;
-    const hsize_t      **scaled_miss   = NULL;
-    haddr_t            **addr_miss     = NULL;
-    hsize_t            **size_miss     = NULL;
-    hsize_t            **def_sz_miss   = NULL;
-    size_t             **hint_miss     = NULL;
-    size_t             **def_hint_miss = NULL;
-    void               **udata_miss    = NULL;
-    size_t              *miss_idx      = NULL;
+    size_t miss_count           = 0;
+    haddr_t md_tag              = HADDR_UNDEF;
+    bool md_tag_set             = false;
+    herr_t ret_value            = SUCCEED;
+    const hsize_t **scaled_miss = NULL;
+    haddr_t **addr_miss         = NULL;
+    hsize_t **size_miss         = NULL;
+    hsize_t **def_sz_miss       = NULL;
+    size_t **hint_miss          = NULL;
+    size_t **def_hint_miss      = NULL;
+    void **udata_miss           = NULL;
+    size_t *miss_idx            = NULL;
 
     FUNC_ENTER_PACKAGE
 
@@ -2341,23 +3434,17 @@ H5SC__lookup_cache_misses(H5D_t *dset, H5SC_io_info_t *sc_io_info)
     assert(sc_io_info);
     assert(dset->shared->layout.sc_ops->lookup);
 
-    sel_start = sc_io_info->sel_start;
-    base      = sc_io_info->sel_chunks;
-
-/* Selection accessor for the active window. */
-#define SEL(j_) (&base[sel_start + (j_)])
-
     /* Count non-resident selections that still need lookup metadata. */
     for (size_t j = 0; j < sc_io_info->num_sel_chunks; j++) {
 
-        H5SC_io_sel_chunk_t *sel = SEL(j);
-        H5SC_chunk_t        *chk = sel->cached_chunk;
+        H5SC_io_sel_chunk_t *sel = H5SC__io_sel_at(sc_io_info, j);
+        H5SC_chunk_t *chk        = sel->cached_chunk;
         assert(chk);
 
         if (chk->chunk_obj)
             continue; /* resident => no lookup needed */
 
-        if (sel->lookup_valid == true)
+        if (sel->lookup_valid)
             continue; /* already cached for this invoke */
 
         miss_count++;
@@ -2367,31 +3454,32 @@ H5SC__lookup_cache_misses(H5D_t *dset, H5SC_io_info_t *sc_io_info)
         HGOTO_DONE(SUCCEED);
     }
 
-    /* Allocate lookup scratch arrays on the heap. */
-    if (NULL == (scaled_miss = (const hsize_t **)H5MM_malloc(miss_count * sizeof(*scaled_miss))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate scaled_miss array");
-    if (NULL == (addr_miss = (haddr_t **)H5MM_malloc(miss_count * sizeof(*addr_miss))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate addr_miss array");
-    if (NULL == (size_miss = (hsize_t **)H5MM_malloc(miss_count * sizeof(*size_miss))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate size_miss array");
-    if (NULL == (def_sz_miss = (hsize_t **)H5MM_malloc(miss_count * sizeof(*def_sz_miss))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate def_sz_miss array");
-    if (NULL == (hint_miss = (size_t **)H5MM_malloc(miss_count * sizeof(*hint_miss))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate hint_miss array");
-    if (NULL == (def_hint_miss = (size_t **)H5MM_malloc(miss_count * sizeof(*def_hint_miss))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate def_hint_miss array");
-    if (NULL == (udata_miss = (void **)H5MM_malloc(miss_count * sizeof(*udata_miss))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate udata_miss array");
-    if (NULL == (miss_idx = (size_t *)H5MM_malloc(miss_count * sizeof(*miss_idx))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate miss_idx array");
+    /*
+     * Ensure the reusable compact lookup workspace can represent all misses in
+     * the current active selection window.
+     */
+    if (H5SC__io_scratch_ensure(sc_io_info, sc_io_info->num_sel_chunks) < 0)
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to prepare SCC compact lookup scratch storage");
+
+    assert(sc_io_info->scratch);
+    assert(sc_io_info->scratch->alloced >= miss_count);
+
+    scaled_miss   = sc_io_info->scratch->lookup_scaled;
+    addr_miss     = sc_io_info->scratch->lookup_addr;
+    size_miss     = sc_io_info->scratch->lookup_size;
+    def_sz_miss   = sc_io_info->scratch->lookup_defined_values_size;
+    hint_miss     = sc_io_info->scratch->lookup_size_hint;
+    def_hint_miss = sc_io_info->scratch->lookup_defined_values_size_hint;
+    udata_miss    = sc_io_info->scratch->lookup_udata;
+    miss_idx      = sc_io_info->scratch->lookup_idx;
 
     /* Build lookup argument arrays for the current miss set. */
     {
         size_t k = 0;
 
         for (size_t j = 0; j < sc_io_info->num_sel_chunks; j++) {
-            H5SC_io_sel_chunk_t *sel = SEL(j);
-            H5SC_chunk_t        *chk = sel->cached_chunk;
+            H5SC_io_sel_chunk_t *sel = H5SC__io_sel_at(sc_io_info, j);
+            H5SC_chunk_t *chk        = sel->cached_chunk;
 
             if (chk->chunk_obj || sel->lookup_valid == true)
                 continue;
@@ -2405,45 +3493,54 @@ H5SC__lookup_cache_misses(H5D_t *dset, H5SC_io_info_t *sc_io_info)
             hint_miss[k]     = &sel->lookup_size_hint;
             def_hint_miss[k] = &sel->lookup_defined_values_size_hint;
 
+            /*
+             * lookup_udata is output storage for this callback invocation. Do not
+             * retain a pointer left over from an earlier compact lookup.
+             */
             udata_miss[k] = NULL;
+
             k++;
         }
 
+        assert(k == miss_count);
+
         /* Tag metadata accesses for the batched lookup. */
         H5AC_tag(dset->oloc.addr, &md_tag);
+        md_tag_set = true;
 
         if (dset->shared->layout.sc_ops->lookup(dset, miss_count, scaled_miss, addr_miss, size_miss,
                                                 def_sz_miss, hint_miss, def_hint_miss, udata_miss) < 0) {
-            H5AC_tag(md_tag, NULL); /* Reset the metadata tag on error as well */
             HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "unable to lookup chunk (SCC)");
         }
 
-        H5AC_tag(md_tag, NULL); /* Reset the metadata tag for the next dataset */
-
         /* Commit returned lookup metadata. */
         for (size_t k2 = 0; k2 < miss_count; k2++) {
-            size_t               j   = miss_idx[k2];
-            H5SC_io_sel_chunk_t *sel = SEL(j);
-            H5SC_chunk_t        *chk = sel->cached_chunk;
+            size_t j                 = miss_idx[k2];
+            H5SC_io_sel_chunk_t *sel = H5SC__io_sel_at(sc_io_info, j);
+            H5SC_chunk_t *chk        = sel->cached_chunk;
+
+#if H5SC_DO_SANITY_CHECKS
+            assert(!sel->lookup_udata);
+            assert(!sel->lookup_valid);
+#endif
 
             sel->lookup_udata = udata_miss[k2];
             sel->lookup_valid = true;
 
-            if (chk && !chk->udata)
-                chk->udata = udata_miss[k2];
+            assert(chk);
+
+#if H5SC_DO_SANITY_CHECKS
+            assert(!chk->chunk_obj);
+            assert(!chk->udata);
+#endif
+
+            chk->udata = udata_miss[k2];
         }
     }
 
-#undef SEL
 done:
-    scaled_miss   = (const hsize_t **)H5MM_xfree((void *)scaled_miss);
-    addr_miss     = (haddr_t **)H5MM_xfree(addr_miss);
-    size_miss     = (hsize_t **)H5MM_xfree(size_miss);
-    def_sz_miss   = (hsize_t **)H5MM_xfree(def_sz_miss);
-    hint_miss     = (size_t **)H5MM_xfree(hint_miss);
-    def_hint_miss = (size_t **)H5MM_xfree(def_hint_miss);
-    udata_miss    = (void **)H5MM_xfree(udata_miss);
-    miss_idx      = (size_t *)H5MM_xfree(miss_idx);
+    if (md_tag_set)
+        H5AC_tag(md_tag, NULL); /* Reset the metadata tag for the next dataset */
 
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5SC__lookup_cache_misses() */
@@ -2471,8 +3568,7 @@ done:
  *-------------------------------------------------------------------------
  */
 
-static inline void
-H5SC__io_sel_chunk_init(H5SC_io_sel_chunk_t *chunk)
+static inline void H5SC__io_sel_chunk_init(H5SC_io_sel_chunk_t *chunk)
 {
     /* Zero everything (safe defaults for most members) */
     memset(chunk, 0, sizeof(*chunk));
@@ -2490,6 +3586,81 @@ H5SC__io_sel_chunk_init(H5SC_io_sel_chunk_t *chunk)
      * buf.vp/cvp = NULL (via zeroing the flexible ptr union)
      * coords/scaled/chk_log_coord = 0
      */
+}
+
+static inline H5SC_io_sel_chunk_t *H5SC__io_sel_at(const H5SC_io_info_t *io, size_t relative_idx)
+{
+    size_t absolute_idx;
+
+    assert(io);
+    assert(io->sel_chunks);
+    assert(relative_idx < io->num_sel_chunks);
+
+    if (io->sel_order)
+        absolute_idx = io->sel_order[relative_idx];
+    else
+        absolute_idx = io->sel_start + relative_idx;
+
+    assert(absolute_idx < io->sel_chunks_alloced);
+
+    return &io->sel_chunks[absolute_idx];
+} /* end H5SC__io_sel_at() */
+
+static herr_t H5SC__build_resident_first_order(H5SC_io_info_t *sc_io_info)
+{
+    size_t order_count = 0;
+    herr_t ret_value   = SUCCEED;
+
+    FUNC_ENTER_PACKAGE
+
+    assert(sc_io_info);
+
+    sc_io_info->sel_order               = NULL;
+    sc_io_info->num_resident_sel_chunks = 0;
+
+    if (sc_io_info->num_sel_chunks == 0)
+        HGOTO_DONE(SUCCEED);
+
+    if (H5SC__io_scratch_ensure(sc_io_info, sc_io_info->num_sel_chunks) < 0)
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate resident-first order vector");
+
+    assert(sc_io_info->scratch);
+    assert(sc_io_info->scratch->order_idx);
+    assert(sc_io_info->scratch->alloced >= sc_io_info->num_sel_chunks);
+
+    /*
+     * First pass: resident decoded chunks, preserving their original order.
+     */
+    for (size_t i = 0; i < sc_io_info->num_sel_chunks; i++) {
+        H5SC_io_sel_chunk_t *sel = &sc_io_info->sel_chunks[sc_io_info->sel_start + i];
+
+        assert(sel->cached_chunk);
+
+        if (sel->cached_chunk->chunk_obj)
+            sc_io_info->scratch->order_idx[order_count++] = sc_io_info->sel_start + i;
+    }
+
+    sc_io_info->num_resident_sel_chunks = order_count;
+
+    /*
+     * Second pass: nonresident chunks and cached shells, preserving their
+     * original order.
+     */
+    for (size_t i = 0; i < sc_io_info->num_sel_chunks; i++) {
+        H5SC_io_sel_chunk_t *sel = &sc_io_info->sel_chunks[sc_io_info->sel_start + i];
+
+        assert(sel->cached_chunk);
+
+        if (!sel->cached_chunk->chunk_obj)
+            sc_io_info->scratch->order_idx[order_count++] = sc_io_info->sel_start + i;
+    }
+
+    assert(order_count == sc_io_info->num_sel_chunks);
+
+    sc_io_info->sel_order = sc_io_info->scratch->order_idx;
+
+done:
+    FUNC_LEAVE_NOAPI(ret_value)
 }
 
 /*-------------------------------------------------------------------------
@@ -2535,18 +3706,18 @@ H5SC__io_sel_chunk_init(H5SC_io_sel_chunk_t *chunk)
  *-------------------------------------------------------------------------
  */
 
-static herr_t
-H5SC__io_info_init(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
+static herr_t H5SC__io_info_init(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
 {
-    H5S_t          *tmp_dset_space     = NULL;
-    H5S_t          *single_chunk_space = NULL;
-    H5SC_io_info_t *sc_io_info         = NULL;
-    size_t          i;
-    herr_t          ret_value = SUCCEED;
+    H5S_t *tmp_dset_space      = NULL;
+    H5S_t *single_chunk_space  = NULL;
+    H5SC_io_info_t *sc_io_info = NULL;
+    size_t i;
+    herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     assert(count == 0 || dset_info);
 
@@ -2555,35 +3726,36 @@ H5SC__io_info_init(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
         H5S_sel_type file_sel_type;
         H5S_sel_type mem_sel_type;
 
-        hsize_t  sel_points;
-        hsize_t  chunk_dims[H5S_MAX_RANK];
-        hsize_t  file_dims[H5S_MAX_RANK];
-        hsize_t  mem_dims[H5S_MAX_RANK];
+        hsize_t sel_points;
+        hsize_t chunk_dims[H5S_MAX_RANK];
+        hsize_t file_dims[H5S_MAX_RANK];
+        hsize_t mem_dims[H5S_MAX_RANK];
         unsigned file_ndims;
         unsigned mem_ndims;
-        hsize_t  start_coords[H5O_LAYOUT_NDIMS]; /* Starting coordinates of selection */
-        hsize_t  coords[H5S_MAX_RANK];           /* Current coordinates of chunk */
-        hsize_t  end[H5S_MAX_RANK];              /* Final coordinates of chunk */
-        hsize_t  start_scaled[H5S_MAX_RANK];     /* Starting scaled coordinates of selection */
-        hsize_t  scaled[H5S_MAX_RANK];           /* Scaled coordinates for this chunk */
-        hsize_t  file_sel_start[H5S_MAX_RANK];   /* Offset of low bound of file selection */
-        hsize_t  file_sel_end[H5S_MAX_RANK];     /* Offset of high bound of file selection */
+        hsize_t start_coords[H5O_LAYOUT_NDIMS]; /* Starting coordinates of selection */
+        hsize_t coords[H5S_MAX_RANK];           /* Current coordinates of chunk */
+        hsize_t end[H5S_MAX_RANK];              /* Final coordinates of chunk */
+        hsize_t start_scaled[H5S_MAX_RANK];     /* Starting scaled coordinates of selection */
+        hsize_t scaled[H5S_MAX_RANK];           /* Scaled coordinates for this chunk */
+        hsize_t file_sel_start[H5S_MAX_RANK];   /* Offset of low bound of file selection */
+        hsize_t file_sel_end[H5S_MAX_RANK];     /* Offset of high bound of file selection */
         unsigned num_partial_dims;
-        hsize_t  curr_partial_clip[H5S_MAX_RANK];    /* Current partial dimension sizes to clip against */
-        hsize_t  partial_dim_size[H5S_MAX_RANK];     /* Size of a partial dimension */
+        hsize_t curr_partial_clip[H5S_MAX_RANK];     /* Current partial dimension sizes to clip against */
+        hsize_t partial_dim_size[H5S_MAX_RANK];      /* Size of a partial dimension */
         bool is_partial_dim[H5S_MAX_RANK] = {false}; /* Whether a dimension is currently a partial chunk */
-        int  curr_dim;                               /* Current dimension to increment */
+        int curr_dim;                                /* Current dimension to increment */
         hssize_t adjust[H5S_MAX_RANK];               /* Adjustment to make to all file chunks (for shape same
                                                         algorithm)*/
         hsize_t zeros[H5S_MAX_RANK]; /* All zero vector (for start parameter to setting hyperslab on
                                         partial   chunks for "all" selection) */
-        hsize_t  dset_sel_chunks;
-        bool     shape_same;
+        hsize_t dset_sel_chunks;
+        bool shape_same;
         unsigned u;
 
-#ifdef H5SC_DO_SANITY_CHECKS
-        /* Sanity check to ensure the is present in */
         H5SC_dset_header_t *dset_hdr = H5SC__ht_dset_find(cache, dset_info[i].dset->oloc.addr);
+
+#if H5SC_DO_SANITY_CHECKS
+        /* Sanity check to ensure the is present in */
         if (dset_hdr == NULL) {
             {
                 HGOTO_ERROR(H5E_SCC, H5E_HT_NOTFOUND, FAIL,
@@ -2807,7 +3979,13 @@ H5SC__io_info_init(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
                 if (cached_chk) {
                     cached_chk->chk_log_coord = log_chk_idx;
                     sel_chunk->cached_chunk   = cached_chk;
-                    sel_chunk->cached_chunk->chunk_counter++;
+
+                    if (H5SC__chunk_pin(cache, dset_hdr, cached_chk) < 0)
+                        HGOTO_ERROR(H5E_SCC, H5E_CANTPIN, FAIL,
+                                    "unable to pin cached chunk during I/O initialization");
+
+                    sel_chunk->pin_held = true;
+
                     sel_chunk->cached_chunk->last_op = H5SC_TAG_PIN_IOINIT_CACHED;
                 }
                 else {
@@ -2823,13 +4001,20 @@ H5SC__io_info_init(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
                                     "failed to insert chunk into hash table during io init process");
                     }
 
-                    if (H5SC__chunk_lru_prepend(dset_hdr, cached_chk) < 0) {
+                    if (H5SC__chunk_lru_prepend(cache, dset_hdr, cached_chk) < 0) {
                         HGOTO_ERROR(H5E_SCC, H5E_CANNOTINSERT, FAIL,
                                     "failed to insert chunk into dset dll during io init process");
                     }
-                    /* Increase pin count to retain this chunk during mid-I/O request processing evictions */
+                    /* Increase pin count to retain this chunk during mid-I/O request processing evictions
+                     */
                     cached_chk->chk_log_coord = log_chk_idx;
-                    cached_chk->chunk_counter++;
+
+                    if (H5SC__chunk_pin(cache, dset_hdr, cached_chk) < 0)
+                        HGOTO_ERROR(H5E_SCC, H5E_CANTPIN, FAIL,
+                                    "unable to pin new chunk during I/O initialization");
+
+                    sel_chunk->pin_held = true;
+
                     cached_chk->last_op     = H5SC_TAG_PIN_IOINIT;
                     sel_chunk->cached_chunk = cached_chk;
                 }
@@ -3075,18 +4260,30 @@ H5SC__io_info_init(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
                         /* Sanity check */
                         assert(num_partial_dims <= file_ndims);
                     } /* end if */
-                }     /* end if */
+                } /* end if */
             }
         }
 
         /* Close temporary dataspaces */
         if (tmp_dset_space && H5S_close(tmp_dset_space) < 0)
             HGOTO_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL, "can't release temporary file dataspace");
+
         tmp_dset_space = NULL;
+
         if (single_chunk_space && H5S_close(single_chunk_space) < 0)
             HGOTO_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL, "can't release temporary file dataspace");
+
         single_chunk_space = NULL;
+
+        if (H5SC__build_resident_first_order(sc_io_info) < 0)
+            HGOTO_ERROR(H5E_SCC, H5E_CANTINIT, FAIL, "unable to build resident-first selection order");
     }
+
+#if H5SC_DO_SANITY_CHECKS
+    if (H5SC__verify_cached_reclaimability(cache) < 0)
+        HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL,
+                    "cached reclaimability mismatch after I/O initialization");
+#endif
 
 done:
     /* Clean up on failure */
@@ -3113,90 +4310,140 @@ done:
 } /* end H5SC__io_info_init() */
 
 /*-------------------------------------------------------------------------
- * Function: H5SC__erase_io_info_init
+ * Function: H5SC__selection_io_info_init
  *
  * Purpose:
- *   Initialize SCC per-request state for an erase operation.
+ *   Initialize the selection-decomposition portion of an SCC request from
+ *     a dataset file-space selection.
  *
- *   This is a trimmed variant of H5SC__io_info_init() specialized for
- *   H5SC_erase().  It identifies the chunks intersecting file_space,
- *   finds or creates SCC chunk entries for them, pins those entries for
- *   the duration of the erase operation, and computes the per-chunk
- *   file-space selection in logical chunk coordinates.
+ *   The function decomposes file_space into the logical structured chunks
+ *     that intersect the selection. For each participating chunk, an
+ *     H5SC_io_sel_chunk_t entry is populated with:
  *
- *   Unlike H5SC__io_info_init(), this function does not compute or store
- *   per-chunk memory-space selections because erase does not involve
- *   scatter/gather operations.
+ *       - the chunk origin in dataset coordinates;
+ *       - the scaled chunk coordinates;
+ *       - the dataset-relative logical chunk index; and
+ *       - a chunk-local dataspace containing the portion of file_space
+ *         that intersects that logical chunk.
+ *
+ *   Partial-edge chunks are clipped to the current dataset extent before
+ *     the chunk-local selection is constructed. The resulting file_space
+ *     stored in each selected-chunk entry is therefore expressed entirely
+ *     in logical chunk coordinates and contains only valid in-extent
+ *     elements.
+ *
+ *   This helper is intentionally cache-neutral. It does not perform SCC
+ *     hash-table lookups, create H5SC_chunk_t entries, modify either SCC
+ *     LRU, pin chunks, perform on-disk chunk lookups, or alter cache
+ *     accounting. Cache-specific behavior is left to the caller.
+ *
+ *   The helper is shared by operations that require the same file-selection
+ *     decomposition but have different cache semantics. In particular,
+ *     H5SC__erase_io_info_init() adds cache lookup/creation and pinning after
+ *     this function returns, while H5SC_get_defined() uses the decomposed
+ *     selections without modifying SCC residency.
+ *
+ *   H5S_SEL_ALL and H5S_SEL_HYPERSLABS selections are supported.
+ *     H5S_SEL_POINTS selections are intentionally unsupported by the current
+ *     SCC interface and are rejected.
+ *
+ * Inputs:
+ *   H5D_t *dset:
+ *     Pointer to the structured-chunk dataset associated with file_space.
+ *     The dataset layout client's layout_query callback is used to obtain
+ *     the logical chunk dimensions.
+ *
+ *   const H5S_t *file_space:
+ *     Dataset dataspace containing the selection to decompose.
+ *
+ *   H5SC_io_info_t *sc_io_info:
+ *     Dataset-owned SCC request state to populate. Existing transient
+ *     selection state is reset before decomposition begins. The sel_chunks
+ *     backing allocation may be retained and reused.
+ *
+ *     On success, num_sel_chunks identifies the number of valid
+ *     H5SC_io_sel_chunk_t entries beginning at sel_chunks[0], and sel_start
+ *     is set to zero.
  *
  * Return:
  *   SUCCEED on success;
  *   FAIL on failure.
  *-------------------------------------------------------------------------
  */
-static herr_t
-H5SC__erase_io_info_init(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
+static herr_t H5SC__selection_io_info_init(H5D_t *dset, const H5S_t *file_space, H5SC_io_info_t *sc_io_info)
 {
-    H5SC_dset_header_t *dset_hdr           = NULL;
-    H5SC_io_info_t     *sc_io_info         = NULL;
-    H5S_t              *single_chunk_space = NULL;
-    hsize_t             chunk_dims[H5S_MAX_RANK];
-    hsize_t             file_dims[H5S_MAX_RANK];
-    hsize_t             start_coords[H5O_LAYOUT_NDIMS];
-    hsize_t             coords[H5S_MAX_RANK];
-    hsize_t             end[H5S_MAX_RANK];
-    hsize_t             start_scaled[H5S_MAX_RANK];
-    hsize_t             scaled[H5S_MAX_RANK];
-    hsize_t             file_sel_start[H5S_MAX_RANK];
-    hsize_t             file_sel_end[H5S_MAX_RANK];
-    hsize_t             zeros[H5S_MAX_RANK];
-    hsize_t             curr_partial_clip[H5S_MAX_RANK];
-    hsize_t             partial_dim_size[H5S_MAX_RANK];
-    bool                is_partial_dim[H5S_MAX_RANK] = {false};
-    hsize_t             sel_points;
-    hsize_t             dset_sel_chunks = 0;
-    unsigned            file_ndims;
-    unsigned            num_partial_dims = 0;
-    H5S_sel_type        file_sel_type;
-    int                 curr_dim;
-    unsigned            u;
-    herr_t              ret_value = SUCCEED;
+    H5S_t *single_chunk_space = NULL;
+    hsize_t chunk_dims[H5S_MAX_RANK];
+    hsize_t file_dims[H5S_MAX_RANK];
+    hsize_t start_coords[H5O_LAYOUT_NDIMS];
+    hsize_t coords[H5S_MAX_RANK];
+    hsize_t end[H5S_MAX_RANK];
+    hsize_t start_scaled[H5S_MAX_RANK];
+    hsize_t scaled[H5S_MAX_RANK];
+    hsize_t file_sel_start[H5S_MAX_RANK];
+    hsize_t file_sel_end[H5S_MAX_RANK];
+    hsize_t zeros[H5S_MAX_RANK];
+
+    hsize_t sel_points;
+    unsigned file_ndims;
+    H5S_sel_type file_sel_type;
+    int curr_dim;
+    unsigned u;
+    herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
-    assert(cache);
     assert(dset);
     assert(file_space);
+    assert(sc_io_info);
     assert(dset->shared->layout.sc_ops);
     assert(dset->shared->layout.sc_ops->layout_query);
 
-    dset_hdr = H5SC__ht_dset_find(cache, dset->oloc.addr);
-    if (dset_hdr == NULL)
-        HGOTO_ERROR(H5E_SCC, H5E_HT_NOTFOUND, FAIL,
-                    "dataset should have been added to the hash table upon creation");
-
-    dset_hdr->dset = dset;
-
-    sc_io_info = dset_hdr->io_info;
-    assert(sc_io_info);
-
+    /*
+     * Release transient state from the previous use of this structure.
+     * The new selection is always constructed beginning at sel_chunks[0].
+     */
     if (H5SC__io_info_reset(sc_io_info) < 0)
-        HGOTO_ERROR(H5E_SCC, H5E_IOFAIL, FAIL, "failed to reset sc_io_info during erase init");
+        HGOTO_ERROR(H5E_SCC, H5E_IOFAIL, FAIL, "failed to reset SCC selection information");
 
+    sc_io_info->sel_start = 0;
+
+    /* Get number of elements in the file selection. */
     sel_points = H5S_GET_SELECT_NPOINTS(file_space);
+
+    /* Nothing to decompose for an empty selection. */
     if (sel_points == 0)
         HGOTO_DONE(SUCCEED);
 
+    /* Get chunk dimensions from the layout client. */
     if (dset->shared->layout.sc_ops->layout_query(dset, chunk_dims, NULL, NULL) < 0)
         HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "unable to query chunk dimensions");
 
+    /* Get dataspace rank. */
     file_ndims = (unsigned)H5S_GET_EXTENT_NDIMS(file_space);
 
+    /* Get selection type. */
     if ((file_sel_type = H5S_GET_SELECT_TYPE(file_space)) < H5S_SEL_NONE)
         HGOTO_ERROR(H5E_DATASET, H5E_BADSELECT, FAIL, "unable to get type of selection");
 
+    /*
+     * Point selections are intentionally unsupported for the current SCC
+     * I/O interface.
+     */
+    if (H5S_SEL_POINTS == file_sel_type)
+        HGOTO_ERROR(H5E_DATASPACE, H5E_UNSUPPORTED, FAIL, "point selections are not yet supported by SCC");
+
+    if (H5S_SEL_ALL != file_sel_type && H5S_SEL_HYPERSLABS != file_sel_type)
+        HGOTO_ERROR(H5E_DATASPACE, H5E_UNSUPPORTED, FAIL, "unsupported file selection type for SCC");
+
+    /* Get dataset dimensions. */
     if (H5S_get_simple_extent_dims(file_space, file_dims, NULL) < 0)
         HGOTO_ERROR(H5E_DATASPACE, H5E_CANTGET, FAIL, "can't get file dataspace dimensions");
 
+    /*
+     * Set up the bounding box and initial chunk coordinates used to
+     * enumerate the selected chunks.
+     */
     if (H5S_SEL_ALL == file_sel_type) {
         memset(zeros, 0, sizeof(zeros));
 
@@ -3210,23 +4457,14 @@ H5SC__erase_io_info_init(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
 
             file_sel_start[u] = 0;
             file_sel_end[u]   = file_dims[u] - 1;
-
-            partial_dim_size[u] = file_dims[u] % chunk_dims[u];
-            if (file_dims[u] < chunk_dims[u]) {
-                curr_partial_clip[u] = partial_dim_size[u];
-                is_partial_dim[u]    = true;
-                num_partial_dims++;
-            }
-            else {
-                curr_partial_clip[u] = chunk_dims[u];
-                is_partial_dim[u]    = false;
-            }
         }
 
         if (NULL == (single_chunk_space = H5S_create_simple(file_ndims, chunk_dims, NULL)))
             HGOTO_ERROR(H5E_DATASET, H5E_CANTCREATE, FAIL, "unable to create dataspace for chunk");
     }
     else {
+        assert(H5S_SEL_HYPERSLABS == file_sel_type);
+
         if (H5S_SELECT_BOUNDS(file_space, file_sel_start, file_sel_end) < 0)
             HGOTO_ERROR(H5E_DATASPACE, H5E_CANTGET, FAIL, "can't get file selection bound info");
 
@@ -3240,13 +4478,26 @@ H5SC__erase_io_info_init(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
         }
     }
 
+    /*
+     * Walk all chunks within the file-selection bounding box. A chunk is
+     * added to sel_chunks only if it intersects the actual selection.
+     */
     while (sel_points) {
-        if ((H5S_SEL_ALL == file_sel_type) || (true == H5S_SELECT_INTERSECT_BLOCK(file_space, coords, end))) {
-            H5SC_io_sel_chunk_t *sel_chunk   = NULL;
-            hsize_t              log_chk_idx = 0;
-            H5SC_chunk_key_t     chk_key;
-            H5SC_chunk_t        *cached_chk = NULL;
+        /*
+         * H5S_SELECT_INTERSECT_BLOCK() is logically a selection query, but its
+         * internal interface does not currently accept a const dataspace. Keep the
+         * SCC selection interfaces const-correct; resolving the H5S signature is
+         * outside the scope of this module.
+         */
+        if ((H5S_SEL_ALL == file_sel_type) ||
+            (true == H5S_SELECT_INTERSECT_BLOCK((H5S_t *)file_space, coords, end))) {
 
+            H5SC_io_sel_chunk_t *sel_chunk = NULL;
+            hsize_t log_chk_idx            = 0;
+
+            /*
+             * Allocate or extend the selected-chunk array as required.
+             */
             if (!sc_io_info->sel_chunks) {
                 assert(sc_io_info->num_sel_chunks == 0);
                 assert(sc_io_info->sel_chunks_alloced == 0);
@@ -3258,7 +4509,7 @@ H5SC__erase_io_info_init(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
                 sc_io_info->sel_chunks_alloced = H5SC_INIT_CHUNK_LIST_SIZE;
             }
             else if (sc_io_info->num_sel_chunks == sc_io_info->sel_chunks_alloced) {
-                void  *tmp_ptr = NULL;
+                void *tmp_ptr = NULL;
                 size_t old_alloc;
 
                 if (NULL ==
@@ -3277,84 +4528,93 @@ H5SC__erase_io_info_init(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
 
             assert(sc_io_info->num_sel_chunks < sc_io_info->sel_chunks_alloced);
 
-            sel_chunk = &(sc_io_info->sel_chunks[sc_io_info->num_sel_chunks]);
+            sel_chunk = &sc_io_info->sel_chunks[sc_io_info->num_sel_chunks];
 
             H5SC__io_sel_chunk_init(sel_chunk);
 
+            /*
+             * Preserve both dataset-coordinate and scaled chunk positions.
+             * These fields are intentionally populated independently of SCC
+             * cache state.
+             */
+            H5MM_memcpy(sel_chunk->coords, coords, sizeof(hsize_t) * file_ndims);
+            H5MM_memcpy(sel_chunk->scaled, scaled, sizeof(hsize_t) * file_ndims);
+
+            /* Compute the dataset-relative logical chunk index. */
             if (H5SC__compute_logical_chunk_index(file_ndims, file_dims, chunk_dims, coords, &log_chk_idx) <
                 0)
                 HGOTO_ERROR(H5E_SCC, H5E_CANTCOMPUTE, FAIL, "failed to compute linear chunk index");
 
             sel_chunk->chk_log_coord = log_chk_idx;
 
-            if (H5SC__compute_chunk_key(&(dset->oloc.addr), &(sel_chunk->chk_log_coord), &chk_key) < 0)
-                HGOTO_ERROR(H5E_SCC, H5E_CHUNK_KEY, FAIL, "failed to compute chunk key during erase init");
-
-            cached_chk = H5SC__ht_chunk_find(cache, &chk_key);
-
-            if (cached_chk) {
-                cached_chk->chk_log_coord = log_chk_idx;
-                sel_chunk->cached_chunk   = cached_chk;
-                sel_chunk->cached_chunk->chunk_counter++;
-                sel_chunk->cached_chunk->last_op = H5SC_TAG_PIN_IOINIT_CACHED;
-            }
-            else {
-                cached_chk = H5SC__make_chunk(chk_key, (size_t)0, (size_t)0, false);
-                if (!cached_chk)
-                    HGOTO_ERROR(H5E_SCC, H5E_CANNOTALLOC, FAIL, "failed to create chunk during erase init");
-
-                if (H5SC__ht_chunk_insert(cache, cached_chk) < 0)
-                    HGOTO_ERROR(H5E_SCC, H5E_CANNOTINSERT, FAIL,
-                                "failed to insert chunk into hash table during erase init");
-
-                if (H5SC__chunk_lru_prepend(dset_hdr, cached_chk) < 0)
-                    HGOTO_ERROR(H5E_SCC, H5E_CANNOTINSERT, FAIL,
-                                "failed to insert chunk into dataset LRU during erase init");
-
-                cached_chk->chk_log_coord = log_chk_idx;
-                cached_chk->chunk_counter++;
-                cached_chk->last_op     = H5SC_TAG_PIN_IOINIT;
-                sel_chunk->cached_chunk = cached_chk;
-            }
-
-            sc_io_info->num_sel_chunks++;
-
+            /*
+             * Construct the selection within the logical chunk.
+             */
             if (H5S_SEL_ALL == file_sel_type) {
+                hsize_t clip_count[H5S_MAX_RANK];
+                bool needs_clip = false;
+
                 if (NULL == (sel_chunk->file_space = H5S_copy(single_chunk_space, true, false)))
                     HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCOPY, FAIL, "unable to copy chunk dataspace");
 
-                if (num_partial_dims > 0)
-                    if (H5S_select_hyperslab(sel_chunk->file_space, H5S_SELECT_SET, zeros, NULL,
-                                             curr_partial_clip, NULL) < 0)
-                        HGOTO_ERROR(H5E_DATASET, H5E_CANTSELECT, FAIL, "can't create chunk erase selection");
+                /*
+                 * Compute the portion of this logical chunk that lies within the
+                 * current dataset extent. This is done per chunk rather than by
+                 * maintaining partial-edge state across the chunk iteration.
+                 */
+                for (u = 0; u < file_ndims; u++) {
+                    if (coords[u] >= file_dims[u])
+                        HGOTO_ERROR(H5E_SCC, H5E_BADVALUE, FAIL,
+                                    "selected chunk origin lies outside dataset extent");
+
+                    clip_count[u] = MIN(chunk_dims[u], file_dims[u] - coords[u]);
+
+                    if (clip_count[u] == 0)
+                        HGOTO_ERROR(H5E_SCC, H5E_BADVALUE, FAIL, "computed zero-sized chunk intersection");
+
+                    if (clip_count[u] < chunk_dims[u])
+                        needs_clip = true;
+                }
+
+                /*
+                 * H5S_copy(single_chunk_space) has H5S_ALL selected. Convert partial
+                 * chunks to an explicit hyperslab covering only the in-extent region.
+                 */
+                if (needs_clip) {
+                    memset(zeros, 0, sizeof(zeros));
+
+                    if (H5S_select_hyperslab(sel_chunk->file_space, H5S_SELECT_SET, zeros, NULL, clip_count,
+                                             NULL) < 0)
+                        HGOTO_ERROR(H5E_DATASET, H5E_CANTSELECT, FAIL,
+                                    "can't create clipped chunk selection");
+                }
             }
             else {
-                if (H5S_SEL_HYPERSLABS == file_sel_type) {
-                    hsize_t clip_count[H5S_MAX_RANK];
+                hsize_t clip_count[H5S_MAX_RANK];
 
-                    for (u = 0; u < file_ndims; u++) {
-                        if (coords[u] >= file_dims[u])
-                            HGOTO_ERROR(
-                                H5E_SCC, H5E_BADVALUE, FAIL,
-                                "attempted to build erase selection for chunk outside dataset extent");
+                assert(H5S_SEL_HYPERSLABS == file_sel_type);
 
-                        clip_count[u] = MIN(chunk_dims[u], file_dims[u] - coords[u]);
+                for (u = 0; u < file_ndims; u++) {
+                    if (coords[u] >= file_dims[u])
+                        HGOTO_ERROR(H5E_SCC, H5E_BADVALUE, FAIL,
+                                    "attempted to build selection for chunk outside dataset extent");
 
-                        if (clip_count[u] == 0)
-                            HGOTO_ERROR(H5E_SCC, H5E_BADVALUE, FAIL,
-                                        "computed zero-sized clipped erase chunk selection");
-                    }
+                    clip_count[u] = MIN(chunk_dims[u], file_dims[u] - coords[u]);
 
-                    if (H5S_combine_hyperslab(file_space, H5S_SELECT_AND, coords, NULL, clip_count, NULL,
-                                              &sel_chunk->file_space) < 0)
-                        HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCOPY, FAIL,
-                                    "unable to combine erase selection with clipped chunk block");
-                }
-                else {
-                    HGOTO_ERROR(H5E_DATASPACE, H5E_UNSUPPORTED, FAIL,
-                                "point selections are not yet supported (SCC erase)");
+                    if (clip_count[u] == 0)
+                        HGOTO_ERROR(H5E_SCC, H5E_BADVALUE, FAIL,
+                                    "computed zero-sized clipped chunk selection");
                 }
 
+                if (H5S_combine_hyperslab(file_space, H5S_SELECT_AND, coords, NULL, clip_count, NULL,
+                                          &sel_chunk->file_space) < 0)
+                    HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCOPY, FAIL,
+                                "unable to combine selection with clipped chunk block");
+
+                /*
+                 * Convert the selected dataspace from dataset coordinates to
+                 * logical chunk coordinates.
+                 */
                 if (H5S_set_extent_real(sel_chunk->file_space, chunk_dims) < 0)
                     HGOTO_ERROR(H5E_DATASET, H5E_CANTSELECT, FAIL, "can't adjust chunk dimensions");
 
@@ -3362,17 +4622,26 @@ H5SC__erase_io_info_init(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
                     HGOTO_ERROR(H5E_DATASET, H5E_CANTSELECT, FAIL, "can't adjust chunk selection");
             }
 
-            hsize_t chunk_points = H5S_GET_SELECT_NPOINTS(sel_chunk->file_space);
+            {
+                hsize_t chunk_points = H5S_GET_SELECT_NPOINTS(sel_chunk->file_space);
 
-            if (chunk_points == 0 || chunk_points > sel_points)
-                HGOTO_ERROR(H5E_SCC, H5E_BADVALUE, FAIL,
-                            "invalid selected chunk point count during SCC erase init");
+                if (chunk_points == 0 || chunk_points > sel_points)
+                    HGOTO_ERROR(H5E_SCC, H5E_BADVALUE, FAIL,
+                                "invalid selected chunk point count during SCC selection init");
 
-            sel_points -= chunk_points;
+                sel_points -= chunk_points;
+            }
 
-            dset_sel_chunks++;
+            /*
+             * Increment only after this entry is fully constructed. This
+             * makes num_sel_chunks represent the set of valid entries.
+             */
+            sc_io_info->num_sel_chunks++;
         }
 
+        /*
+         * Advance to the next chunk in row-major chunk-coordinate order.
+         */
         curr_dim = (int)file_ndims - 1;
 
         coords[curr_dim] += chunk_dims[curr_dim];
@@ -3385,15 +4654,6 @@ H5SC__erase_io_info_init(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
                 coords[curr_dim] = start_coords[curr_dim];
                 end[curr_dim]    = (coords[curr_dim] + chunk_dims[curr_dim]) - 1;
 
-                if (is_partial_dim[curr_dim] && end[curr_dim] < file_dims[curr_dim]) {
-                    assert(num_partial_dims > 0);
-                    assert(H5S_SEL_ALL == file_sel_type);
-
-                    curr_partial_clip[curr_dim] = chunk_dims[curr_dim];
-                    is_partial_dim[curr_dim]    = false;
-                    num_partial_dims--;
-                }
-
                 curr_dim--;
 
                 if (curr_dim >= 0) {
@@ -3401,30 +4661,424 @@ H5SC__erase_io_info_init(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
                     coords[curr_dim] += chunk_dims[curr_dim];
                     end[curr_dim] = (coords[curr_dim] + chunk_dims[curr_dim]) - 1;
                 }
-            } while (curr_dim >= 0 && (coords[curr_dim] > file_sel_end[curr_dim]));
-
-            if ((H5S_SEL_ALL == file_sel_type) && curr_dim >= 0) {
-                if (!is_partial_dim[curr_dim] && file_dims[curr_dim] <= end[curr_dim]) {
-                    curr_partial_clip[curr_dim] = partial_dim_size[curr_dim];
-                    is_partial_dim[curr_dim]    = true;
-                    num_partial_dims++;
-                    assert(num_partial_dims <= file_ndims);
-                }
-            }
+            } while (curr_dim >= 0 && coords[curr_dim] > file_sel_end[curr_dim]);
         }
     }
 
 done:
+    if (single_chunk_space && H5S_close(single_chunk_space) < 0)
+        HDONE_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL,
+                    "can't release temporary chunk dataspace during selection init");
+
     if (ret_value < 0) {
-        if (sc_io_info) {
+        if (sc_io_info)
             if (H5SC__io_info_reset(sc_io_info) < 0)
-                HDONE_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL, "can't close within erase I/O info");
+                HDONE_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL, "can't reset SCC selection information");
+    }
+
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5SC__selection_io_info_init() */
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__merge_defined_chunk_selection
+ *
+ * Purpose:
+ *   Translate a defined-value selection from logical chunk coordinates into
+ *     dataset coordinates and merge it into an accumulating dataset-level
+ *     defined-value selection.
+ *
+ *   chunk_defined describes defined elements relative to the origin of one
+ *     logical chunk. The selection is translated using sel->coords and then
+ *     combined with defined using H5S_SELECT_OR.
+ *
+ *   Selection types are handled explicitly:
+ *
+ *       H5S_SEL_NONE
+ *         Contributes no elements and leaves the accumulator unchanged.
+ *
+ *       H5S_SEL_ALL
+ *         Represents the complete valid portion of the logical chunk. It is
+ *         converted to an explicit dataset-coordinate hyperslab and clipped
+ *         against the current dataset extent before merging. This prevents
+ *         an ALL selection from being reinterpreted as the entire dataset
+ *         when the dataspace extent changes.
+ *
+ *       H5S_SEL_HYPERSLABS
+ *         The chunk-local selection is copied into a dataset-sized dataspace
+ *         and translated forward by the chunk's dataset-relative origin.
+ *
+ *   The accumulator is also handled without assuming that HDF5 preserves a
+ *     particular internal selection representation. In particular, a
+ *     selection that covers the complete dataspace may be canonicalized by
+ *     the dataspace layer as H5S_SEL_ALL.
+ *
+ *   Point selections are not currently supported by the SCC interface.
+ *
+ * Inputs:
+ *   H5S_t *defined:
+ *     Dataset-sized dataspace containing the accumulated defined-value
+ *     selection. Updated in place.
+ *
+ *   const H5S_t *chunk_defined:
+ *     Dataspace containing the defined-value selection for one logical
+ *     chunk, expressed in chunk-local coordinates.
+ *
+ *   const H5SC_io_sel_chunk_t *sel:
+ *     Selected-chunk information containing the dataset-relative chunk
+ *     origin in sel->coords.
+ *
+ *   unsigned ndims:
+ *     Rank of the dataset and logical chunk.
+ *
+ *   const hsize_t *dset_dims:
+ *     Current dataset dimensions.
+ *
+ *   const hsize_t *chunk_dims:
+ *     Logical structured-chunk dimensions.
+ *
+ * Return:
+ *   SUCCEED on success;
+ *   FAIL on failure.
+ *-------------------------------------------------------------------------
+ */
+static herr_t H5SC__merge_defined_chunk_selection(H5S_t *defined, const H5S_t *chunk_defined,
+                                                  const H5SC_io_sel_chunk_t *sel, unsigned ndims,
+                                                  const hsize_t *dset_dims, const hsize_t *chunk_dims)
+{
+    H5S_t *translated = NULL;
+    H5S_t *combined   = NULL;
+    H5S_sel_type sel_type;
+    hssize_t adjust[H5S_MAX_RANK];
+    hsize_t count[H5S_MAX_RANK];
+    herr_t ret_value = SUCCEED;
+
+    FUNC_ENTER_PACKAGE
+
+    assert(defined);
+    assert(chunk_defined);
+    assert(sel);
+    assert(ndims > 0);
+    assert(dset_dims);
+    assert(chunk_dims);
+
+    if ((sel_type = H5S_GET_SELECT_TYPE(chunk_defined)) < H5S_SEL_NONE)
+        HGOTO_ERROR(H5E_DATASPACE, H5E_BADSELECT, FAIL, "unable to get defined chunk selection type");
+
+    if (H5S_SEL_NONE == sel_type)
+        HGOTO_DONE(SUCCEED);
+
+    if (NULL == (translated = H5S_create_simple(ndims, dset_dims, NULL)))
+        HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCREATE, FAIL,
+                    "unable to create translated defined-value dataspace");
+
+    if (H5S_select_none(translated) < 0)
+        HGOTO_ERROR(H5E_DATASPACE, H5E_CANTSELECT, FAIL,
+                    "unable to clear translated defined-value selection");
+
+    if (H5S_SEL_ALL == sel_type) {
+        /*
+         * Explicitly describe this complete logical chunk as a hyperslab in
+         * dataset coordinates. Clip defensively at a partial dataset edge.
+         */
+        for (unsigned u = 0; u < ndims; u++) {
+            if (sel->coords[u] >= dset_dims[u])
+                HGOTO_ERROR(H5E_DATASPACE, H5E_BADVALUE, FAIL, "defined chunk lies outside dataset extent");
+
+            count[u] = MIN(chunk_dims[u], dset_dims[u] - sel->coords[u]);
+
+            if (count[u] == 0)
+                HGOTO_ERROR(H5E_DATASPACE, H5E_BADVALUE, FAIL,
+                            "defined chunk has zero-sized dataset intersection");
+        }
+
+        if (H5S_select_hyperslab(translated, H5S_SELECT_SET, sel->coords, NULL, count, NULL) < 0)
+            HGOTO_ERROR(H5E_DATASPACE, H5E_CANTSELECT, FAIL,
+                        "unable to translate full defined chunk selection");
+    }
+    else if (H5S_SEL_HYPERSLABS == sel_type) {
+        /*
+         * Copy the logical-chunk selection into a dataset-sized dataspace.
+         * H5S_SELECT_ADJUST_S subtracts the supplied adjustment, so a
+         * negative chunk origin translates the selection forward into
+         * dataset coordinates.
+         */
+        if (H5S_SELECT_COPY(translated, chunk_defined, false) < 0)
+            HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCOPY, FAIL, "unable to copy defined chunk selection");
+
+        for (unsigned u = 0; u < ndims; u++) {
+            H5_CHECK_OVERFLOW(sel->coords[u], hsize_t, hssize_t);
+            adjust[u] = -(hssize_t)sel->coords[u];
+        }
+
+        if (H5S_SELECT_ADJUST_S(translated, adjust) < 0)
+            HGOTO_ERROR(H5E_DATASPACE, H5E_CANTSET, FAIL, "unable to translate defined chunk selection");
+    }
+    else
+        HGOTO_ERROR(H5E_DATASPACE, H5E_UNSUPPORTED, FAIL, "unsupported defined-value selection type");
+
+    /* Do not assume that HDF5 preserves a hyperslab representation after
+     * selection copies/combinations. A selection that covers the entire
+     * dataspace may be represented internally as H5S_SEL_ALL.
+     */
+    {
+        H5S_sel_type defined_type;
+        H5S_sel_type translated_type;
+
+        if ((defined_type = H5S_GET_SELECT_TYPE(defined)) < H5S_SEL_NONE)
+            HGOTO_ERROR(H5E_DATASPACE, H5E_BADSELECT, FAIL,
+                        "unable to get accumulated defined selection type");
+
+        if ((translated_type = H5S_GET_SELECT_TYPE(translated)) < H5S_SEL_NONE)
+            HGOTO_ERROR(H5E_DATASPACE, H5E_BADSELECT, FAIL,
+                        "unable to get translated defined selection type");
+
+        /*
+         * Nothing new to add:
+         *
+         *     X OR NONE == X
+         */
+        if (H5S_SEL_NONE == translated_type)
+            HGOTO_DONE(SUCCEED);
+
+        /*
+         * The accumulated selection already covers the complete extent:
+         *
+         *     ALL OR X == ALL
+         */
+        if (H5S_SEL_ALL == defined_type)
+            HGOTO_DONE(SUCCEED);
+
+        /*
+         * The new selection covers the complete extent:
+         *
+         *     X OR ALL == ALL
+         */
+        if (H5S_SEL_ALL == translated_type) {
+            if (H5S_select_all(defined, true) < 0)
+                HGOTO_ERROR(H5E_DATASPACE, H5E_CANTSELECT, FAIL,
+                            "unable to set accumulated defined selection to all");
+
+            HGOTO_DONE(SUCCEED);
+        }
+
+        /*
+         * Initialize an empty accumulator directly from the translated
+         * selection:
+         *
+         *     NONE OR X == X
+         */
+        if (H5S_SEL_NONE == defined_type) {
+            if (H5S_SELECT_COPY(defined, translated, false) < 0)
+                HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCOPY, FAIL,
+                            "unable to initialize accumulated defined selection");
+
+            HGOTO_DONE(SUCCEED);
+        }
+
+        /*
+         * Point selections are intentionally unsupported by the current SCC
+         * interface. The remaining supported case should therefore consist
+         * of two hyperslab selections.
+         */
+        if (H5S_SEL_HYPERSLABS != defined_type || H5S_SEL_HYPERSLABS != translated_type)
+            HGOTO_ERROR(H5E_DATASPACE, H5E_UNSUPPORTED, FAIL,
+                        "unsupported selection type while merging defined values");
+
+        if (NULL == (combined = H5S__combine_select(defined, H5S_SELECT_OR, translated)))
+            HGOTO_ERROR(H5E_DATASPACE, H5E_CANTINIT, FAIL, "unable to merge defined chunk selection");
+
+        if (H5S_SELECT_COPY(defined, combined, false) < 0)
+            HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCOPY, FAIL, "unable to update accumulated defined selection");
+    }
+
+done:
+    if (combined && H5S_close(combined) < 0)
+        HDONE_ERROR(H5E_DATASPACE, H5E_CANTRELEASE, FAIL, "unable to close combined defined-value dataspace");
+
+    if (translated && H5S_close(translated) < 0)
+        HDONE_ERROR(H5E_DATASPACE, H5E_CANTRELEASE, FAIL,
+                    "unable to close translated defined-value dataspace");
+
+    FUNC_LEAVE_NOAPI(ret_value)
+} /* end H5SC__merge_defined_chunk_selection() */
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__erase_io_info_init
+ *
+ * Purpose:
+ *   Initialize the SCC request state required by H5SC_erase().
+ *
+ *   File-selection decomposition is delegated to
+ *     H5SC__selection_io_info_init(), which produces cache-neutral
+ *     H5SC_io_sel_chunk_t entries containing chunk-local selections and
+ *     logical chunk identity information.
+ *
+ *   This function then adds the erase-specific cache state for each selected
+ *     logical chunk. It computes the SCC chunk key, finds or creates the
+ *     corresponding H5SC_chunk_t entry, inserts newly created entries into
+ *     the SCC chunk hash table and dataset-local LRU, synchronizes persistent
+ *     scaled-coordinate information, and increments the chunk pin count.
+ *
+ *   On successful return, H5SC_erase() assumes responsibility for releasing
+ *     the pins established here. If initialization fails after one or more
+ *     chunks have been pinned, this function unwinds those pins before
+ *     resetting the request selection state.
+ *
+ *   This function intentionally contains only the cache-specific portion of
+ *     erase initialization; selection decomposition remains centralized in
+ *     H5SC__selection_io_info_init() so the same logic can be reused by
+ *     cache-neutral operations such as H5SC_get_defined().
+ *
+ * Inputs:
+ *   H5SC_t *cache:
+ *     Pointer to the shared chunk cache containing the dataset and chunk
+ *     tracking structures.
+ *
+ *   H5D_t *dset:
+ *     Pointer to the structured-chunk dataset being prepared for erase.
+ *
+ *   const H5S_t *file_space:
+ *     Dataset dataspace containing the selection to erase.
+ *
+ * Return:
+ *   SUCCEED on success;
+ *   FAIL on failure.
+ *-------------------------------------------------------------------------
+ */
+static herr_t H5SC__erase_io_info_init(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
+{
+    H5SC_dset_header_t *dset_hdr = NULL;
+    H5SC_io_info_t *sc_io_info   = NULL;
+    herr_t ret_value             = SUCCEED;
+
+    FUNC_ENTER_PACKAGE
+
+    assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
+    assert(dset);
+    assert(file_space);
+    assert(dset->shared->layout.sc_ops);
+
+    /*
+     * Locate the dataset's SCC header. Erase requires cache-backed chunk
+     * entries, unlike the common selection-decomposition helper.
+     */
+    dset_hdr = H5SC__ht_dset_find(cache, dset->oloc.addr);
+    if (dset_hdr == NULL)
+        HGOTO_ERROR(H5E_SCC, H5E_HT_NOTFOUND, FAIL,
+                    "dataset should have been added to the hash table upon creation");
+
+    dset_hdr->dset = dset;
+
+    sc_io_info = dset_hdr->io_info;
+    assert(sc_io_info);
+
+    /*
+     * Build the cache-neutral per-chunk selection information.
+     */
+    if (H5SC__selection_io_info_init(dset, file_space, sc_io_info) < 0)
+        HGOTO_ERROR(H5E_SCC, H5E_IOFAIL, FAIL, "failed to initialize SCC erase selection information");
+
+    /*
+     * Associate each selected logical chunk with its SCC cache entry and
+     * pin that entry for the erase request.
+     */
+    for (size_t i = 0; i < sc_io_info->num_sel_chunks; i++) {
+        H5SC_io_sel_chunk_t *sel_chunk = &sc_io_info->sel_chunks[i];
+        H5SC_chunk_key_t chk_key;
+        H5SC_chunk_t *cached_chk = NULL;
+
+        if (H5SC__compute_chunk_key(&dset->oloc.addr, &sel_chunk->chk_log_coord, &chk_key) < 0)
+            HGOTO_ERROR(H5E_SCC, H5E_CHUNK_KEY, FAIL, "failed to compute chunk key during erase init");
+
+        cached_chk = H5SC__ht_chunk_find(cache, &chk_key);
+
+        if (cached_chk) {
+            cached_chk->chk_log_coord = sel_chunk->chk_log_coord;
+
+            /*
+             * Keep the cache entry's persistent coordinate metadata
+             * synchronized with the selection entry.
+             */
+            cached_chk->ndims = dset->shared->ndims;
+            H5MM_memcpy(cached_chk->scaled, sel_chunk->scaled, sizeof(hsize_t) * cached_chk->ndims);
+
+            if (H5SC__chunk_pin(cache, dset_hdr, cached_chk) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_CANTPIN, FAIL,
+                            "unable to pin cached chunk during erase initialization");
+
+            sel_chunk->pin_held = true;
+
+            cached_chk->last_op = H5SC_TAG_PIN_IOINIT_CACHED;
+
+            sel_chunk->cached_chunk = cached_chk;
+        }
+        else {
+            cached_chk = H5SC__make_chunk(chk_key, (size_t)0, (size_t)0, false);
+
+            if (!cached_chk)
+                HGOTO_ERROR(H5E_SCC, H5E_CANNOTALLOC, FAIL, "failed to create chunk during erase init");
+
+            /*
+             * Populate persistent chunk identity/coordinate information
+             * before exposing the entry through the hash table or LRU.
+             */
+            cached_chk->chk_log_coord = sel_chunk->chk_log_coord;
+            cached_chk->ndims         = dset->shared->ndims;
+
+            H5MM_memcpy(cached_chk->scaled, sel_chunk->scaled, sizeof(hsize_t) * cached_chk->ndims);
+
+            if (H5SC__ht_chunk_insert(cache, cached_chk) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_CANNOTINSERT, FAIL,
+                            "failed to insert chunk into hash table during erase init");
+
+            if (H5SC__chunk_lru_prepend(cache, dset_hdr, cached_chk) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_CANNOTINSERT, FAIL,
+                            "failed to insert chunk into dataset LRU during erase init");
+
+            if (H5SC__chunk_pin(cache, dset_hdr, cached_chk) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_CANTPIN, FAIL,
+                            "unable to pin new chunk during erase initialization");
+
+            sel_chunk->pin_held = true;
+
+            cached_chk->last_op = H5SC_TAG_PIN_IOINIT;
+
+            sel_chunk->cached_chunk = cached_chk;
         }
     }
 
-    if (single_chunk_space && H5S_close(single_chunk_space) < 0)
-        HDONE_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL,
-                    "can't release temporary chunk dataspace during erase init");
+#if H5SC_DO_SANITY_CHECKS
+    if (H5SC__verify_cached_reclaimability(cache) < 0)
+        HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL,
+                    "cached reclaimability mismatch after erase initialization");
+#endif
+
+done:
+    /*
+     * H5SC_erase() owns normal pin unwinding once initialization succeeds.
+     *
+     * If initialization itself fails after some entries have been pinned,
+     * unwind those pins here before resetting the selection state.
+     */
+    if (ret_value < 0 && sc_io_info) {
+        for (size_t i = 0; i < sc_io_info->num_sel_chunks; i++) {
+            H5SC_io_sel_chunk_t *sel = &sc_io_info->sel_chunks[i];
+            H5SC_chunk_t *chk        = sel->cached_chunk;
+
+            if (sel->pin_held) {
+                if (!chk || H5SC__chunk_unpin(cache, dset_hdr, chk) < 0)
+                    HDONE_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL, "unable to unwind erase initialization pin");
+                else {
+                    sel->pin_held = false;
+                    chk->last_op  = H5SC_TAG_UNPIN_ERASE_DONE_ERROR;
+                }
+            }
+        }
+
+        if (H5SC__io_info_reset(sc_io_info) < 0)
+            HDONE_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL, "can't reset erase I/O information");
+    }
 
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5SC__erase_io_info_init() */
@@ -3433,29 +5087,45 @@ done:
  * Function: H5SC__io_info_reset
  *
  * Purpose:
- *   Function that resets an H5SC_io_info_t structure for reuse after a
- *     dataset I/O operation. The function releases any temporary per-chunk
- *     dataspaces owned by the structure, clears per-chunk transient state,
- *     and resets the active selected-chunk count while preserving the
- *     underlying sel_chunks allocation for later reuse.
+ *   Reset an H5SC_io_info_t structure for reuse while retaining its
+ *     sel_chunks backing allocation.
  *
- *   In addition to clearing the currently active chunk-selection entries,
- *     the function resets all per-invocation lookup-related fields across
- *     the full allocated sel_chunks array so that stale lookup metadata is
- *     not reused by subsequent I/O operations.
+ *   The function closes temporary file and memory dataspaces owned by the
+ *     currently active H5SC_io_sel_chunk_t entries, clears per-request
+ *     references, resets the active selection count and selection-window
+ *     state, and invalidates lookup metadata across the reusable
+ *     sel_chunks allocation.
+ *
+ *   lookup_udata requires special ownership handling. Following a successful
+ *     SCC miss lookup, lookup_udata is a transient alias to layout-specific
+ *     udata whose persistent ownership has been transferred to the
+ *     associated H5SC_chunk_t when required. This reset routine therefore
+ *     clears lookup_udata but does not free it.
+ *
+ *   Callers are responsible for ensuring that any lookup-generated udata
+ *     has either been transferred to its owning H5SC_chunk_t or otherwise
+ *     released before this function is invoked. Resident chunk udata is
+ *     subsequently released through the layout client's normal chunk
+ *     teardown/evict path.
+ *
+ *   The sel_chunks allocation itself is intentionally retained so that it
+ *     may be reused by a later SCC request. H5SC__io_info_term() performs
+ *     final destruction of that allocation.
+ *
+ *  Any H5SC_io_scratch_t allocation associated with sc_io_info is also
+ *     retained unchanged for reuse by subsequent requests.
  *
  * Inputs:
  *   H5SC_io_info_t *sc_io_info:
- *     Pointer to the I/O request state structure to reset.
+ *     Pointer to the dataset-owned SCC request state to reset.
  *
  * Return:
  *   SUCCEED on success;
- *   FAIL on failure.
+ *   FAIL if one or more owned temporary dataspaces cannot be released.
  *-------------------------------------------------------------------------
  */
 
-static herr_t
-H5SC__io_info_reset(H5SC_io_info_t *sc_io_info)
+static herr_t H5SC__io_info_reset(H5SC_io_info_t *sc_io_info)
 {
     herr_t ret_value = SUCCEED;
 
@@ -3469,11 +5139,11 @@ H5SC__io_info_reset(H5SC_io_info_t *sc_io_info)
 
         if (c->file_space && !c->file_space_shared)
             if (H5S_close(c->file_space) < 0)
-                HDONE_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL, "can't release temporary file dataspace");
+                HGOTO_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL, "can't release temporary file dataspace");
 
         if (c->mem_space && !c->mem_space_shared)
             if (H5S_close(c->mem_space) < 0)
-                HDONE_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL, "can't release temporary memory dataspace");
+                HGOTO_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL, "can't release temporary memory dataspace");
 
         c->file_space        = NULL;
         c->mem_space         = NULL;
@@ -3482,10 +5152,22 @@ H5SC__io_info_reset(H5SC_io_info_t *sc_io_info)
         c->dset_info         = NULL;
     }
 
+    sc_io_info->sel_order               = NULL;
+    sc_io_info->num_resident_sel_chunks = 0;
+    sc_io_info->sel_start               = 0;
+
     /* Mark the active selection set as empty. */
     sc_io_info->num_sel_chunks = 0;
 
-    /* Clear per-invocation lookup metadata across teh full allocation */
+    /* Clear per-invocation lookup metadata across the full allocation
+     *
+     * Note that lookup_udata is a non-owning, per-request alias after
+     * a successful lookup. Any lookup udata that must persist beyond the
+     * request is owned by the associated H5SC_chunk_t and is released
+     * through the layout client's normal chunk teardown path. Callers
+     * must resolve or transfer ownership of lookup-generated udata
+     * before invoking this reset routine.
+     * */
     if (sc_io_info->sel_chunks) {
         for (size_t i = 0; i < sc_io_info->sel_chunks_alloced; i++) {
             sc_io_info->sel_chunks[i].lookup_valid                    = false;
@@ -3495,6 +5177,11 @@ H5SC__io_info_reset(H5SC_io_info_t *sc_io_info)
             sc_io_info->sel_chunks[i].lookup_size_hint                = 0;
             sc_io_info->sel_chunks[i].lookup_defined_values_size_hint = 0;
             sc_io_info->sel_chunks[i].lookup_udata                    = NULL;
+            sc_io_info->sel_chunks[i].pin_held                        = false;
+
+            sc_io_info->sel_chunks[i].estimate_resident_size = 0;
+            sc_io_info->sel_chunks[i].estimate_source        = H5SC_SIZE_EST_NONE;
+            sc_io_info->sel_chunks[i].estimate_pending       = false;
         }
     }
 
@@ -3506,26 +5193,31 @@ done:
  * Function: H5SC__io_info_term
  *
  * Purpose:
- *   Function that releases resources owned by an H5SC_io_info_t structure
- *     and returns it to an uninitialized/empty state. The function closes
- *     any owned temporary per-chunk dataspaces for the currently active
- *     selected chunks, frees the sel_chunks backing array, and clears the
- *     structure’s bookkeeping fields.
+ *   Permanently release resources owned directly by an H5SC_io_info_t
+ *     structure.
  *
- *   This function releases memory and transient handles referenced by
- *     sc_io_info, but does not free the H5SC_io_info_t structure itself.
+ *   The function closes any temporary per-chunk file or memory dataspaces
+ *     owned by the currently active selection entries, frees the sel_chunks
+ *     backing allocation, and resets the request bookkeeping fields.
+ *
+ *   The H5SC_io_info_t structure itself is not freed by this routine.
+ *
+ *   Layout-specific chunk objects and udata are not owned by
+ *     H5SC_io_info_t and are therefore not released here. Persistent
+ *     callback state belongs to the corresponding H5SC_chunk_t and must be
+ *     released through the normal chunk teardown path before the dataset
+ *     header is destroyed.
  *
  * Inputs:
  *   H5SC_io_info_t *sc_io_info:
- *     Pointer to the I/O request state structure to tear down.
+ *     Pointer to the SCC request-state structure to terminate.
  *
  * Return:
  *   SUCCEED on success;
- *   FAIL on failure.
+ *   FAIL if an owned temporary dataspace cannot be released.
  *-------------------------------------------------------------------------
  */
-static herr_t
-H5SC__io_info_term(H5SC_io_info_t *sc_io_info)
+static herr_t H5SC__io_info_term(H5SC_io_info_t *sc_io_info)
 {
     size_t i;
     herr_t ret_value = SUCCEED;
@@ -3538,18 +5230,26 @@ H5SC__io_info_term(H5SC_io_info_t *sc_io_info)
     for (i = 0; i < sc_io_info->num_sel_chunks; i++) {
         if (sc_io_info->sel_chunks[i].file_space && !sc_io_info->sel_chunks[i].file_space_shared)
             if (H5S_close(sc_io_info->sel_chunks[i].file_space) < 0)
-                HDONE_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL, "can't release temporary file dataspace");
+                HGOTO_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL, "can't release temporary file dataspace");
 
         if (sc_io_info->sel_chunks[i].mem_space && !sc_io_info->sel_chunks[i].mem_space_shared)
             if (H5S_close(sc_io_info->sel_chunks[i].mem_space) < 0)
-                HDONE_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL, "can't release temporary memory dataspace");
+                HGOTO_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL, "can't release temporary memory dataspace");
+    }
+
+    if (sc_io_info->scratch) {
+        H5SC__io_scratch_free_storage(sc_io_info->scratch);
+        sc_io_info->scratch = (H5SC_io_scratch_t *)H5MM_xfree(sc_io_info->scratch);
     }
 
     /* Free backing storage and reset structure state. */
-    sc_io_info->sel_chunks         = (H5SC_io_sel_chunk_t *)H5MM_xfree(sc_io_info->sel_chunks);
-    sc_io_info->num_sel_chunks     = 0;
-    sc_io_info->sel_chunks_alloced = 0;
-    sc_io_info->sel_start          = 0;
+    sc_io_info->sel_chunks              = (H5SC_io_sel_chunk_t *)H5MM_xfree(sc_io_info->sel_chunks);
+    sc_io_info->scratch                 = (H5SC_io_scratch_t *)H5MM_xfree(sc_io_info->scratch);
+    sc_io_info->sel_order               = NULL;
+    sc_io_info->sel_start               = 0;
+    sc_io_info->num_sel_chunks          = 0;
+    sc_io_info->num_resident_sel_chunks = 0;
+    sc_io_info->sel_chunks_alloced      = 0;
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
@@ -3584,10 +5284,6 @@ done:
  *     Pointer to the SCC cache state used for lookup, residency,
  *     accounting, and callback-driven chunk processing.
  *
- *   size_t count:
- *     Number of dataset I/O entries in dset_info. The current SCC read
- *     path expects count == 1. (TO BE REMOVED)
- *
  *   H5D_dset_io_info_t *dset_info:
  *     Pointer to the array of dataset I/O request descriptors to process.
  *
@@ -3597,42 +5293,41 @@ done:
  *-------------------------------------------------------------------------
  */
 
-herr_t
-H5SC_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
+herr_t H5SC_read(H5SC_t *cache, H5D_dset_io_info_t *dset_info)
 {
 
-    herr_t             ret_value = SUCCEED;
-    H5D_io_type_info_t my_io_type_info;    /* First used in the scatter_mem callback */
-    const H5S_t       *scatter_mem_space;  /* Used in the scatter_mem callback */
-    const H5S_t       *scatter_file_space; /* Used in the scatter_mem callback */
-    haddr_t            md_tag                                  = HADDR_UNDEF;
-    bool               partial_bound_chunks_different_encoding = false;
-    H5O_stc_pline_t   *pline                                   = NULL; /* I/O pipeline info */
-    hbool_t            filtered                                = false;
-    size_t             alloc_size_total;
+    herr_t ret_value = SUCCEED;
+    H5D_io_type_info_t my_io_type_info; /* First used in the scatter_mem callback */
+    const H5S_t *scatter_mem_space;     /* Used in the scatter_mem callback */
+    const H5S_t *scatter_file_space;    /* Used in the scatter_mem callback */
+    haddr_t md_tag                               = HADDR_UNDEF;
+    bool md_tag_set                              = false;
+    bool partial_bound_chunks_different_encoding = false;
+    H5O_stc_pline_t *pline                       = NULL; /* I/O pipeline info */
+    hbool_t filtered                             = false;
+    size_t alloc_size_total;
 
-    H5SC_dset_header_t  *dset_hdr                 = NULL;
-    H5SC_io_info_t      *sc_io_info               = NULL;
-    H5SC_io_sel_chunk_t *base                     = NULL;
-    size_t               sel_start                = 0;
-    size_t               sel_count                = 0;
-    size_t               chunk_count              = 0;
-    size_t               old_dset_size            = 0;
-    const hsize_t      **scaled                   = NULL;
-    haddr_t            **addr                     = NULL;
-    hsize_t            **size                     = NULL;
-    hsize_t            **defined_values_size      = NULL;
-    size_t             **size_hint                = NULL;
-    size_t             **defined_values_size_hint = NULL;
-    void               **udata_arr                = NULL;
-    size_t              *miss_arr                 = NULL;
-    void               **chunk_arr                = NULL;
+    H5SC_dset_header_t *dset_hdr      = NULL;
+    H5SC_io_info_t *sc_io_info        = NULL;
+    H5SC_io_sel_chunk_t *base         = NULL;
+    size_t sel_start                  = 0;
+    size_t sel_count                  = 0;
+    size_t chunk_count                = 0;
+    size_t old_dset_size              = 0;
+    const hsize_t **scaled            = NULL;
+    haddr_t **addr                    = NULL;
+    hsize_t **size                    = NULL;
+    hsize_t **defined_values_size     = NULL;
+    size_t **size_hint                = NULL;
+    size_t **defined_values_size_hint = NULL;
+    void **udata_arr                  = NULL;
+    size_t *miss_arr                  = NULL;
+    void **chunk_arr                  = NULL;
 
     FUNC_ENTER_NOAPI(FAIL)
 
     assert(cache);
-    assert(count == 0 || dset_info);
-    assert(count == 1);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     dset_hdr = H5SC__ht_dset_find(cache, dset_info[0].dset->oloc.addr);
     if (dset_hdr == NULL) {
@@ -3672,68 +5367,47 @@ H5SC_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
 
     /* Set metadata tagging for this dataset */
     H5AC_tag(dset_info[0].dset->oloc.addr, &md_tag);
+    md_tag_set = true;
 
     chunk_count = sc_io_info->num_sel_chunks;
 
-    /* Allocate scratch arrays used for lookup/read processing. */
-    if (NULL == (scaled = (const hsize_t **)H5MM_malloc(chunk_count * sizeof(*scaled))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate scaled array");
+    /*
+     * Ensure reusable callback-vector scratch is large enough for this active
+     * selection window.
+     */
+    if (H5SC__io_scratch_ensure(sc_io_info, sc_io_info->num_sel_chunks) < 0)
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to prepare reusable SCC read scratch storage");
 
-    if (NULL == (addr = (haddr_t **)H5MM_malloc(chunk_count * sizeof(*addr))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate addr array");
+    assert(sc_io_info->scratch);
+    assert(sc_io_info->scratch->alloced >= chunk_count);
 
-    if (NULL == (size = (hsize_t **)H5MM_malloc(chunk_count * sizeof(*size))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate size array");
+    addr                     = sc_io_info->scratch->addr;
+    size                     = sc_io_info->scratch->size;
+    defined_values_size      = sc_io_info->scratch->defined_values_size;
+    size_hint                = sc_io_info->scratch->size_hint;
+    defined_values_size_hint = sc_io_info->scratch->defined_values_size_hint;
+    scaled                   = sc_io_info->scratch->scaled;
+    udata_arr                = sc_io_info->scratch->udata;
+    miss_arr                 = sc_io_info->scratch->miss_idx;
+    chunk_arr                = sc_io_info->scratch->chunk;
 
-    if (NULL == (defined_values_size = (hsize_t **)H5MM_malloc(chunk_count * sizeof(*defined_values_size))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate defined_values_size array");
-
-    if (NULL == (size_hint = (size_t **)H5MM_malloc(chunk_count * sizeof(*size_hint))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate size_hint array");
-
-    if (NULL ==
-        (defined_values_size_hint = (size_t **)H5MM_malloc(chunk_count * sizeof(*defined_values_size_hint))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate defined_values_size_hint array");
-
-    if (NULL == (udata_arr = (void **)H5MM_malloc(chunk_count * sizeof(*udata_arr))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate udata_arr array");
-
-    if (NULL == (miss_arr = (size_t *)H5MM_malloc(chunk_count * sizeof(*miss_arr))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate miss_arr array");
-
-    if (NULL == (chunk_arr = (void **)H5MM_malloc(chunk_count * sizeof(*chunk_arr))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate chunk_arr array");
-
-        /* Window-relevant selection accessor */
-#define SEL(j_) (&base[sel_start + (j_)])
     /* Chunk lookup (in file) */
 
     /* For each chunk in this dataset, initialize each necessary array value*/
     for (size_t j = 0; j < chunk_count; j++) {
-        /* Setup scaled for the jth chunk */
-        scaled[j] = SEL(j)->scaled;
+        /* Setup scaled for the jth chunk. */
+        scaled[j] = H5SC__io_sel_at(sc_io_info, j)->scaled;
 
-        /* Setup the initial address with a unique pointer */
-        haddr_t *tmp_addr = H5MM_malloc(sizeof(haddr_t));
-        *tmp_addr         = HADDR_UNDEF;
-        addr[j]           = tmp_addr;
-
-        /* Setup the initial size with a unique pointer */
-        hsize_t *tmp_size = H5MM_malloc(sizeof(hsize_t));
-        *tmp_size         = 0;
-        size[j]           = tmp_size;
-
-        hsize_t *tmp_def_val_size = H5MM_malloc(sizeof(hsize_t));
-        *tmp_def_val_size         = 0;
-        defined_values_size[j]    = tmp_def_val_size;
-
-        size_t *tmp_size_hint = H5MM_malloc(sizeof(size_t));
-        *tmp_size_hint        = 0;
-        size_hint[j]          = tmp_size_hint;
-
-        size_t *tmp_def_val_size_hint = H5MM_malloc(sizeof(size_t));
-        *tmp_def_val_size_hint        = 0;
-        defined_values_size_hint[j]   = tmp_def_val_size_hint;
+        /*
+         * The pointer views were permanently bound to reusable contiguous
+         * backing storage by H5SC__io_scratch_ensure(). Reset only the scalar
+         * values needed by this call.
+         */
+        *addr[j]                     = HADDR_UNDEF;
+        *size[j]                     = 0;
+        *defined_values_size[j]      = 0;
+        *size_hint[j]                = 0;
+        *defined_values_size_hint[j] = 0;
 
         udata_arr[j] = NULL;
         chunk_arr[j] = NULL;
@@ -3750,7 +5424,7 @@ H5SC_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
 
     for (size_t j = 0; j < chunk_count; j++) {
 
-        H5SC_chunk_t *chk = SEL(j)->cached_chunk;
+        H5SC_chunk_t *chk = H5SC__io_sel_at(sc_io_info, j)->cached_chunk;
 
         if (chk && chk->chunk_obj) {
             /* Cache hit: Skip on-disk lookup */
@@ -3772,7 +5446,7 @@ H5SC_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
     for (size_t j = 0; j < miss_count; j++) {
         size_t idx = miss_arr[j];
 
-        H5SC_io_sel_chunk_t *sel = SEL(idx);
+        H5SC_io_sel_chunk_t *sel = H5SC__io_sel_at(sc_io_info, idx);
         assert(sel->lookup_valid == true);
 
         *addr[idx]                     = sel->lookup_addr;
@@ -3805,16 +5479,17 @@ H5SC_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
     for (size_t j = 0; j < chunk_count; j++) {
         /* true: a NOT-to-be-filtered-partial-edge chunk */
         /* false : a to-be-filtered-partial-edge-chunk */
-        bool                 partial_bound = false;
+        bool partial_bound = false;
         H5SC_io_sel_chunk_t *sel_chunk;
-        H5SC_chunk_t        *cached_chunk;
+        H5SC_chunk_t *cached_chunk;
+        size_t nbytes_local = 0;
 
         my_io_type_info.tconv_buf      = NULL; /* Pointer to the datatype conv buffer */
         my_io_type_info.tconv_buf_size = dset_info[0].type_info.src_type_size;
         my_io_type_info.bkg_buf        = NULL; /* Pointer to background buffer */
         my_io_type_info.bkg_buf_size   = dset_info[0].type_info.dst_type_size;
 
-        sel_chunk    = SEL(j);
+        sel_chunk    = H5SC__io_sel_at(sc_io_info, j);
         cached_chunk = sel_chunk->cached_chunk;
         assert(cached_chunk);
 
@@ -3841,19 +5516,23 @@ H5SC_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
             }
 
             /* If the chunk is not present within the cache, it must be allocated/created here */
-            if (!(SEL(j)->cached_chunk && SEL(j)->cached_chunk->udata == udata_arr[j])) {
+            if (!(H5SC__io_sel_at(sc_io_info, j)->cached_chunk &&
+                  H5SC__io_sel_at(sc_io_info, j)->cached_chunk->udata == udata_arr[j])) {
                 udata_arr[j] = H5MM_xfree(udata_arr[j]);
             }
 
             /* Create a new chunk that will then have the fill value written to it. */
-            if (dset_info[0].dset->shared->layout.sc_ops->new_chunk(
-                    dset_info[0].dset, false, size[j], size_hint[j], &chunk_arr[j], &udata_arr[j]) < 0) {
+            if (dset_info[0].dset->shared->layout.sc_ops->new_chunk(dset_info[0].dset, false, &nbytes_local,
+                                                                    size_hint[j], &chunk_arr[j],
+                                                                    &udata_arr[j]) < 0) {
                 HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "unable to create new chunk (SCC)");
             }
 
+            alloc_size_total = 0;
+
             if (dset_info[0].dset->shared->layout.sc_ops->fill(
-                    &dset_info[0], &my_io_type_info, SEL(j)->file_space, size[j], size_hint[j],
-                    &alloc_size_total, chunk_arr[j], udata_arr[j]) < 0) {
+                    &dset_info[0], &my_io_type_info, H5SC__io_sel_at(sc_io_info, j)->file_space,
+                    &nbytes_local, size_hint[j], &alloc_size_total, chunk_arr[j], udata_arr[j]) < 0) {
                 HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "unable to fill chunk (SCC)");
             }
             /* Add info for the resident chunk within the cache */
@@ -3861,12 +5540,27 @@ H5SC_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
             cached_chunk->udata       = udata_arr[j];
             cached_chunk->disk_addr   = HADDR_UNDEF;
             cached_chunk->disk_nbytes = 0;
-            cached_chunk->dirty_flag  = false;
+
+            if (H5SC__chunk_set_dirty(cache, dset_hdr, cached_chunk, false) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "unable to set materialized read chunk clean");
 
             /* Update per-dataset bytes now; global accounting is reconciled once per request */
-            if (H5SC__chunk_update_cached_size(dset_hdr, cached_chunk, *size[j]) < 0) {
+            if (H5SC__chunk_update_cached_size(cache, dset_hdr, cached_chunk, alloc_size_total) < 0) {
                 HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "read: chunk size accounting failed");
             }
+
+            if (sel_chunk->estimate_pending) {
+#if defined(H5SC_COLLECT_ESTIMATE_STATS) && (H5SC_COLLECT_ESTIMATE_STATS + 0)
+                H5SC__stats_record_size_estimate(cache, sel_chunk->estimate_source,
+                                                 sel_chunk->estimate_resident_size, alloc_size_total);
+#endif
+
+                sel_chunk->estimate_pending       = false;
+                sel_chunk->estimate_source        = H5SC_SIZE_EST_NONE;
+                sel_chunk->estimate_resident_size = 0;
+            }
+
+            H5SC__update_resident_estimate_history(dset_hdr, alloc_size_total);
         }
 
         /* If the chunk lookup is successful; only read/decode if the chunk is not already a resident
@@ -3896,23 +5590,40 @@ H5SC_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
                 HGOTO_ERROR(H5E_DATASET, H5E_READERROR, FAIL, "unable to block read from file (SCC)");
             }
 
+            H5_CHECKED_ASSIGN(nbytes_local, size_t, *size[j], hsize_t);
+
             /* Skip for invalid addr */
-            if (dset_info[0].dset->shared->layout.sc_ops->decode(dset_info[0].dset, size[j], size_hint[j],
-                                                                 partial_bound, &chunk_arr[j],
+            if (dset_info[0].dset->shared->layout.sc_ops->decode(dset_info[0].dset, &nbytes_local,
+                                                                 size_hint[j], partial_bound, &chunk_arr[j],
                                                                  udata_arr[j]) < 0) {
-                HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "unable to decode chunk in place (SCC)");
             }
 
             /* Add info for the resident chunk within the cache */
-            cached_chunk->chunk_obj  = chunk_arr[j];
-            cached_chunk->udata      = udata_arr[j];
-            cached_chunk->disk_addr  = *addr[j];
-            cached_chunk->dirty_flag = false;
+            cached_chunk->chunk_obj = chunk_arr[j];
+            cached_chunk->udata     = udata_arr[j];
+            cached_chunk->disk_addr = *addr[j];
+
+            if (H5SC__chunk_set_dirty(cache, dset_hdr, cached_chunk, false) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "unable to set materialized read chunk clean");
 
             /* Update LRU byte counters + cache quiescent bytes */
-            if (H5SC__chunk_update_cached_size(dset_hdr, cached_chunk, *size[j]) < 0) {
-                HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "chunk size accounting failed (SCC read)");
+            if (H5SC__chunk_update_cached_size(cache, dset_hdr, cached_chunk, *size_hint[j]) < 0) {
+                HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL,
+                            "read: chunk size accounting failed after decode");
             }
+
+            if (sel_chunk->estimate_pending) {
+#if defined(H5SC_COLLECT_ESTIMATE_STATS) && (H5SC_COLLECT_ESTIMATE_STATS + 0)
+                H5SC__stats_record_size_estimate(cache, sel_chunk->estimate_source,
+                                                 sel_chunk->estimate_resident_size, *size_hint[j]);
+#endif
+
+                sel_chunk->estimate_pending       = false;
+                sel_chunk->estimate_source        = H5SC_SIZE_EST_NONE;
+                sel_chunk->estimate_resident_size = 0;
+            }
+
+            H5SC__update_resident_estimate_history(dset_hdr, *size_hint[j]);
         }
 
         if (dset_info[0].dset->shared->layout.sc_ops->scatter_mem(&dset_info[0], &my_io_type_info,
@@ -3922,16 +5633,19 @@ H5SC_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
         }
 
         {
-            H5SC_chunk_t *chk = SEL(j)->cached_chunk;
+            H5SC_chunk_t *chk = H5SC__io_sel_at(sc_io_info, j)->cached_chunk;
             assert(chk);
 
-            if (chk->chunk_counter > 0) {
-                chk->chunk_counter--;
-                chk->last_op = H5SC_TAG_UNPIN_READ_DONE;
+            if (H5SC__io_sel_at(sc_io_info, j)->pin_held) {
+                if (H5SC__chunk_unpin(cache, dset_hdr, chk) < 0)
+                    HDONE_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL, "unable to release SCC request pin");
+
+                H5SC__io_sel_at(sc_io_info, j)->pin_held = false;
+                chk->last_op                             = H5SC_TAG_UNPIN_READ_DONE;
             }
             else {
                 HGOTO_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL,
-                            "SCC read: chunk counter was not properly incremented");
+                            "SCC read: selected chunk does not own a valid pin");
             }
         }
 
@@ -3942,19 +5656,29 @@ H5SC_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
         HGOTO_ERROR(H5E_SCC, H5E_BADVALUE, FAIL, "global size accounting failed (SCC read)");
     }
 
-    H5AC_tag(md_tag, NULL); /* Reset the metadata tag for the next dataset */
-#undef SEL
+#if H5SC_DO_SANITY_CHECKS
+    if (H5SC__verify_cached_reclaimability(cache) < 0)
+        HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "cached reclaimability mismatch after SCC read");
+#endif
 
 done:
+    if (md_tag_set)
+        H5AC_tag(md_tag, NULL); /* Reset the metadata tag for the next dataset */
 
     if (ret_value < 0) {
         if (sc_io_info && base && sel_count > 0) {
             for (size_t j = 0; j < sel_count; j++) {
-                H5SC_chunk_t *chk = base[sel_start + j].cached_chunk;
+                H5SC_io_sel_chunk_t *sel = H5SC__io_sel_at(sc_io_info, j);
+                H5SC_chunk_t *chk        = sel->cached_chunk;
 
-                if (chk && chk->chunk_counter > 0) {
-                    chk->chunk_counter--;
-                    chk->last_op = H5SC_TAG_UNPIN_READ_DONE_ERROR;
+                if (sel->pin_held) {
+                    if (!chk || H5SC__chunk_unpin(cache, dset_hdr, chk) < 0)
+                        HDONE_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL,
+                                    "SCC read cleanup encountered an invalid owned pin");
+                    else {
+                        sel->pin_held = false;
+                        chk->last_op  = H5SC_TAG_UNPIN_READ_DONE_ERROR;
+                    }
                 }
             }
         }
@@ -3963,41 +5687,6 @@ done:
     /* Restore base sel_chunks pointer for the caller (invoke batching expects this) */
     if (sc_io_info && base)
         sc_io_info->sel_chunks = base;
-
-    if (addr) {
-        for (size_t j = 0; j < chunk_count; j++)
-            addr[j] = (haddr_t *)H5MM_xfree(addr[j]);
-    }
-
-    if (size) {
-        for (size_t j = 0; j < chunk_count; j++)
-            size[j] = (hsize_t *)H5MM_xfree(size[j]);
-    }
-
-    if (defined_values_size) {
-        for (size_t j = 0; j < chunk_count; j++)
-            defined_values_size[j] = (hsize_t *)H5MM_xfree(defined_values_size[j]);
-    }
-
-    if (size_hint) {
-        for (size_t j = 0; j < chunk_count; j++)
-            size_hint[j] = (size_t *)H5MM_xfree(size_hint[j]);
-    }
-
-    if (defined_values_size_hint) {
-        for (size_t j = 0; j < chunk_count; j++)
-            defined_values_size_hint[j] = (size_t *)H5MM_xfree(defined_values_size_hint[j]);
-    }
-
-    scaled                   = (const hsize_t **)H5MM_xfree((void *)scaled);
-    addr                     = (haddr_t **)H5MM_xfree(addr);
-    size                     = (hsize_t **)H5MM_xfree(size);
-    defined_values_size      = (hsize_t **)H5MM_xfree(defined_values_size);
-    size_hint                = (size_t **)H5MM_xfree(size_hint);
-    defined_values_size_hint = (size_t **)H5MM_xfree(defined_values_size_hint);
-    udata_arr                = (void **)H5MM_xfree(udata_arr);
-    miss_arr                 = (size_t *)H5MM_xfree(miss_arr);
-    chunk_arr                = (void **)H5MM_xfree(chunk_arr);
 
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5SC_read() */
@@ -4011,8 +5700,8 @@ done:
  *     H5SC__io_info_init(). The function processes the active
  *     selected-chunk window for the dataset, materializes any needed
  *     resident chunk state from cache or disk, gathers data from the
- *     caller's memory selection into chunk buffers, writes encoded chunk
- *     data to disk, updates SCC chunk state, and releases the
+ *     caller's memory selection into chunk buffers, marks the resident
+ *     chunks dirty, updates SCC accounting, and releases the
  *     per-selection pins established during I/O setup.
  *
  *   For each selected chunk in the active window, the function uses
@@ -4020,8 +5709,9 @@ done:
  *     misses, creates new resident chunks for chunks not present on disk,
  *     reads and decodes on-disk chunks when necessary, invokes the layout
  *     client's gather_mem callback to update chunk contents from the user
- *     buffer, encodes the resulting chunk image, updates on-disk chunk
- *     indexing, and writes the encoded chunk to file.
+ *     buffer, and retains the modified resident representation as the
+ *     authoritative state until an explicit flush or dirty eviction writes
+ *     it to disk.
  *
  *   The function follows the current SCC selection-window semantics:
  *     sel_chunks remains the stable base allocation owned by the dataset,
@@ -4033,10 +5723,6 @@ done:
  *     Pointer to the SCC cache state used for lookup, residency,
  *     accounting, and callback-driven chunk processing.
  *
- *   size_t count:
- *     Number of dataset I/O entries in dset_info. The current SCC write
- *     path expects count == 1. (TO BE REMOVED)
- *
  *   H5D_dset_io_info_t *dset_info:
  *     Pointer to the dataset I/O request descriptor to process.
  *
@@ -4046,53 +5732,40 @@ done:
  *-------------------------------------------------------------------------
  */
 
-herr_t
-H5SC_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
+herr_t H5SC_write(H5SC_t *cache, H5D_dset_io_info_t *dset_info)
 {
 
-    herr_t               ret_value = SUCCEED;
-    size_t               alloc_size_total;
-    H5D_io_type_info_t   my_io_type_info; /* Used in gather_mem callback */
-    const H5S_t         *gather_mem_space;
-    const H5S_t         *gather_file_space;
-    haddr_t              md_tag                                  = HADDR_UNDEF;
-    bool                 partial_bound_chunks_different_encoding = false;
-    H5O_stc_pline_t     *pline                                   = NULL; /* I/O pipeline info */
-    hbool_t              filtered                                = false;
-    H5SC_dset_header_t  *dset_hdr                                = NULL;
-    H5SC_io_info_t      *sc_io_info                              = NULL;
-    H5SC_io_sel_chunk_t *base                                    = NULL;
-    size_t               sel_start                               = 0;
-    size_t               sel_count                               = 0;
-    size_t               chunk_count                             = 0;
-    size_t               old_dset_size                           = 0;
-    const hsize_t      **scaled                                  = NULL;
-    haddr_t            **addr                                    = NULL;
-    hsize_t            **size                                    = NULL;
-    hsize_t             *old_disk_size                           = NULL;
-    hsize_t            **defined_values_size                     = NULL;
-    size_t             **size_hint                               = NULL;
-    size_t             **defined_values_size_hint                = NULL;
-    void               **udata_arr                               = NULL;
-    hsize_t             *write_size_arr                          = NULL;
-    void               **write_buf_arr                           = NULL;
-    hsize_t             *write_buf_alloc_arr                     = NULL;
-    size_t              *miss_arr                                = NULL;
-    size_t              *hit_arr                                 = NULL;
-    void               **chunk_arr                               = NULL;
-    const hsize_t      **scaled_hit                              = NULL;
-    haddr_t            **addr_hit                                = NULL;
-    hsize_t            **size_hit                                = NULL;
-    hsize_t            **defined_values_size_hit                 = NULL;
-    size_t             **size_hint_hit                           = NULL;
-    size_t             **defined_values_size_hint_hit            = NULL;
-    void               **udata_hit                               = NULL;
+    herr_t ret_value = SUCCEED;
+    size_t alloc_size_total;
+    H5D_io_type_info_t my_io_type_info; /* Used in gather_mem callback */
+    const H5S_t *gather_mem_space;
+    const H5S_t *gather_file_space;
+    haddr_t md_tag                               = HADDR_UNDEF;
+    bool md_tag_set                              = false;
+    bool partial_bound_chunks_different_encoding = false;
+    H5O_stc_pline_t *pline                       = NULL; /* I/O pipeline info */
+    hbool_t filtered                             = false;
+    H5SC_dset_header_t *dset_hdr                 = NULL;
+    H5SC_io_info_t *sc_io_info                   = NULL;
+    H5SC_io_sel_chunk_t *base                    = NULL;
+    size_t sel_start                             = 0;
+    size_t sel_count                             = 0;
+    size_t chunk_count                           = 0;
+    size_t old_dset_size                         = 0;
+    const hsize_t **scaled                       = NULL;
+    haddr_t **addr                               = NULL;
+    hsize_t **size                               = NULL;
+    hsize_t **defined_values_size                = NULL;
+    size_t **size_hint                           = NULL;
+    size_t **defined_values_size_hint            = NULL;
+    void **udata_arr                             = NULL;
+    size_t *miss_arr                             = NULL;
+    void **chunk_arr                             = NULL;
 
     FUNC_ENTER_NOAPI(FAIL)
 
     assert(cache);
-    assert(count == 0 || dset_info);
-    assert(count == 1);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     dset_hdr = H5SC__ht_dset_find(cache, dset_info[0].dset->oloc.addr);
     if (dset_hdr == NULL) {
@@ -4127,8 +5800,6 @@ H5SC_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
     assert(dset_info[0].dset->shared->layout.sc_ops->lookup);
     assert(dset_info[0].dset->shared->layout.sc_ops->new_chunk);
     assert(dset_info[0].dset->shared->layout.sc_ops->gather_mem);
-    assert(dset_info[0].dset->shared->layout.sc_ops->encode);
-    assert(dset_info[0].dset->shared->layout.sc_ops->insert);
 
     /* Snapshot dataset accounting once per request; update after I/O completes */
     old_dset_size = dset_hdr->curr_dset_size;
@@ -4142,131 +5813,79 @@ H5SC_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
 
     /* Tag metadata accesses for this dataset. */
     H5AC_tag(dset_info[0].dset->oloc.addr, &md_tag); /* Set the metadata tag */
+    md_tag_set = true;
 
     /* Operate only on the chunks in the active window */
     chunk_count = sel_count;
 
-    /* Allocate per-call scratch storage. */
-    if (NULL == (scaled = (const hsize_t **)H5MM_malloc(chunk_count * sizeof(*scaled))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate scaled array");
+    /*
+     * Ensure reusable callback-vector scratch is large enough for this active
+     * write selection window.
+     */
+    if (H5SC__io_scratch_ensure(sc_io_info, chunk_count) < 0)
+        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to prepare reusable SCC write scratch storage");
 
-    if (NULL == (addr = (haddr_t **)H5MM_malloc(chunk_count * sizeof(*addr))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate addr array");
+    assert(sc_io_info->scratch);
+    assert(sc_io_info->scratch->alloced >= chunk_count);
 
-    if (NULL == (size = (hsize_t **)H5MM_malloc(chunk_count * sizeof(*size))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate size array");
+    scaled                   = sc_io_info->scratch->scaled;
+    addr                     = sc_io_info->scratch->addr;
+    size                     = sc_io_info->scratch->size;
+    defined_values_size      = sc_io_info->scratch->defined_values_size;
+    size_hint                = sc_io_info->scratch->size_hint;
+    defined_values_size_hint = sc_io_info->scratch->defined_values_size_hint;
 
-    if (NULL == (old_disk_size = (hsize_t *)H5MM_calloc(chunk_count * sizeof(*old_disk_size))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate old_disk_size array");
-
-    if (NULL == (defined_values_size = (hsize_t **)H5MM_malloc(chunk_count * sizeof(*defined_values_size))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate defined_values_size array");
-
-    if (NULL == (size_hint = (size_t **)H5MM_malloc(chunk_count * sizeof(*size_hint))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate size_hint array");
-
-    if (NULL ==
-        (defined_values_size_hint = (size_t **)H5MM_malloc(chunk_count * sizeof(*defined_values_size_hint))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate defined_values_size_hint array");
-
-    if (NULL == (udata_arr = (void **)H5MM_malloc(chunk_count * sizeof(*udata_arr))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate udata_arr array");
-
-    if (NULL == (write_size_arr = (hsize_t *)H5MM_calloc(chunk_count * sizeof(*write_size_arr))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate write_size_arr array");
-
-    if (NULL == (write_buf_arr = (void **)H5MM_calloc(chunk_count * sizeof(*write_buf_arr))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate write_buf_arr array");
-
-    if (NULL == (write_buf_alloc_arr = (hsize_t *)H5MM_calloc(chunk_count * sizeof(*write_buf_alloc_arr))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate write_buf_alloc_arr array");
-
-    if (NULL == (miss_arr = (size_t *)H5MM_malloc(chunk_count * sizeof(*miss_arr))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate miss_arr array");
-
-    if (NULL == (hit_arr = (size_t *)H5MM_malloc(chunk_count * sizeof(*hit_arr))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate hit_arr array");
-
-    if (NULL == (chunk_arr = (void **)H5MM_calloc(chunk_count * sizeof(*chunk_arr))))
-        HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate chunk_arr array");
-
-        /* Window-relevant selection accessor */
-#define SEL(j_) (&base[sel_start + (j_)])
+    udata_arr = sc_io_info->scratch->udata;
+    miss_arr  = sc_io_info->scratch->miss_idx;
+    chunk_arr = sc_io_info->scratch->chunk;
 
     /* Initialize per-chunk scratch state. */
     for (size_t j = 0; j < chunk_count; j++) {
-        haddr_t *tmp_addr              = NULL;
-        hsize_t *tmp_size              = NULL;
-        hsize_t *tmp_def_val_size      = NULL;
-        size_t  *tmp_size_hint         = NULL;
-        size_t  *tmp_def_val_size_hint = NULL;
+        scaled[j] = H5SC__io_sel_at(sc_io_info, j)->scaled;
 
-        scaled[j] = SEL(j)->scaled;
-
-        tmp_addr = (haddr_t *)H5MM_malloc(sizeof(haddr_t));
-        if (!tmp_addr)
-            HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate chunk address scratch");
-        *tmp_addr = HADDR_UNDEF;
-        addr[j]   = tmp_addr;
-
-        tmp_size = (hsize_t *)H5MM_malloc(sizeof(hsize_t));
-        if (!tmp_size)
-            HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate chunk size scratch");
-        *tmp_size = 0;
-        size[j]   = tmp_size;
-
-        tmp_def_val_size = (hsize_t *)H5MM_malloc(sizeof(hsize_t));
-        if (!tmp_def_val_size)
-            HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate defined_values_size scratch");
-        *tmp_def_val_size      = 0;
-        defined_values_size[j] = tmp_def_val_size;
-
-        tmp_size_hint = (size_t *)H5MM_malloc(sizeof(size_t));
-        if (!tmp_size_hint)
-            HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate size_hint scratch");
-        *tmp_size_hint = 0;
-        size_hint[j]   = tmp_size_hint;
-
-        tmp_def_val_size_hint = (size_t *)H5MM_malloc(sizeof(size_t));
-        if (!tmp_def_val_size_hint)
-            HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL,
-                        "unable to allocate defined_values_size_hint scratch");
-        *tmp_def_val_size_hint      = 0;
-        defined_values_size_hint[j] = tmp_def_val_size_hint;
+        /*
+         * Callback-facing pointer views are permanently bound to reusable
+         * contiguous backing storage by H5SC__io_scratch_ensure().
+         * Reinitialize only the scalar values used by this write.
+         */
+        *addr[j]                     = HADDR_UNDEF;
+        *size[j]                     = 0;
+        *defined_values_size[j]      = 0;
+        *size_hint[j]                = 0;
+        *defined_values_size_hint[j] = 0;
 
         udata_arr[j] = NULL;
+        chunk_arr[j] = NULL;
     }
 
-    /* Partition the active window into resident hits and lookup misses. */
+    /* Populate on-disk metadata only for nonresident chunks. */
     size_t miss_count = 0;
-    size_t hit_count  = 0;
 
     if (H5SC__lookup_cache_misses(dset_info[0].dset, sc_io_info) < 0) {
         HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "unable to lookup cache missed chunks (SCC)");
     }
 
     for (size_t j = 0; j < chunk_count; j++) {
-        H5SC_chunk_t *chk = SEL(j)->cached_chunk;
+        H5SC_chunk_t *chk = H5SC__io_sel_at(sc_io_info, j)->cached_chunk;
 
         if (chk && chk->chunk_obj) {
-            /* Cache hit: skip lookup; reuse persistent udata and on-disk identity */
+            /* Cache hit: use the resident object and its persistent udata. */
             *addr[j]                     = chk->disk_addr;
             *size[j]                     = (hsize_t)chk->disk_nbytes;
-            *size_hint[j]                = (size_t)chk->disk_nbytes;
+            *size_hint[j]                = chk->cached_chunk_size;
             *defined_values_size[j]      = 0;
             *defined_values_size_hint[j] = 0;
-
-            hit_arr[hit_count++] = j;
+            udata_arr[j]                 = chk->udata;
         }
         else {
             miss_arr[miss_count++] = j;
         }
     }
 
-    /* Refresh per-call udata for resident cache hits before insert/writeback. */
+    /* Transfer cached lookup outputs into the general callback vectors. */
     for (size_t j = 0; j < miss_count; j++) {
-        size_t               idx = miss_arr[j];
-        H5SC_io_sel_chunk_t *sel = SEL(idx);
+        size_t idx               = miss_arr[j];
+        H5SC_io_sel_chunk_t *sel = H5SC__io_sel_at(sc_io_info, idx);
 
         assert(sel->lookup_valid == true);
 
@@ -4281,53 +5900,6 @@ H5SC_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
             *size_hint[idx] = (size_t)dset_info[0].dset->shared->layout.u.struct_chunk.size;
     }
 
-    /* Refresh per-call udata for resident cache hits before insert/writeback. */
-    if (hit_count > 0) {
-        if (NULL == (scaled_hit = (const hsize_t **)H5MM_malloc(hit_count * sizeof(*scaled_hit))))
-            HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate scaled_hit array");
-
-        if (NULL == (addr_hit = (haddr_t **)H5MM_malloc(hit_count * sizeof(*addr_hit))))
-            HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate addr_hit array");
-
-        if (NULL == (size_hit = (hsize_t **)H5MM_malloc(hit_count * sizeof(*size_hit))))
-            HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate size_hit array");
-
-        if (NULL ==
-            (defined_values_size_hit = (hsize_t **)H5MM_malloc(hit_count * sizeof(*defined_values_size_hit))))
-            HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate defined_values_size_hit array");
-
-        if (NULL == (size_hint_hit = (size_t **)H5MM_malloc(hit_count * sizeof(*size_hint_hit))))
-            HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate size_hint_hit array");
-
-        if (NULL == (defined_values_size_hint_hit =
-                         (size_t **)H5MM_malloc(hit_count * sizeof(*defined_values_size_hint_hit))))
-            HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL,
-                        "unable to allocate defined_values_size_hint_hit array");
-
-        if (NULL == (udata_hit = (void **)H5MM_calloc(hit_count * sizeof(*udata_hit))))
-            HGOTO_ERROR(H5E_RESOURCE, H5E_NOSPACE, FAIL, "unable to allocate udata_hit array");
-
-        for (size_t j = 0; j < hit_count; j++) {
-            size_t idx                      = hit_arr[j];
-            scaled_hit[j]                   = scaled[idx];
-            addr_hit[j]                     = addr[idx];
-            size_hit[j]                     = size[idx];
-            defined_values_size_hit[j]      = defined_values_size[idx];
-            size_hint_hit[j]                = size_hint[idx];
-            defined_values_size_hint_hit[j] = defined_values_size_hint[idx];
-        }
-
-        if (dset_info[0].dset->shared->layout.sc_ops->lookup(
-                dset_info[0].dset, hit_count, scaled_hit, addr_hit, size_hit, defined_values_size_hit,
-                size_hint_hit, defined_values_size_hint_hit, udata_hit) < 0)
-            HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "unable to refresh udata for cache hits (SCC)");
-
-        for (size_t j = 0; j < hit_count; j++) {
-            size_t idx     = hit_arr[j];
-            udata_arr[idx] = udata_hit[j]; /* per-call only: do not persist into cached_chunk->udata */
-        }
-    }
-
     /* Determine whether partial edge chunks use alternate encoding behavior. */
     if (dset_info[0].dset->shared->layout.sc_ops->layout_query(dset_info[0].dset, NULL, NULL,
                                                                &partial_bound_chunks_different_encoding) < 0)
@@ -4338,8 +5910,10 @@ H5SC_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
         filtered = true;
 
     for (size_t j = 0; j < chunk_count; j++) {
-        bool          partial_bound = false;
-        H5SC_chunk_t *chk           = SEL(j)->cached_chunk;
+        bool partial_bound  = false;
+        H5SC_chunk_t *chk   = H5SC__io_sel_at(sc_io_info, j)->cached_chunk;
+        size_t nbytes_local = 0;
+
         assert(chk);
 
         /* Persist minimal chunk identity for later flush */
@@ -4365,7 +5939,8 @@ H5SC_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
                  * True sparse miss: no on-disk chunk and no resident chunk.
                  * Create a new resident chunk.
                  */
-                if (!(SEL(j)->cached_chunk && SEL(j)->cached_chunk->udata == udata_arr[j])) {
+                if (!(H5SC__io_sel_at(sc_io_info, j)->cached_chunk &&
+                      H5SC__io_sel_at(sc_io_info, j)->cached_chunk->udata == udata_arr[j])) {
                     udata_arr[j] = H5MM_xfree(udata_arr[j]);
                 }
 
@@ -4374,31 +5949,36 @@ H5SC_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
                                 "write: invalid size_hint for new chunk allocation");
                 }
 
-                if (dset_info[0].dset->shared->layout.sc_ops->new_chunk(
-                        dset_info[0].dset, false, size[j], size_hint[j], &chunk_arr[j], &udata_arr[j]) < 0) {
+                if (dset_info[0].dset->shared->layout.sc_ops->new_chunk(dset_info[0].dset, false,
+                                                                        &nbytes_local, size_hint[j],
+                                                                        &chunk_arr[j], &udata_arr[j]) < 0) {
                     HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "unable to create new chunk (SCC)");
                 }
 
+                H5_CHECKED_ASSIGN(*size[j], hsize_t, nbytes_local, size_t);
+
                 chk->chunk_obj   = chunk_arr[j];
+                chk->udata       = udata_arr[j];
                 chk->disk_addr   = HADDR_UNDEF;
                 chk->disk_nbytes = 0;
-                chk->dirty_flag  = true;
+
+                if (H5SC__chunk_set_dirty(cache, dset_hdr, chk, true) < 0)
+                    HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "unable to mark new resident chunk dirty");
 
                 {
                     size_t resident_bytes = *size_hint[j];
                     if (resident_bytes == 0)
                         resident_bytes = (size_t)dset_info[0].dset->shared->layout.u.struct_chunk.size;
 
-                    if (H5SC__chunk_update_cached_size(dset_hdr, chk, resident_bytes) < 0)
+                    if (H5SC__chunk_update_cached_size(cache, dset_hdr, chk, resident_bytes) < 0)
                         HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL,
                                     "write: chunk size accounting failed for new resident chunk");
                 }
             }
         }
         else {
-            old_disk_size[j] = *size[j];
-            chk->disk_addr   = *addr[j];
-            chk->disk_nbytes = (size_t)*size[j];
+            chk->disk_addr = *addr[j];
+            H5_CHECKED_ASSIGN(chk->disk_nbytes, size_t, *size[j], hsize_t);
 
             if (filtered && partial_bound_chunks_different_encoding &&
                 H5D__chunk_is_partial_edge_chunk(dset_info[0].dset->shared->ndims,
@@ -4429,14 +6009,24 @@ H5SC_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
                                    chunk_arr[j]) < 0) {
                     HGOTO_ERROR(H5E_DATASET, H5E_READERROR, FAIL, "unable to block read from file (SCC)");
                 }
-                if (dset_info[0].dset->shared->layout.sc_ops->decode(dset_info[0].dset, size[j], size_hint[j],
-                                                                     partial_bound, &chunk_arr[j],
-                                                                     udata_arr[j]) < 0) {
+
+                H5_CHECKED_ASSIGN(nbytes_local, size_t, *size[j], hsize_t);
+
+                if (dset_info[0].dset->shared->layout.sc_ops->decode(dset_info[0].dset, &nbytes_local,
+                                                                     size_hint[j], partial_bound,
+                                                                     &chunk_arr[j], udata_arr[j]) < 0) {
                     HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "unable to decode chunk in place (SCC)");
                 }
+
+                H5_CHECKED_ASSIGN(*size[j], hsize_t, nbytes_local, size_t);
+
                 /* After decode, chunk_arr[j] is in the in-cache format */
-                chk->chunk_obj  = chunk_arr[j];
-                chk->dirty_flag = false; /* (will become dirty after gather_mem updates) */
+                chk->chunk_obj = chunk_arr[j];
+                chk->udata     = udata_arr[j];
+
+                if (H5SC__chunk_set_dirty(cache, dset_hdr, chk, false) < 0)
+                    HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL,
+                                "unable to set materialized read chunk clean");
 
                 /* Charge resident bytes for this chunk */
                 size_t resident_bytes = *size_hint[j];
@@ -4444,7 +6034,7 @@ H5SC_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
                     resident_bytes = (size_t)dset_info[0].dset->shared->layout.u.struct_chunk.size;
                 }
 
-                if (H5SC__chunk_update_cached_size(dset_hdr, chk, resident_bytes) < 0)
+                if (H5SC__chunk_update_cached_size(cache, dset_hdr, chk, resident_bytes) < 0)
                     HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL,
                                 "write: chunk size accounting failed for decoded resident chunk");
             }
@@ -4452,100 +6042,106 @@ H5SC_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
     }
 
     for (size_t j = 0; j < chunk_count; j++) {
+        H5SC_io_sel_chunk_t *sel = H5SC__io_sel_at(sc_io_info, j);
+        H5SC_chunk_t *chk        = sel->cached_chunk;
+        size_t nbytes_local;
+
+        assert(sel);
+        assert(chk);
+
+        /*
+         * The gather callback may begin modifying the decoded object before
+         * reporting an error. Mark the chunk dirty before entering the callback so
+         * that a partially modified resident object can never be treated as clean.
+         */
+        if (H5SC__chunk_set_dirty(cache, dset_hdr, chk, true) < 0)
+            HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "unable to mark new write chunk dirty");
 
         /* Gather user data into the resident chunk buffer. */
-        gather_mem_space  = SEL(j)->mem_space;
-        gather_file_space = SEL(j)->file_space;
+        gather_mem_space  = sel->mem_space;
+        gather_file_space = sel->file_space;
 
-        if (dset_info[0].dset->shared->layout.sc_ops->gather_mem(
-                &dset_info[0], &my_io_type_info, gather_mem_space, gather_file_space, size[j], size_hint[j],
-                &alloc_size_total, chunk_arr[j], udata_arr[j]) < 0) {
-            HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "unable to gather mem for new chunk (SCC)");
-        }
-
-        /* After gather_mem, chunk is modified: mark resident chunk dirty */
-        SEL(j)->cached_chunk->dirty_flag = true;
-    }
-
-    /* Encode resident chunks for writeback. */
-    for (int j = 0; j < chunk_count; j++) {
-        bool partial_bound = false;
-
-        if (partial_bound_chunks_different_encoding && filtered &&
-            H5D__chunk_is_partial_edge_chunk(dset_info[0].dset->shared->ndims,
-                                             dset_info[0].dset->shared->layout.u.struct_chunk.dim, scaled[j],
-                                             dset_info[0].dset->shared->curr_dims))
-            partial_bound = true;
-
-        /* Preserve cached decoded chunk objects: use encode (non-in-place) */
-        if (dset_info[0].dset->shared->layout.sc_ops->encode(
-                dset_info[0].dset, &write_size_arr[j], &write_buf_alloc_arr[j], partial_bound, chunk_arr[j],
-                udata_arr[j], &write_buf_arr[j]) < 0) {
-            HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "unable to encode chunk in place (SCC)");
-        }
-    }
-
-    /* Insert the chunk into the chunk index within the file */
-    if (dset_info[0].dset->shared->layout.sc_ops->insert(dset_info[0].dset, chunk_count, scaled, addr,
-                                                         old_disk_size, write_size_arr, chunk_arr,
-                                                         udata_arr) < 0)
-        HGOTO_ERROR(H5E_DATASET, H5E_CANTINSERT, FAIL, "unable to insert chunk into file (SCC)");
-
-    for (size_t j = 0; j < chunk_count; j++) {
-
-        /* Write the encoded chunk image to file. */
-        if (H5F_block_write(dset_info[0].dset->oloc.file, H5FD_MEM_DRAW, *addr[j], (size_t)write_size_arr[j],
-                            write_buf_arr[j]) < 0) {
-            HGOTO_ERROR(H5E_DATASET, H5E_WRITEERROR, FAIL, "unable to block write to file (SCC)");
-        }
-
-        /* insert() may update addr; reflect the final on-disk identity */
+#if defined(H5SC_COLLECT_ESTIMATE_STATS) && (H5SC_COLLECT_ESTIMATE_STATS + 0)
         {
-            H5SC_chunk_t *chk = SEL(j)->cached_chunk;
-            assert(chk);
-            chk->disk_addr   = *addr[j];
-            chk->disk_nbytes = (size_t)write_size_arr[j];
-            chk->dirty_flag  = false;
+            size_t pre_gather_size = chk->cached_chunk_size;
+#endif
 
-            /*
-             * Unpin: this chunk is no longer "in flight" for this write call.
-             */
-            if (chk->chunk_counter > 0) {
-                chk->chunk_counter--;
-                chk->last_op = H5SC_TAG_UNPIN_WRITE_DONE;
+            alloc_size_total = 0;
+
+            alloc_size_total = 0;
+
+            H5_CHECKED_ASSIGN(nbytes_local, size_t, *size[j], hsize_t);
+
+            if (dset_info[0].dset->shared->layout.sc_ops->gather_mem(
+                    &dset_info[0], &my_io_type_info, gather_mem_space, gather_file_space, &nbytes_local,
+                    size_hint[j], &alloc_size_total, chunk_arr[j], udata_arr[j]) < 0)
+                HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL,
+                            "unable to gather memory data into resident chunk (SCC)");
+
+            H5_CHECKED_ASSIGN(*size[j], hsize_t, nbytes_local, size_t);
+
+#if defined(H5SC_COLLECT_ESTIMATE_STATS) && (H5SC_COLLECT_ESTIMATE_STATS + 0)
+            if (alloc_size_total > pre_gather_size) {
+                size_t growth = alloc_size_total - pre_gather_size;
+
+                cache->stats.write_growth_count++;
+                H5SC__saturating_add_size(&cache->stats.write_growth_total, growth);
+
+                if (growth > cache->stats.write_growth_max)
+                    cache->stats.write_growth_max = growth;
             }
-            else {
-                HGOTO_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL,
-                            "SCC write: chunk counter was not properly incrimented");
-            }
+        }
+#endif
+
+        /* gather_mem() may resize the resident representation. */
+        if (H5SC__chunk_update_cached_size(cache, dset_hdr, chk, alloc_size_total) < 0)
+            HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL,
+                        "write: chunk size accounting failed after gather_mem");
+
+        if (sel->estimate_pending) {
+#if defined(H5SC_COLLECT_ESTIMATE_STATS) && (H5SC_COLLECT_ESTIMATE_STATS + 0)
+
+            H5SC__stats_record_size_estimate(cache, sel->estimate_source, sel->estimate_resident_size,
+                                             alloc_size_total);
+#endif
+
+            sel->estimate_pending       = false;
+            sel->estimate_source        = H5SC_SIZE_EST_NONE;
+            sel->estimate_resident_size = 0;
         }
 
-        if (write_buf_arr[j]) {
-            write_buf_arr[j] = H5MM_xfree(write_buf_arr[j]);
+        H5SC__update_resident_estimate_history(dset_hdr, alloc_size_total);
+
+        /*
+         * Release exactly the pin owned by this selected-chunk entry.
+         */
+        if (sel->pin_held) {
+            if (H5SC__chunk_unpin(cache, dset_hdr, chk) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL, "unable to release SCC request pin");
+
+            sel->pin_held = false;
+            chk->last_op  = H5SC_TAG_UNPIN_WRITE_DONE;
         }
-        if (!(SEL(j)->cached_chunk && SEL(j)->cached_chunk->udata == udata_arr[j])) {
-            udata_arr[j] = H5MM_xfree(udata_arr[j]);
-        }
+        else
+            HGOTO_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL, "SCC write: selected chunk does not own a valid pin");
     }
     /* Reconcile dataset/global cache size accounting once per request */
     if (H5SC__account_chunk_link_change(cache, dset_hdr, old_dset_size) < 0) {
         HGOTO_ERROR(H5E_SCC, H5E_BADVALUE, FAIL, "global size accounting failed (SCC write)");
     }
 
-    H5AC_tag(md_tag, NULL); /* Reset the metadata tag for the next dataset */
-
     /* Close any temporary per-call dataspaces for the active window. */
     for (size_t j = 0; j < chunk_count; j++) {
-        H5SC_io_sel_chunk_t *chk = SEL(j);
+        H5SC_io_sel_chunk_t *chk = H5SC__io_sel_at(sc_io_info, j);
 
         if (chk->file_space && !chk->file_space_shared)
             if (H5S_close(chk->file_space) < 0)
-                HDONE_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL,
+                HGOTO_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL,
                             "can't release temporary file dataspace (SCC write)");
 
         if (chk->mem_space && !chk->mem_space_shared)
             if (H5S_close(chk->mem_space) < 0)
-                HDONE_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL,
+                HGOTO_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL,
                             "can't release temporary memory dataspace (SCC write)");
 
         /* Poison only the ephemeral dataspace pointers; leave lookup cache intact */
@@ -4555,22 +6151,35 @@ H5SC_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info)
         chk->mem_space_shared  = false;
         chk->dset_info         = NULL;
     }
-#undef SEL
+
+#if H5SC_DO_SANITY_CHECKS
+    if (H5SC__verify_cached_reclaimability(cache) < 0)
+        HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "cached reclaimability mismatch after SCC write");
+#endif
 
 done:
+    if (md_tag_set)
+        H5AC_tag(md_tag, NULL); /* Reset the metadata tag for the next dataset */
+
     /*
      * Defensive unpin on error paths: if we abort mid-write, make sure any
      * chunks referenced by the current selection window are no longer marked
      * in-flight.
      */
     if (ret_value < 0) {
-        if (sc_io_info && base && sel_count > 0) {
+        if (sc_io_info && sc_io_info->sel_chunks && sel_count > 0) {
             for (size_t j = 0; j < sel_count; j++) {
-                H5SC_chunk_t *chk = base[sel_start + j].cached_chunk;
+                H5SC_io_sel_chunk_t *sel = H5SC__io_sel_at(sc_io_info, j);
+                H5SC_chunk_t *chk        = sel->cached_chunk;
 
-                if (chk && chk->chunk_counter > 0) {
-                    chk->chunk_counter--;
-                    chk->last_op = H5SC_TAG_UNPIN_WRITE_DONE_ERROR;
+                if (sel->pin_held) {
+                    if (!chk || H5SC__chunk_unpin(cache, dset_hdr, chk) < 0)
+                        HDONE_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL,
+                                    "SCC write cleanup encountered an invalid owned pin");
+                    else {
+                        sel->pin_held = false;
+                        chk->last_op  = H5SC_TAG_UNPIN_WRITE_DONE_ERROR;
+                    }
                 }
             }
         }
@@ -4586,52 +6195,6 @@ done:
         /* num_sel_chunks and sel_start are owned by the caller’s batching logic */
     }
 
-    if (write_buf_arr) {
-        for (size_t j = 0; j < chunk_count; j++)
-            if (write_buf_arr[j])
-                write_buf_arr[j] = H5MM_xfree(write_buf_arr[j]);
-    }
-
-    if (addr) {
-        for (size_t j = 0; j < chunk_count; j++)
-            addr[j] = (haddr_t *)H5MM_xfree(addr[j]);
-    }
-
-    if (size) {
-        for (size_t j = 0; j < chunk_count; j++)
-            size[j] = (hsize_t *)H5MM_xfree(size[j]);
-    }
-
-    if (defined_values_size) {
-        for (size_t j = 0; j < chunk_count; j++)
-            defined_values_size[j] = (hsize_t *)H5MM_xfree(defined_values_size[j]);
-    }
-
-    if (size_hint) {
-        for (size_t j = 0; j < chunk_count; j++)
-            size_hint[j] = (size_t *)H5MM_xfree(size_hint[j]);
-    }
-
-    if (defined_values_size_hint) {
-        for (size_t j = 0; j < chunk_count; j++)
-            defined_values_size_hint[j] = (size_t *)H5MM_xfree(defined_values_size_hint[j]);
-    }
-
-    scaled                   = (const hsize_t **)H5MM_xfree((void *)scaled);
-    addr                     = (haddr_t **)H5MM_xfree(addr);
-    size                     = (hsize_t **)H5MM_xfree(size);
-    old_disk_size            = (hsize_t *)H5MM_xfree(old_disk_size);
-    defined_values_size      = (hsize_t **)H5MM_xfree(defined_values_size);
-    size_hint                = (size_t **)H5MM_xfree(size_hint);
-    defined_values_size_hint = (size_t **)H5MM_xfree(defined_values_size_hint);
-    udata_arr                = (void **)H5MM_xfree(udata_arr);
-    write_size_arr           = (hsize_t *)H5MM_xfree(write_size_arr);
-    write_buf_arr            = (void **)H5MM_xfree(write_buf_arr);
-    write_buf_alloc_arr      = (hsize_t *)H5MM_xfree(write_buf_alloc_arr);
-    miss_arr                 = (size_t *)H5MM_xfree(miss_arr);
-    hit_arr                  = (size_t *)H5MM_xfree(hit_arr);
-    chunk_arr                = (void **)H5MM_xfree(chunk_arr);
-
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5SC_write() */
 
@@ -4643,25 +6206,28 @@ done:
  * or conversion. First flushes that chunk if it is dirty in
  * the cache.
  *
+ * Not currently implemented or supported.
+ *
  * Return:   SUCCEED on success, FAIL on failure
  *-------------------------------------------------------------------------
  */
-herr_t
-H5SC_direct_chunk_read(H5SC_t *cache, H5D_t *dset, const hsize_t *offset, H5_ATTR_UNUSED void *udata,
-                       void *buf, size_t *buf_size)
+herr_t H5SC_direct_chunk_read(H5SC_t *cache, H5D_t *dset, const hsize_t *offset, H5_ATTR_UNUSED void *udata,
+                              void *buf, size_t *buf_size)
 {
     herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_NOAPI(FAIL)
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset);
     assert(dset->shared->layout.sc_ops);
     assert(offset);
     assert(buf);
     assert(buf_size);
 
-    HGOTO_ERROR(H5E_SCC, H5E_NOT_IMPLEMTED, FAIL, "the expected chunk was not found eligible for eviction");
+    HGOTO_ERROR(H5E_SCC, H5E_NOT_IMPLEMTED, FAIL,
+                "direct chunk read is not currently supported or implemented");
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
@@ -4675,24 +6241,27 @@ done:
  * decoding or conversion. First evicts that chunk from
  * cache if it is present.
  *
+ * Not currently implemented or supported.
+ *
  * Return:   SUCCEED on success, FAIL on failure
  *-------------------------------------------------------------------------
  */
-herr_t
-H5SC_direct_chunk_write(H5SC_t *cache, H5D_t *dset, const hsize_t *offset, H5_ATTR_UNUSED void *udata,
-                        const void *buf)
+herr_t H5SC_direct_chunk_write(H5SC_t *cache, H5D_t *dset, const hsize_t *offset, H5_ATTR_UNUSED void *udata,
+                               const void *buf)
 {
     herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_NOAPI(FAIL)
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset);
     assert(dset->shared->layout.sc_ops);
     assert(offset);
     assert(buf);
 
-    HGOTO_ERROR(H5E_SCC, H5E_NOT_IMPLEMTED, FAIL, "the expected chunk was not found eligible for eviction");
+    HGOTO_ERROR(H5E_SCC, H5E_NOT_IMPLEMTED, FAIL,
+                "direct chunk write is not currently supported or implemented");
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
@@ -4701,41 +6270,181 @@ done:
 /*-------------------------------------------------------------------------
  * Function: H5SC_get_defined
  *
- * Purpose:  Returns a copy of file_space with only elements
- * selected that are both selected in file_space and defined
- * in dset. If file_space uses a point selection, the
- * ordering of selected points will be preserved in the
- * returned dataspace.
+ * Purpose:
+ *   Construct a dataset dataspace containing the elements that are both
+ *     selected by file_space and currently defined in a structured sparse
+ *     dataset.
  *
- * Return:   SUCCEED on success, FAIL on failure
+ *   The input selection is decomposed into logical chunks through
+ *     H5SC__selection_io_info_init(). For each participating chunk, the SCC
+ *     chunk key is computed and the cache is checked for an existing entry.
+ *     Resident decoded chunk state is treated as authoritative so that
+ *     defined values modified in memory but not yet written to disk are
+ *     reflected in the result.
+ *
+ *   Nonresident chunks are queried without creating SCC entries or
+ *     materializing full resident chunk state. H5SC__get_defined_chunk()
+ *     performs the required layout lookup and, when necessary, reads and
+ *     decodes only the defined-value metadata. An allocated chunk reporting
+ *     defined_values_size == 0 is handled as a fast path in which all
+ *     selected values in that logical chunk are considered defined.
+ *
+ *   Per-chunk defined-value selections are translated from logical chunk
+ *     coordinates into dataset coordinates and merged into the returned
+ *     dataspace.
+ *
+ *   The operation is intended to be cache-neutral: it does not create
+ *     H5SC_chunk_t entries, alter SCC LRU ordering, pin chunks, or modify
+ *     SCC byte accounting. Existing resident state may be inspected but is
+ *     not otherwise modified.
+ *
+ *   H5S_SEL_ALL and H5S_SEL_HYPERSLABS input selections are currently
+ *     supported. Point selections are intentionally unsupported by the
+ *     current SCC interface.
+ *
+ * Inputs:
+ *   H5SC_t *cache:
+ *     Pointer to the shared chunk cache associated with dset. Used only to
+ *     locate existing dataset/chunk state; the operation does not modify
+ *     cache residency or accounting.
+ *
+ *   H5D_t *dset:
+ *     Pointer to the structured sparse dataset whose defined elements are
+ *     being queried.
+ *
+ *   const H5S_t *file_space:
+ *     Dataset dataspace containing the input selection. Only elements that
+ *     are both selected here and currently defined are included in the
+ *     returned dataspace.
+ *
+ * Return:
+ *   Success:
+ *     Pointer to a newly allocated dataset-sized H5S_t containing the
+ *     resulting defined-value selection. Ownership is transferred to the
+ *     caller.
+ *
+ *   Failure:
+ *     NULL.
  *-------------------------------------------------------------------------
  */
-H5S_t *
-H5SC_get_defined(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
+H5S_t *H5SC_get_defined(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
 {
-    H5S_t *defined   = NULL;
-    H5S_t *ret_value = NULL;
+    H5SC_dset_header_t *dset_hdr = NULL;
+    H5SC_io_info_t *sc_io_info   = NULL;
+    H5S_t *defined               = NULL;
+    hsize_t dset_dims[H5S_MAX_RANK];
+    hsize_t chunk_dims[H5S_MAX_RANK];
+    unsigned ndims;
+    bool partial_bound_chunks_different_encoding = false;
+    H5O_stc_pline_t *pline                       = NULL;
+    hbool_t filtered                             = false;
+    H5S_t *ret_value                             = NULL;
+    haddr_t md_tag                               = HADDR_UNDEF;
+    bool md_tag_set                              = false;
 
     FUNC_ENTER_NOAPI(NULL)
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset);
+    assert(dset->shared);
     assert(dset->shared->layout.sc_ops);
     assert(file_space);
 
-    /* FOR NOW: just return copy of file_space */
-    if (NULL == (defined = H5S_copy(file_space, false, true)))
-        HGOTO_ERROR(H5E_DATASET, H5E_CANTINIT, NULL, "unable to copy dataspace");
+    assert(dset->shared->layout.sc_ops->lookup);
+    assert(dset->shared->layout.sc_ops->layout_query);
 
-    /* Set return value */
+    ndims = dset->shared->ndims;
+
+    if (ndims == 0 || ndims > H5S_MAX_RANK)
+        HGOTO_ERROR(H5E_DATASET, H5E_BADVALUE, NULL, "invalid dataset rank for SCC get-defined operation");
+
+    if (H5S_get_simple_extent_dims(file_space, dset_dims, NULL) < 0)
+        HGOTO_ERROR(H5E_DATASPACE, H5E_CANTGET, NULL, "unable to get dataset dimensions");
+
+    if (dset->shared->layout.sc_ops->layout_query(dset, chunk_dims, NULL,
+                                                  &partial_bound_chunks_different_encoding) < 0)
+        HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, NULL, "unable to query structured chunk layout");
+
+    pline = &(dset->shared->dcpl_cache.stc_pline);
+    if (pline && pline->tot_filt_nsects)
+        filtered = true;
+
+    /*
+     * Create the result with the same extent as file_space, but begin with
+     * an empty selection.
+     */
+    if (NULL == (defined = H5S_copy(file_space, false, true)))
+        HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCOPY, NULL, "unable to copy input dataspace");
+
+    if (H5S_select_none(defined) < 0)
+        HGOTO_ERROR(H5E_DATASPACE, H5E_CANTSELECT, NULL, "unable to clear defined-value result selection");
+
+    /*
+     * Reuse the dataset-owned selection scratch structure. No cache entries
+     * are created or modified by the common selection initializer.
+     */
+    dset_hdr = H5SC__ht_dset_find(cache, dset->oloc.addr);
+    if (!dset_hdr)
+        HGOTO_ERROR(H5E_SCC, H5E_HT_NOTFOUND, NULL, "dataset should have been added to SCC upon creation");
+
+    sc_io_info = dset_hdr->io_info;
+    assert(sc_io_info);
+
+    if (H5SC__selection_io_info_init(dset, file_space, sc_io_info) < 0)
+        HGOTO_ERROR(H5E_SCC, H5E_CANTINIT, NULL, "unable to initialize SCC defined-value selection");
+
+    H5AC_tag(dset->oloc.addr, &md_tag);
+    md_tag_set = true;
+
+    for (size_t i = 0; i < sc_io_info->num_sel_chunks; i++) {
+        H5SC_io_sel_chunk_t *sel = &sc_io_info->sel_chunks[i];
+        H5SC_chunk_key_t key;
+        H5SC_chunk_t *cached_chk;
+        H5S_t *chunk_defined = NULL;
+
+        if (H5SC__compute_chunk_key(&dset->oloc.addr, &sel->chk_log_coord, &key) < 0)
+            HGOTO_ERROR(H5E_SCC, H5E_CHUNK_KEY, NULL, "unable to compute SCC chunk key");
+
+        cached_chk = H5SC__ht_chunk_find(cache, &key);
+
+        if (H5SC__get_defined_chunk(dset, sel, cached_chk, filtered, partial_bound_chunks_different_encoding,
+                                    &chunk_defined) < 0)
+            HGOTO_ERROR(H5E_SCC, H5E_CANNOTGET_SELECTION, NULL,
+                        "unable to determine defined values for selected chunk");
+
+        if (chunk_defined) {
+            if (H5S_GET_SELECT_NPOINTS(chunk_defined) > 0)
+                if (H5SC__merge_defined_chunk_selection(defined, chunk_defined, sel, ndims, dset_dims,
+                                                        chunk_dims) < 0)
+                    HGOTO_ERROR(H5E_DATASPACE, H5E_CANTSELECT, NULL,
+                                "unable to merge defined-value selection");
+
+            if (H5S_close(chunk_defined) < 0)
+                HGOTO_ERROR(H5E_DATASPACE, H5E_CANTRELEASE, NULL,
+                            "unable to close chunk defined-value selection");
+        }
+    }
+
     ret_value = defined;
     defined   = NULL;
 
 done:
+    if (md_tag_set)
+        H5AC_tag(md_tag, NULL);
+
+    /*
+     * Selection decomposition uses reusable dataset-owned scratch state.
+     * Reset it regardless of success or failure.
+     */
+    if (sc_io_info) {
+        if (H5SC__io_info_reset(sc_io_info) < 0)
+            HDONE_ERROR(H5E_SCC, H5E_CANTRELEASE, NULL, "unable to reset get-defined selection information");
+    }
+
     if (defined) {
-        assert(!ret_value);
         if (H5S_close(defined) < 0)
-            HDONE_ERROR(H5E_DATASET, H5E_CLOSEERROR, NULL, "unable to release dataspace");
+            HDONE_ERROR(H5E_DATASPACE, H5E_CANTRELEASE, NULL, "unable to release defined-value result");
     }
 
     FUNC_LEAVE_NOAPI(ret_value)
@@ -4754,36 +6463,41 @@ done:
  *              currently defined values when the layout provides a
  *              defined_values callback, and invokes sc_ops->erase_values().
  *
- *              Chunks that become empty are removed from structured storage,
- *              detached from the dataset LRU, removed from the SCC chunk hash
- *              table, and released. Chunks that retain defined values are
- *              marked dirty and flushed through the normal single-chunk SCC
- *              flush path.
+ *              Chunks that become empty are removed immediately from
+ *              structured storage, detached from the dataset chunk LRU,
+ *              removed from the SCC chunk hash table, and released. Chunks
+ *              that retain defined values remain resident in the SCC. Their
+ *              resident-size accounting is reconciled, their dataset-local
+ *              resident-size history is updated, and they are marked dirty
+ *              for persistence by a subsequent SCC flush or flush-and-evict
+ *              operation.
  *
- *              The routine also preserves SCC pin/unpin accounting for chunks
- *              selected during erase initialization and reconciles dataset
- *              cache-size accounting after the erase operation completes.
+ *              The routine preserves SCC pin/unpin accounting for chunks
+ *              selected during erase initialization and reconciles
+ *              dataset/cache size accounting after the erase operation
+ *              completes.
  *
  * Return:      SUCCEED/FAIL
  *
  *-------------------------------------------------------------------------
  */
 
-herr_t
-H5SC_erase(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
+herr_t H5SC_erase(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
 {
-    H5SC_dset_header_t  *dset_hdr      = NULL;
-    H5SC_io_info_t      *sc_io_info    = NULL;
-    H5SC_io_sel_chunk_t *base          = NULL;
-    size_t               sel_start     = 0;
-    size_t               sel_count     = 0;
-    size_t               old_dset_size = 0;
-    haddr_t              md_tag        = HADDR_UNDEF;
-    herr_t               ret_value     = SUCCEED;
+    H5SC_dset_header_t *dset_hdr = NULL;
+    H5SC_io_info_t *sc_io_info   = NULL;
+    H5SC_io_sel_chunk_t *base    = NULL;
+    size_t sel_start             = 0;
+    size_t sel_count             = 0;
+    size_t old_dset_size         = 0;
+    haddr_t md_tag               = HADDR_UNDEF;
+    bool md_tag_set              = false;
+    herr_t ret_value             = SUCCEED;
 
     FUNC_ENTER_NOAPI(FAIL)
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset);
     assert(dset->shared->layout.sc_ops);
     assert(file_space);
@@ -4809,22 +6523,24 @@ H5SC_erase(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
     sel_start = sc_io_info->sel_start;
     sel_count = sc_io_info->num_sel_chunks;
 
+    if (sel_start > sc_io_info->sel_chunks_alloced || sel_count > sc_io_info->sel_chunks_alloced - sel_start)
+        HGOTO_ERROR(H5E_SCC, H5E_BADVALUE, FAIL, "invalid erase selection window");
+
     if (sel_count == 0)
         HGOTO_DONE(SUCCEED);
 
     H5AC_tag(dset->oloc.addr, &md_tag);
-
-#define SEL(j_) (&base[sel_start + (j_)])
+    md_tag_set = true;
 
     for (size_t j = 0; j < sel_count; j++) {
-        H5SC_io_sel_chunk_t *sel          = SEL(j);
-        H5SC_chunk_t        *chk          = sel->cached_chunk;
-        H5S_t               *erase_sel    = NULL;
-        bool                 delete_chunk = false;
-        haddr_t              old_addr;
-        hsize_t              old_disk_size;
-        size_t               nbytes;
-        size_t               alloc_size;
+        H5SC_io_sel_chunk_t *sel = H5SC__io_sel_at(sc_io_info, j);
+        H5SC_chunk_t *chk        = sel->cached_chunk;
+        H5S_t *erase_sel         = NULL;
+        bool delete_chunk        = false;
+        haddr_t old_addr;
+        hsize_t old_disk_size;
+        size_t nbytes;
+        size_t alloc_size;
 
         assert(sel);
         assert(chk);
@@ -4839,23 +6555,25 @@ H5SC_erase(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
          * H5SC_write() / H5SC_read().
          */
         if (!chk->chunk_obj) {
-            const hsize_t   *scaled_arr[1];
-            haddr_t         *addr_arr[1];
-            hsize_t         *size_arr[1];
-            hsize_t         *def_sz_arr[1];
-            size_t          *size_hint_arr[1];
-            size_t          *def_sz_hint_arr[1];
-            void            *udata_arr[1]                            = {NULL};
-            haddr_t          addr_local                              = HADDR_UNDEF;
-            hsize_t          size_local                              = 0;
-            hsize_t          def_local                               = 0;
-            size_t           hint_local                              = 0;
-            size_t           def_hint_local                          = 0;
-            bool             partial_bound                           = false;
-            bool             partial_bound_chunks_different_encoding = false;
-            H5O_stc_pline_t *pline                                   = NULL;
-            hbool_t          filtered                                = false;
-            void            *chunk_buf                               = NULL;
+            const hsize_t *scaled_arr[1];
+            haddr_t *addr_arr[1];
+            hsize_t *size_arr[1];
+            hsize_t *def_sz_arr[1];
+            size_t *size_hint_arr[1];
+            size_t *def_sz_hint_arr[1];
+            void *udata_arr[1]                           = {NULL};
+            haddr_t addr_local                           = HADDR_UNDEF;
+            hsize_t size_local                           = 0;
+            hsize_t encoded_size_local                   = 0;
+            hsize_t def_local                            = 0;
+            size_t hint_local                            = 0;
+            size_t nbytes_local                          = 0;
+            size_t def_hint_local                        = 0;
+            bool partial_bound                           = false;
+            bool partial_bound_chunks_different_encoding = false;
+            H5O_stc_pline_t *pline                       = NULL;
+            hbool_t filtered                             = false;
+            void *chunk_buf                              = NULL;
 
             scaled_arr[0]      = chk->scaled;
             addr_arr[0]        = &addr_local;
@@ -4868,13 +6586,13 @@ H5SC_erase(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
              * can be no defined on-disk chunk here. Erasing is a no-op.
              */
             if (!(*dset->shared->layout.ops->is_space_alloc)(&dset->shared->layout.storage)) {
-                if (chk->chunk_counter > 0) {
-                    chk->chunk_counter--;
-                    chk->last_op = H5SC_TAG_UNPIN_ERASE_DONE;
-                }
-                else
+
+                if (!sel->pin_held || H5SC__chunk_unpin(cache, dset_hdr, chk) < 0)
                     HGOTO_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL,
-                                "SCC erase: chunk counter was not properly incremented");
+                                "unable to release erase pin for unallocated storage");
+
+                sel->pin_held = false;
+                chk->last_op  = H5SC_TAG_UNPIN_ERASE_DONE;
 
                 continue;
             }
@@ -4888,16 +6606,22 @@ H5SC_erase(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
                 if (udata_arr[0])
                     udata_arr[0] = H5MM_xfree(udata_arr[0]);
 
-                if (chk->chunk_counter > 0) {
-                    chk->chunk_counter--;
-                    chk->last_op = H5SC_TAG_UNPIN_ERASE_DONE;
-                }
-                else
+                if (!sel->pin_held || H5SC__chunk_unpin(cache, dset_hdr, chk) < 0)
                     HGOTO_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL,
-                                "SCC erase: chunk counter was not properly incremented");
+                                "unable to release erase pin after sparse miss");
+
+                sel->pin_held = false;
+                chk->last_op  = H5SC_TAG_UNPIN_ERASE_DONE;
 
                 continue;
             }
+
+            /*
+             * Preserve the actual structured-storage allocation length. decode() may
+             * replace size_local with the decoded representation size, which must not be
+             * passed to delete_chunk() as the on-disk block length.
+             */
+            encoded_size_local = size_local;
 
             if (hint_local == 0)
                 HGOTO_ERROR(H5E_SCC, H5E_BADVALUE, FAIL,
@@ -4923,17 +6647,21 @@ H5SC_erase(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
             if (H5F_block_read(dset->oloc.file, H5FD_MEM_DRAW, addr_local, size_local, chunk_buf) < 0)
                 HGOTO_ERROR(H5E_DATASET, H5E_READERROR, FAIL, "erase: block read failed");
 
-            if (dset->shared->layout.sc_ops->decode(dset, &size_local, &hint_local, partial_bound, &chunk_buf,
-                                                    udata_arr[0]) < 0)
+            H5_CHECKED_ASSIGN(nbytes_local, size_t, size_local, hsize_t);
+
+            if (dset->shared->layout.sc_ops->decode(dset, &nbytes_local, &hint_local, partial_bound,
+                                                    &chunk_buf, udata_arr[0]) < 0)
                 HGOTO_ERROR(H5E_DATASET, H5E_CANTGET, FAIL, "erase: decode callback failed");
 
-            chk->chunk_obj   = chunk_buf;
-            chk->udata       = udata_arr[0];
-            chk->disk_addr   = addr_local;
-            chk->disk_nbytes = (size_t)size_local;
-            chk->dirty_flag  = false;
+            chk->chunk_obj = chunk_buf;
+            chk->udata     = udata_arr[0];
+            chk->disk_addr = addr_local;
+            H5_CHECKED_ASSIGN(chk->disk_nbytes, size_t, encoded_size_local, hsize_t);
 
-            if (H5SC__chunk_update_cached_size(dset_hdr, chk, hint_local) < 0)
+            if (H5SC__chunk_set_dirty(cache, dset_hdr, chk, false) < 0)
+                HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "unable to mark decoded erase chunk clean");
+
+            if (H5SC__chunk_update_cached_size(cache, dset_hdr, chk, hint_local) < 0)
                 HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "erase: chunk size accounting failed");
         }
 
@@ -4955,13 +6683,12 @@ H5SC_erase(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
                     HGOTO_ERROR(H5E_DATASPACE, H5E_CANTRELEASE, FAIL,
                                 "can't release defined-values dataspace");
 
-                if (chk->chunk_counter > 0) {
-                    chk->chunk_counter--;
-                    chk->last_op = H5SC_TAG_UNPIN_ERASE_DONE;
-                }
-                else
+                if (!sel->pin_held || H5SC__chunk_unpin(cache, dset_hdr, chk) < 0)
                     HGOTO_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL,
-                                "SCC erase: chunk counter was not properly incremented");
+                                "unable to release erase pin for empty defined selection");
+
+                sel->pin_held = false;
+                chk->last_op  = H5SC_TAG_UNPIN_ERASE_DONE;
 
                 continue;
             }
@@ -4991,7 +6718,7 @@ H5SC_erase(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
                     HGOTO_ERROR(H5E_DATASET, H5E_CANTDELETE, FAIL, "erase: unable to delete empty chunk");
             }
 
-            if (H5SC__chunk_lru_remove(dset_hdr, chk) < 0)
+            if (H5SC__chunk_lru_remove(cache, dset_hdr, chk) < 0)
                 HGOTO_ERROR(H5E_SCC, H5E_CANNOTREMOVE, FAIL, "failed to remove chunk from dataset LRU");
 
             if (H5SC__chunk_teardown_resident(dset, chk) < 0)
@@ -5002,39 +6729,59 @@ H5SC_erase(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space)
                 HGOTO_ERROR(H5E_SCC, H5E_CANNOTREMOVE, FAIL,
                             "failed to remove chunk from hash table during erase");
 
+            /*
+             * The selected chunk is being destroyed while its request pin is still
+             * logically owned. LRU removal sees the chunk as pinned and therefore removes
+             * no reclaimable contribution. Clear selection ownership before freeing the
+             * chunk; no unpin transition is needed because the object no longer exists.
+             */
+            sel->pin_held     = false;
+            sel->cached_chunk = NULL;
+
             chk = H5MM_xfree(chk);
             continue;
         }
 
-        /* Surviving chunk: rewrite using the established single-chunk flush path */
-        chk->dirty_flag = true;
+        /* Surviving chunk remains resident and dirty until flush or eviction. */
+        if (H5SC__chunk_update_cached_size(cache, dset_hdr, chk, alloc_size) < 0)
+            HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL,
+                        "erase: chunk size accounting failed after erase_values");
 
-        if (H5SC__flush_one_chunk(cache, dset, dset_hdr, chk) < 0)
-            HGOTO_ERROR(H5E_DATASET, H5E_WRITEERROR, FAIL, "erase: unable to flush modified chunk");
+        H5SC__update_resident_estimate_history(dset_hdr, alloc_size);
 
-        if (chk->chunk_counter > 0) {
-            chk->chunk_counter--;
-            chk->last_op = H5SC_TAG_UNPIN_ERASE_DONE;
-        }
-        else
-            HGOTO_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL,
-                        "SCC erase: chunk counter was not properly incremented");
+        if (H5SC__chunk_set_dirty(cache, dset_hdr, chk, true) < 0)
+            HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "unable to mark erase chunk dirty");
+
+        if (!sel->pin_held || H5SC__chunk_unpin(cache, dset_hdr, chk) < 0)
+            HGOTO_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL, "unable to release erase request pin");
+
+        sel->pin_held = false;
+        chk->last_op  = H5SC_TAG_UNPIN_ERASE_DONE;
     }
 
     if (H5SC__account_chunk_link_change(cache, dset_hdr, old_dset_size) < 0)
         HGOTO_ERROR(H5E_SCC, H5E_BADVALUE, FAIL, "global size accounting failed (SCC erase)");
 
-    H5AC_tag(md_tag, NULL);
+#if H5SC_DO_SANITY_CHECKS
+    if (H5SC__verify_cached_reclaimability(cache) < 0)
+        HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "cached reclaimability mismatch after SCC erase");
+#endif
 
 done:
-    if (ret_value < 0) {
-        if (sc_io_info && base && sel_count > 0) {
-            for (size_t j = 0; j < sel_count; j++) {
-                H5SC_chunk_t *chk = base[sel_start + j].cached_chunk;
+    if (md_tag_set)
+        H5AC_tag(md_tag, NULL);
 
-                if (chk && chk->chunk_counter > 0) {
-                    chk->chunk_counter--;
-                    chk->last_op = H5SC_TAG_UNPIN_ERASE_DONE_ERROR;
+    if (ret_value < 0 && sc_io_info && base && sel_count > 0) {
+        for (size_t j = 0; j < sel_count; j++) {
+            H5SC_io_sel_chunk_t *sel = H5SC__io_sel_at(sc_io_info, j);
+            H5SC_chunk_t *chk        = sel->cached_chunk;
+
+            if (sel->pin_held) {
+                if (!chk || H5SC__chunk_unpin(cache, dset_hdr, chk) < 0)
+                    HDONE_ERROR(H5E_SCC, H5E_BADOPCODE, FAIL, "unable to unwind erase request pin");
+                else {
+                    sel->pin_held = false;
+                    chk->last_op  = H5SC_TAG_UNPIN_ERASE_DONE_ERROR;
                 }
             }
         }
@@ -5042,10 +6789,9 @@ done:
 
     if (sc_io_info) {
         if (H5SC__io_info_reset(sc_io_info) < 0)
-            HDONE_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL, "can't close erase I/O info");
+            HGOTO_ERROR(H5E_DATASET, H5E_CANTRELEASE, FAIL, "can't close erase I/O info");
     }
 
-#undef SEL
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5SC_erase() */
 
@@ -5066,11 +6812,10 @@ done:
  *-------------------------------------------------------------------------
  */
 
-static bool
-H5SC__chunk_outside_extent(const H5D_t *dset, const hsize_t *chunk_dims, const hsize_t *scaled)
+static bool H5SC__chunk_outside_extent(const H5D_t *dset, const hsize_t *chunk_dims, const hsize_t *scaled)
 {
     const hsize_t *new_dims = dset->shared->curr_dims;
-    unsigned       u;
+    unsigned u;
 
     assert(dset);
     assert(chunk_dims);
@@ -5104,9 +6849,8 @@ H5SC__chunk_outside_extent(const H5D_t *dset, const hsize_t *chunk_dims, const h
  *-------------------------------------------------------------------------
  */
 
-static bool
-H5SC__chunk_is_partial_bound(unsigned ndims, const hsize_t *chunk_dims, const hsize_t *scaled,
-                             const hsize_t *dims)
+static bool H5SC__chunk_is_partial_bound(unsigned ndims, const hsize_t *chunk_dims, const hsize_t *scaled,
+                                         const hsize_t *dims)
 {
     unsigned u;
 
@@ -5143,13 +6887,12 @@ H5SC__chunk_is_partial_bound(unsigned ndims, const hsize_t *chunk_dims, const hs
  *-------------------------------------------------------------------------
  */
 
-static bool
-H5SC__chunk_needs_erase(const H5D_t *dset, const hsize_t *chunk_dims, const hsize_t *scaled,
-                        const hsize_t *old_dims)
+static bool H5SC__chunk_needs_erase(const H5D_t *dset, const hsize_t *chunk_dims, const hsize_t *scaled,
+                                    const hsize_t *old_dims)
 
 {
     const hsize_t *new_dims = dset->shared->curr_dims;
-    unsigned       u;
+    unsigned u;
 
     assert(dset);
     assert(chunk_dims);
@@ -5200,17 +6943,16 @@ H5SC__chunk_needs_erase(const H5D_t *dset, const hsize_t *chunk_dims, const hsiz
  *-------------------------------------------------------------------------
  */
 
-static herr_t
-H5SC__erase_chunk_invalid_extent_region(H5D_t *dset, const hsize_t *chunk_dims, const hsize_t *old_dims,
-                                        H5SC_chunk_t *chk, size_t *nbytes, size_t *alloc_size,
-                                        bool *delete_chunk)
+static herr_t H5SC__erase_chunk_invalid_extent_region(H5D_t *dset, const hsize_t *chunk_dims,
+                                                      const hsize_t *old_dims, H5SC_chunk_t *chk,
+                                                      size_t *nbytes, size_t *alloc_size, bool *delete_chunk)
 {
     hsize_t origin[H5S_MAX_RANK];
     hsize_t old_valid_count[H5S_MAX_RANK];
     hsize_t new_valid_count[H5S_MAX_RANK];
-    bool    has_invalid          = false;
-    bool    has_new_valid_region = true;
-    herr_t  ret_value            = SUCCEED;
+    bool has_invalid          = false;
+    bool has_new_valid_region = true;
+    herr_t ret_value          = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
@@ -5267,16 +7009,21 @@ H5SC__erase_chunk_invalid_extent_region(H5D_t *dset, const hsize_t *chunk_dims, 
      * prefix and all later dimensions to their old-valid extent.
      */
     for (unsigned u = 0; u < dset->shared->ndims; u++) {
-        H5S_t   *erase_space = NULL;
-        hsize_t  start[H5S_MAX_RANK];
-        hsize_t  count[H5S_MAX_RANK];
-        hssize_t npoints = 0;
-        bool     empty   = false;
+        H5S_t *erase_space = NULL;
+        hsize_t start[H5S_MAX_RANK];
+        hsize_t count[H5S_MAX_RANK];
+        hsize_t npoints = 0;
+        bool empty      = false;
 
         if (new_valid_count[u] >= old_valid_count[u])
             continue;
 
-        if (NULL == (erase_space = H5S_create_simple((int)dset->shared->ndims, chunk_dims, NULL)))
+#if H5SC_DO_SANITY_CHECKS
+        assert(dset->shared->ndims > 0);
+        assert(dset->shared->ndims <= H5S_MAX_RANK);
+#endif
+
+        if (NULL == (erase_space = H5S_create_simple(dset->shared->ndims, chunk_dims, NULL)))
             HGOTO_ERROR(H5E_DATASPACE, H5E_CANTCREATE, FAIL, "unable to create chunk-local erase dataspace");
 
         if (H5S_select_none(erase_space) < 0)
@@ -5306,22 +7053,26 @@ H5SC__erase_chunk_invalid_extent_region(H5D_t *dset, const hsize_t *chunk_dims, 
 
         if (H5S_select_hyperslab(erase_space, H5S_SELECT_SET, start, NULL, count, NULL) < 0) {
             if (H5S_close(erase_space) < 0)
-                HDONE_ERROR(H5E_DATASPACE, H5E_CLOSEERROR, FAIL,
+                HGOTO_ERROR(H5E_DATASPACE, H5E_CLOSEERROR, FAIL,
                             "unable to close erase dataspace after selection failure");
             HGOTO_ERROR(H5E_DATASPACE, H5E_CANTSELECT, FAIL,
                         "unable to select invalid chunk-local erase slab");
         }
 
         npoints = H5S_GET_SELECT_NPOINTS(erase_space);
-        if (npoints < 0)
-            HGOTO_ERROR(H5E_DATASPACE, H5E_CANTGET, FAIL,
-                        "unable to get invalid chunk-local erase selection point count");
+        if (npoints == 0) {
+            if (H5S_close(erase_space) < 0)
+                HGOTO_ERROR(H5E_DATASPACE, H5E_CLOSEERROR, FAIL,
+                            "unable to close erase dataspace after npoints validation");
+            erase_space = NULL;
+            continue;
+        }
 
         if (npoints > 0) {
             if ((dset->shared->layout.sc_ops->erase_values)(dset, erase_space, nbytes, alloc_size,
                                                             chk->chunk_obj, delete_chunk, chk->udata) < 0) {
                 if (H5S_close(erase_space) < 0)
-                    HDONE_ERROR(H5E_DATASPACE, H5E_CLOSEERROR, FAIL,
+                    HGOTO_ERROR(H5E_DATASPACE, H5E_CLOSEERROR, FAIL,
                                 "unable to close erase dataspace after erase failure");
                 HGOTO_ERROR(H5E_DATASET, H5E_CANTREMOVE, FAIL,
                             "unable to erase out-of-bounds values from structured chunk");
@@ -5368,17 +7119,17 @@ done:
  *-------------------------------------------------------------------------
  */
 
-static herr_t
-H5SC__prune_one_scaled_coord_outside_extent(H5SC_t *cache, H5D_t *dset, const hsize_t *scaled)
+static herr_t H5SC__prune_one_scaled_coord_outside_extent(H5SC_t *cache, H5D_t *dset, const hsize_t *scaled)
 {
-    haddr_t addr      = HADDR_UNDEF;
-    hsize_t nbytes    = 0;
-    bool    exists    = false;
-    herr_t  ret_value = SUCCEED;
+    haddr_t addr     = HADDR_UNDEF;
+    hsize_t nbytes   = 0;
+    bool exists      = false;
+    herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset);
     assert(scaled);
     assert(dset->shared->layout.sc_ops);
@@ -5419,16 +7170,17 @@ done:
  *-------------------------------------------------------------------------
  */
 
-static herr_t
-H5SC__for_each_scaled_coord_outside_extent(H5SC_t *cache, H5D_t *dset, unsigned ndims,
-                                           const hsize_t *old_nchunks, const hsize_t *new_nchunks)
+static herr_t H5SC__for_each_scaled_coord_outside_extent(H5SC_t *cache, H5D_t *dset, unsigned ndims,
+                                                         const hsize_t *old_nchunks,
+                                                         const hsize_t *new_nchunks)
 {
     hsize_t scaled[H5S_MAX_RANK];
-    herr_t  ret_value = SUCCEED;
+    herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset);
     assert(ndims > 0);
     assert(old_nchunks);
@@ -5493,22 +7245,20 @@ done:
  *-------------------------------------------------------------------------
  */
 
-static herr_t
-H5SC__lookup_chunk_for_prune(H5D_t *dset, const hsize_t *scaled, haddr_t *addr, hsize_t *disk_nbytes,
-                             bool *exists)
+static herr_t H5SC__lookup_chunk_for_prune(H5D_t *dset, const hsize_t *scaled, haddr_t *addr,
+                                           hsize_t *disk_nbytes, bool *exists)
 {
     const hsize_t *scaled_arr[1];
-    haddr_t       *addr_arr[1];
-    hsize_t       *size_arr[1];
-    hsize_t        defined_values_size = 0;
-    hsize_t       *defined_values_size_arr[1];
-    size_t         size_hint = 0;
-    size_t        *size_hint_arr[1];
-    size_t         defined_values_size_hint = 0;
-    size_t        *defined_values_size_hint_arr[1];
-    void          *udata = NULL;
-    void         **udata_arr[1];
-    herr_t         ret_value = SUCCEED;
+    haddr_t *addr_arr[1];
+    hsize_t *size_arr[1];
+    hsize_t defined_values_size = 0;
+    hsize_t *defined_values_size_arr[1];
+    size_t size_hint = 0;
+    size_t *size_hint_arr[1];
+    size_t defined_values_size_hint = 0;
+    size_t *defined_values_size_hint_arr[1];
+    void *udata_arr[1] = {NULL};
+    herr_t ret_value   = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
@@ -5531,7 +7281,6 @@ H5SC__lookup_chunk_for_prune(H5D_t *dset, const hsize_t *scaled, haddr_t *addr, 
     defined_values_size_arr[0]      = &defined_values_size;
     size_hint_arr[0]                = &size_hint;
     defined_values_size_hint_arr[0] = &defined_values_size_hint;
-    udata_arr[0]                    = &udata;
 
     if ((dset->shared->layout.sc_ops->lookup)(dset, (size_t)1, scaled_arr, addr_arr, size_arr,
                                               defined_values_size_arr, size_hint_arr,
@@ -5542,8 +7291,8 @@ H5SC__lookup_chunk_for_prune(H5D_t *dset, const hsize_t *scaled, haddr_t *addr, 
         *exists = true;
 
 done:
-    if (udata)
-        udata = H5MM_xfree(udata);
+    if (udata_arr[0])
+        udata_arr[0] = H5MM_xfree(udata_arr[0]);
 
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5SC__lookup_chunk_for_prune() */
@@ -5570,17 +7319,18 @@ done:
  *-------------------------------------------------------------------------
  */
 
-static herr_t
-H5SC__rekey_dset_chunks_after_extent_change(H5SC_t *cache, H5D_t *dset, H5SC_dset_header_t *dset_hdr,
-                                            const hsize_t *chunk_dims)
+static herr_t H5SC__rekey_dset_chunks_after_extent_change(H5SC_t *cache, H5D_t *dset,
+                                                          H5SC_dset_header_t *dset_hdr,
+                                                          const hsize_t *chunk_dims)
 {
-    H5SC_chunk_t *chk       = NULL;
-    haddr_t       dset_addr = dset->oloc.addr;
-    herr_t        ret_value = SUCCEED;
+    H5SC_chunk_t *chk = NULL;
+    haddr_t dset_addr = dset->oloc.addr;
+    herr_t ret_value  = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset);
     assert(dset_hdr);
     assert(chunk_dims);
@@ -5601,8 +7351,8 @@ H5SC__rekey_dset_chunks_after_extent_change(H5SC_t *cache, H5D_t *dset, H5SC_dse
      * post-extent-change dataset dimensions.
      */
     for (chk = dset_hdr->lru_head_ptr; chk; chk = chk->next_ptr) {
-        hsize_t          elem_coord[H5S_MAX_RANK];
-        hsize_t          new_log_chk_coord = 0;
+        hsize_t elem_coord[H5S_MAX_RANK];
+        hsize_t new_log_chk_coord = 0;
         H5SC_chunk_key_t new_key;
 
         for (unsigned u = 0; u < dset->shared->ndims; u++) {
@@ -5633,6 +7383,11 @@ H5SC__rekey_dset_chunks_after_extent_change(H5SC_t *cache, H5D_t *dset, H5SC_dse
             HGOTO_ERROR(H5E_SCC, H5E_CANNOTINSERT, FAIL,
                         "unable to reinsert dataset chunk after dataset rekey");
     }
+
+#if H5SC_DO_SANITY_CHECKS
+    if (H5SC__verify_cached_reclaimability(cache) < 0)
+        HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "cached reclaimability mismatch after extent change");
+#endif
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
@@ -5676,22 +7431,22 @@ done:
  *-------------------------------------------------------------------------
  */
 
-static herr_t
-H5SC_prune_by_extent(H5SC_t *cache, H5D_t *dset, const hsize_t *old_dims)
+static herr_t H5SC_prune_by_extent(H5SC_t *cache, H5D_t *dset, const hsize_t *old_dims)
 {
-    H5SC_dset_header_t *dset_hdr      = NULL;
-    H5SC_chunk_t       *chk           = NULL;
-    H5SC_chunk_t       *next_chk      = NULL;
-    size_t              old_dset_size = 0;
-    hsize_t             chunk_dims[H5S_MAX_RANK];
-    hsize_t             old_nchunks[H5S_MAX_RANK];
-    hsize_t             new_nchunks[H5S_MAX_RANK];
-    bool                partial_bound_chunks_different_encoding = false;
-    herr_t              ret_value                               = SUCCEED;
+    H5SC_dset_header_t *dset_hdr = NULL;
+    H5SC_chunk_t *chk            = NULL;
+    H5SC_chunk_t *next_chk       = NULL;
+    size_t old_dset_size         = 0;
+    hsize_t chunk_dims[H5S_MAX_RANK];
+    hsize_t old_nchunks[H5S_MAX_RANK];
+    hsize_t new_nchunks[H5S_MAX_RANK];
+    bool partial_bound_chunks_different_encoding = false;
+    herr_t ret_value                             = SUCCEED;
 
     FUNC_ENTER_NOAPI(FAIL)
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset);
     assert(dset->shared->layout.sc_ops);
     assert(old_dims);
@@ -5745,10 +7500,10 @@ H5SC_prune_by_extent(H5SC_t *cache, H5D_t *dset, const hsize_t *old_dims)
     for (chk = dset_hdr->lru_head_ptr; chk; chk = next_chk) {
         haddr_t old_addr;
         hsize_t old_disk_size;
-        bool    old_partial;
-        bool    new_partial;
-        bool    encoding_changed;
-        bool    delete_chunk = false;
+        bool old_partial;
+        bool new_partial;
+        bool encoding_changed;
+        bool delete_chunk = false;
 
         next_chk = chk->next_ptr;
 
@@ -5789,7 +7544,7 @@ H5SC_prune_by_extent(H5SC_t *cache, H5D_t *dset, const hsize_t *old_dims)
                 chk->udata     = NULL;
             }
 
-            if (H5SC__chunk_lru_remove(dset_hdr, chk) < 0)
+            if (H5SC__chunk_lru_remove(cache, dset_hdr, chk) < 0)
                 HGOTO_ERROR(H5E_SCC, H5E_CANTREMOVE, FAIL, "unable to remove chunk from dataset LRU");
 
             if (H5SC__ht_chunk_delete(cache, &chk->data_key) < 0)
@@ -5816,12 +7571,16 @@ H5SC_prune_by_extent(H5SC_t *cache, H5D_t *dset, const hsize_t *old_dims)
                             "unable to erase invalid extent region from structured chunk");
 
             if (!delete_chunk) {
-                if (H5SC__chunk_update_cached_size(dset_hdr, chk, alloc_size) < 0)
+                if (H5SC__chunk_update_cached_size(cache, dset_hdr, chk, alloc_size) < 0)
                     HGOTO_ERROR(H5E_SCC, H5E_CANTSET, FAIL,
                                 "unable to update SCC chunk cached size after extent prune erase");
 
+                H5SC__update_resident_estimate_history(dset_hdr, alloc_size);
+
                 chk->disk_nbytes = nbytes;
-                chk->dirty_flag  = true;
+
+                if (H5SC__chunk_set_dirty(cache, dset_hdr, chk, true) < 0)
+                    HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "unable to mark extent-pruned chunk dirty");
             }
         }
 
@@ -5847,7 +7606,7 @@ H5SC_prune_by_extent(H5SC_t *cache, H5D_t *dset, const hsize_t *old_dims)
                 chk->udata     = NULL;
             }
 
-            if (H5SC__chunk_lru_remove(dset_hdr, chk) < 0)
+            if (H5SC__chunk_lru_remove(cache, dset_hdr, chk) < 0)
                 HGOTO_ERROR(H5E_SCC, H5E_CANTREMOVE, FAIL, "unable to remove chunk from dataset LRU");
 
             if (H5SC__ht_chunk_delete(cache, &chk->data_key) < 0)
@@ -5862,8 +7621,6 @@ H5SC_prune_by_extent(H5SC_t *cache, H5D_t *dset, const hsize_t *old_dims)
          * Case 4: surviving chunk must be re-encoded / rewritten
          *--------------------------------------------------------------*/
         if (chk->chunk_obj && (chk->dirty_flag || encoding_changed)) {
-            chk->dirty_flag = true;
-
             if (H5SC__flush_one_chunk(cache, dset, dset_hdr, chk) < 0)
                 HGOTO_ERROR(H5E_DATASET, H5E_WRITEERROR, FAIL,
                             "unable to flush structured chunk after extent change");
@@ -5920,18 +7677,18 @@ done:
  *-------------------------------------------------------------------------
  */
 
-herr_t
-H5SC_set_extent_notify(H5SC_t *cache, H5D_t *dset, const hsize_t *old_dims)
+herr_t H5SC_set_extent_notify(H5SC_t *cache, H5D_t *dset, const hsize_t *old_dims)
 {
-    hsize_t  ext_dims[H5S_MAX_RANK]; /* Extended dimension sizes */
-    unsigned dim_idx;                /* Dimension index */
-    bool     shrink    = false;      /* Whether any dimension shrank */
-    bool     expand    = false;      /* Whether any dimension grew */
-    herr_t   ret_value = SUCCEED;
+    hsize_t ext_dims[H5S_MAX_RANK]; /* Extended dimension sizes */
+    unsigned dim_idx;               /* Dimension index */
+    bool shrink      = false;       /* Whether any dimension shrank */
+    bool expand      = false;       /* Whether any dimension grew */
+    herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_NOAPI(FAIL)
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset);
     assert(dset->shared->layout.sc_ops);
     assert(old_dims);
@@ -6006,14 +7763,14 @@ done:
  *-------------------------------------------------------------------------
  */
 
-H5SC_dset_header_t *
-H5SC_dset_create_header(H5SC_t *cache, haddr_t addr, size_t max_chunk_size)
+H5SC_dset_header_t *H5SC_dset_create_header(H5SC_t *cache, haddr_t addr, size_t max_chunk_size)
 {
     H5SC_dset_header_t *ret_value = NULL;
-    size_t              min_size  = (size_t)(10ULL * 1024ULL);
+    size_t min_size               = (size_t)(10ULL * 1024ULL);
     FUNC_ENTER_NOAPI(FAIL)
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     if (cache->SCC_quiescent_limit < (size_t)(10ULL * 1024ULL)) {
         /*
@@ -6037,7 +7794,6 @@ H5SC_dset_create_header(H5SC_t *cache, haddr_t addr, size_t max_chunk_size)
     dset_hdr->magic              = H5SC_DSET_HDR_MAGIC;
     dset_hdr->last_op            = H5SC_TAG_CREATE;
     dset_hdr->resize_in_progress = false;
-    dset_hdr->evict_exhausted    = false;
 
     dset_hdr->io_info = (H5SC_io_info_t *)H5MM_calloc(sizeof(H5SC_io_info_t));
     if (!dset_hdr->io_info)
@@ -6045,6 +7801,7 @@ H5SC_dset_create_header(H5SC_t *cache, haddr_t addr, size_t max_chunk_size)
 
     /* Default values: “empty but reusable” */
     dset_hdr->io_info->sel_chunks         = NULL;
+    dset_hdr->io_info->scratch            = NULL;
     dset_hdr->io_info->num_sel_chunks     = 0;
     dset_hdr->io_info->sel_chunks_alloced = 0;
 
@@ -6068,44 +7825,22 @@ done:
  *  - Frees the dataset header itself.
  *-------------------------------------------------------------------------
  */
-herr_t
-H5SC_dset_destroy_header(H5SC_t *cache, H5D_t *dset, H5SC_dset_header_t *dset_hdr)
+herr_t H5SC_dset_destroy_header(H5SC_t *cache, H5D_t *dset, H5SC_dset_header_t *dset_hdr)
 {
     herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_NOAPI(FAIL)
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset);
     assert(dset_hdr);
     assert(dset_hdr->io_info);
     assert(dset_hdr->io_info->num_sel_chunks == 0);
 
-    /* To avoid data loss: if the dataset still has resident chunks, evict them now */
-    if (dset_hdr->lru_tail_ptr) {
-        H5SC_chunk_t *chk = dset_hdr->lru_tail_ptr;
-        while (chk) {
-            H5SC_chunk_t *prev = chk->prev_ptr;
-
-#ifdef H5SC_DO_SANITY_CHECKS
-            assert(chk->chunk_counter == 0);
-#endif
-
-            if (H5SC__chunk_teardown_resident(dset, chk) < 0)
-                HGOTO_ERROR(H5E_SCC, H5E_CANTRELEASE, FAIL,
-                            "unable to tear down resident chunk object during dataset destroy");
-
-            if (H5SC__chunk_lru_remove(dset_hdr, chk) < 0)
-                HGOTO_ERROR(H5E_SCC, H5E_CANNOTREMOVE, FAIL,
-                            "failed to remove chunk from dataset LRU during destroy");
-            if (H5SC__ht_chunk_delete(cache, &chk->data_key) < 0)
-                HGOTO_ERROR(H5E_SCC, H5E_CANNOTREMOVE, FAIL,
-                            "failed to remove chunk from hash table during destroy");
-
-            chk = H5MM_xfree(chk);
-            chk = prev;
-        }
-    }
+    if (dset_hdr->lru_head_ptr || dset_hdr->lru_tail_ptr || dset_hdr->chunk_lru_len != 0 ||
+        dset_hdr->curr_dset_size != 0)
+        HGOTO_ERROR(H5E_SCC, H5E_CANNOTFREE, FAIL, "cannot destroy nonempty SCC dataset header");
 
     /* Free dataset I/O scratchpad */
     if (dset_hdr->io_info) {
@@ -6161,8 +7896,7 @@ done:
  *-------------------------------------------------------------------------
  */
 
-H5SC_chunk_t *
-H5SC__make_chunk(H5SC_chunk_key_t key, size_t cached_sz, size_t counter, bool pio)
+H5SC_chunk_t *H5SC__make_chunk(H5SC_chunk_key_t key, size_t cached_sz, size_t counter, bool pio)
 {
     H5SC_chunk_t *chk = NULL;
 
@@ -6195,246 +7929,11 @@ H5SC__make_chunk(H5SC_chunk_key_t key, size_t cached_sz, size_t counter, bool pi
     chk->dirty_flag        = false;
     chk->partial_IO        = pio;
 
-done:
     if (!chk)
         H5MM_free(chk);
 
     return chk;
 } /* end H5SC__make_chunk() */
-
-/*-------------------------------------------------------------------------
- * Function: H5SC_make_and_insert_chunk
- *
- * Purpose:
- *   Helper that ensures a chunk corresponding to a given element coordinate
- *   is present in the shared chunk cache and attached to a dataset's chunk
- *   LRU list.
- *
- *   The function performs the following steps:
- *
- *     1) Computes the linear logical chunk index for the given element
- *        coordinate using H5SC__compute_logical_chunk_index().
- *
- *     2) Derives a 128-bit chunk key by interleaving the linear index and
- *        the dataset object header address via H5SC__compute_chunk_key().
- *        (Key convention: addr = linear chunk index; size = dset_addr.)
- *
- *     3) Queries the chunk hash table for an existing entry matching the
- *        computed key. If an entry exists:
- *           - *out_chunk is set to the found chunk
- *           - *out_key is set to the computed key
- *           - SUCCEED is returned without modifying the LRU.
- *
- *     4) If no entry exists in the hash table, allocates a new H5SC_chunk_t
- *        via t_make_chunk(), initializes its payload (including data_key),
- *        inserts it into the chunk hash table, and prepends it to the
- *        dataset's chunk LRU list.
- *
- *     5) Performs an identity check by re-looking up the key in the hash
- *        table and verifying that the returned pointer matches the inserted
- *        H5SC_chunk_t.
- *
- * Inputs:
- *   H5SC_t *cache:
- *     Pointer to the shared chunk cache instance (hash tables + LRU state).
- *
- *   H5SC_dset_header_t *dset_hdr:
- *     Pointer to the dataset header whose per-dataset chunk LRU should
- *     contain the chunk. Must remain valid for the lifetime of the chunk.
- *
- *   haddr_t daddr:
- *     Dataset object header address. Used as one half of the interleaved
- *     chunk key (paired with the linear chunk index).
- *
- *   unsigned ndims:
- *     Rank of the dataset (number of dimensions).
- *
- *   const hsize_t *dims:
- *     Array of length nd containing the dataset dimensions (in elements).
- *
- *   const uint32_t *cdims:
- *     Array of length nd containing the chunk dimensions (in elements).
- *
- *   const hsize_t *elem:
- *     Element coordinate (length nd) that lies inside the chunk for which
- *     we are ensuring cache residency. This coordinate is used to derive
- *     the logical chunk coordinates and the linear chunk index.
- *
- *   size_t cached_sz:
- *     Size (in bytes) to assign to both cached_chunk_size and disk_chunk_size
- *     in the newly created chunk (if one is allocated). This is used for
- *     accounting and LRU byte counters in the tests.
- *
- * Outputs:
- *   H5SC_chunk_t **out_chunk:
- *     On success, *out_chunk is set to point at the chunk that now represents
- *     this logical chunk in the cache. This may be an existing chunk (if one
- *     was already present in the hash table) or a newly allocated chunk.
- *
- *   H5SC_chunk_key_t *out_key:
- *     On success, *out_key is set to the computed chunk key corresponding
- *     to the given element coordinate and dataset address.
- *
- * Return:
- *   SUCCEED (0) on success, FAIL (<0) on error. On failure, no new chunk
- *   remains linked in the hash table or the LRU list, and no allocation
- *   is leaked.
- *------------------------------------------------------------------------- */
-herr_t
-H5SC_make_and_insert_chunk(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, haddr_t daddr, unsigned ndims,
-                           const hsize_t *dims, hsize_t *cdims,
-                           const hsize_t    *elem,      /* element coord inside the chunk */
-                           size_t            cached_sz, /* cached (and disk) size for counters */
-                           H5SC_chunk_t    **out_chunk, /* [out] chunk pointer (existing or new) */
-                           H5SC_chunk_key_t *out_key /* [out] computed key */)
-{
-    herr_t ret_value = SUCCEED;
-
-    hsize_t       idx = 0;
-    H5SC_chunk_t *chk = NULL;
-    FUNC_ENTER_NOAPI(FAIL)
-
-    if (!cache || !dset_hdr || !dims || !cdims || !elem || !out_chunk || !out_key) {
-        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "invalid argument(s) (make and insert chunk, SCC)");
-    }
-
-    /* 1) Compute linear chunk index from element coordinate */
-    if (H5SC__compute_logical_chunk_index(ndims, dims, cdims, elem, &idx) < 0) {
-        HGOTO_ERROR(H5E_SCC, H5E_CHUNK_KEY, FAIL, "failed to compute the logical chunk coordinate");
-    }
-
-    /* After computing idx */
-#ifdef H5SC_DO_SANITY_CHECKS
-    {
-        /* Basic argument sanity (fast checks) */
-        assert(ndims > 0);
-        assert(dims);
-        assert(cdims);
-        assert(elem);
-        for (unsigned i = 0; i < ndims; i++) {
-            assert(dims[i] > 0);
-            assert(cdims[i] > 0);
-            assert(elem[i] < dims[i]);
-        }
-
-        /* idx must be within total chunk count (product of nchunks per dim) */
-        {
-            hsize_t total = 1;
-            for (unsigned i = 0; i < ndims; i++) {
-                hsize_t n = (dims[i] + cdims[i] - 1) / cdims[i];
-                assert(n > 0);
-                total *= n;
-            }
-            assert(idx < total);
-        }
-    }
-#endif
-
-/* After computing out_key */
-#ifdef H5SC_DO_SANITY_CHECKS
-    {
-        /* Key should not be all-zero unless both components are zero */
-        if (daddr != (haddr_t)0 || idx != (hsize_t)0)
-            assert(!(out_key->high_half == 0 && out_key->low_half == 0));
-    }
-#endif
-
-    /* 2) Compute chunk key: interleave (dset_addr, linear_idx) */
-    if (H5SC__compute_chunk_key(&daddr, &idx, out_key) < 0) {
-        HGOTO_ERROR(H5E_SCC, H5E_CHUNK_KEY, FAIL, "failed to compute the chunk key coordinate");
-    }
-
-    /* Key sanity check (post-computation); keys should never be all-zero */
-    if (out_key->high_half == 0 && out_key->low_half == 0) {
-        HGOTO_ERROR(H5E_SCC, H5E_CHUNK_KEY, FAIL, "computed chunk key should never be all-zero");
-    }
-
-    /* 3) Lookup existing chunk in hash table */
-    chk = H5SC__ht_chunk_find(cache, out_key);
-    if (chk) {
-        /* Check that the cached chunk has the correct scaled coordinates (for callback usage) */
-        for (unsigned u = 0; u < ndims; u++) {
-            hsize_t size = elem[u] / cdims[u];
-#ifdef H5SC_DO_SANITY_CHECKS
-            assert(chk->scaled[u] == 0 || chk->scaled[u] == size);
-#endif
-            chk->scaled[u] = size;
-        }
-
-        /* Existing chunk: just hand it back and return success */
-        *out_chunk = chk;
-
-#ifdef H5SC_DO_SANITY_CHECKS
-        assert(chk->magic == H5SC_CHUNK_MAGIC);
-        assert(chk->data_key.high_half == out_key->high_half);
-        assert(chk->data_key.low_half == out_key->low_half);
-#endif
-
-        return SUCCEED;
-    }
-
-    /* 4) If not found: ensure space, then allocate and insert new chunk */
-
-    if (H5SC__ensure_space(cache, cached_sz) < 0) {
-        HGOTO_ERROR(H5E_SCC, H5E_CANNOTEVICT, FAIL, "failed to make room for for new chunk (SCC)");
-    }
-
-    chk = H5SC__make_chunk(*out_key, cached_sz, 0, false);
-
-    /* Fail if the chunk is NULL */
-    if (!chk) {
-        HGOTO_ERROR(H5E_RESOURCE, H5E_CANTALLOC, FAIL, "failed to allocate chunk (SCC)");
-    }
-
-    /* Persist scaled coordinates nedeed by the callbacks */
-    for (unsigned u = 0; u < ndims; u++) {
-        chk->scaled[u] = elem[u] / cdims[u];
-    }
-
-    /* Set the chunk tag to 1 after creation */
-
-    if (H5SC__ht_chunk_insert(cache, chk) < 0) {
-        H5MM_xfree(chk);
-        return FAIL;
-    }
-    chk->last_op = H5SC_TAG_HT_INSERT;
-
-    size_t old_dset_size = dset_hdr->curr_dset_size;
-
-    if (H5SC__chunk_lru_prepend(dset_hdr, chk) < 0) {
-        (void)H5SC__ht_chunk_delete(cache, out_key);
-        H5MM_xfree(chk);
-        return FAIL;
-    }
-
-    chk->last_op = H5SC_TAG_LRU_INSERT;
-
-    /* Update dataset and cache size accounting */
-    if (H5SC__account_chunk_link_change(cache, dset_hdr, old_dset_size) < 0) {
-        chk->last_op = H5SC_TAG_EVICT;
-        (void)H5SC__chunk_lru_remove(dset_hdr, chk);
-        (void)H5SC__ht_chunk_delete(cache, out_key);
-        H5MM_xfree(chk);
-        return FAIL;
-    }
-
-    /* 5) Identity check: HT lookup must return the same pointer */
-    {
-        H5SC_chunk_t *got = H5SC__ht_chunk_find(cache, out_key);
-        if (got != chk) {
-            chk->last_op = H5SC_TAG_EVICT;
-            (void)H5SC__chunk_lru_remove(dset_hdr, chk);
-            (void)H5SC__ht_chunk_delete(cache, out_key);
-            H5MM_xfree(chk);
-            return FAIL;
-        }
-    }
-
-    *out_chunk = chk;
-
-done:
-    FUNC_LEAVE_NOAPI(ret_value)
-}
 
 /*-------------------------------------------------------------------------
  * Function: H5SC_dset_is_empty
@@ -6465,8 +7964,7 @@ done:
  *-------------------------------------------------------------------------
  * */
 
-herr_t
-H5SC_dset_is_empty(H5SC_dset_header_t *dset_hdr, bool *is_empty)
+herr_t H5SC_dset_is_empty(H5SC_dset_header_t *dset_hdr, bool *is_empty)
 {
     herr_t ret_value = SUCCEED;
 
@@ -6476,6 +7974,13 @@ H5SC_dset_is_empty(H5SC_dset_header_t *dset_hdr, bool *is_empty)
 
     *is_empty =
         (dset_hdr->chunk_lru_len == 0 && dset_hdr->lru_head_ptr == NULL && dset_hdr->lru_tail_ptr == NULL);
+
+    if (!dset_hdr)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "invalid dataset header pointer");
+
+    if (!is_empty)
+        HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "invalid output pointer");
+
 done:
     FUNC_LEAVE_NOAPI(ret_value);
 }
@@ -6504,8 +8009,7 @@ done:
  *-------------------------------------------------------------------------
  * */
 
-haddr_t
-H5SC_dset_get_addr(H5SC_dset_header_t *dset_hdr)
+haddr_t H5SC_dset_get_addr(H5SC_dset_header_t *dset_hdr)
 {
     assert(dset_hdr);
     return dset_hdr->dset_addr;
@@ -6514,50 +8018,6 @@ H5SC_dset_get_addr(H5SC_dset_header_t *dset_hdr)
 /**************************************************
  * Chunk Key Functions
  **************************************************/
-
-/*-------------------------------------------------------------------------
- * Function: H5SC__set_interleave_bit
- *
- * Purpose:
- *   Helper function that sets a specified bit position within the
- *     128-bit chunk key (H5SC_chunk_key_t), which is represented as
- *     two uint64_t halves (low_half and high_half).
- *
- *   The function determines whether the target bit lies in the lower
- *     or upper 64-bit segment and sets the corresponding bit. It is
- *     intended to be used during construction of interleaved chunk
- *     keys.
- *
- * Inputs:
- *   H5SC_chunk_key_t *chunk_key:
- *     Pointer to the chunk key structure whose bit field is to be
- *     modified. The structure is assumed to be properly initialized
- *     prior to invocation.
- *
- *   unsigned bit_position:
- *     The bit position within the 128-bit key to set (range: 0–127).
- *
- * Return:
- *   None.
- *-------------------------------------------------------------------------
- */
-
-static inline void
-H5SC__set_interleave_bit(H5SC_chunk_key_t *chunk_key, unsigned bit_position)
-{
-
-    /* Prior to this function being called, all necessary
-     * inputs should be checked and/or verified, allowing
-     * this function to be light-weight.
-     */
-
-    if (bit_position < (unsigned)64) {
-        chunk_key->low_half |= ((uint64_t)1 << bit_position);
-    }
-    else {
-        chunk_key->high_half |= ((uint64_t)1 << (bit_position - (unsigned)64));
-    }
-} /* end H5SC__set_interleave_bit() */
 
 /*-------------------------------------------------------------------------
  * Function: H5SC__compute_chunk_key
@@ -6596,37 +8056,85 @@ H5SC__set_interleave_bit(H5SC_chunk_key_t *chunk_key, unsigned bit_position)
  *-------------------------------------------------------------------------
  */
 
-static herr_t
-H5SC__compute_chunk_key(haddr_t *dset_object_header_addr /*in*/, hsize_t *log_chk_coord /*in*/,
-                        H5SC_chunk_key_t *chunk_key /*in,out*/)
+static herr_t H5SC__compute_chunk_key(const haddr_t *dset_object_header_addr /*in*/,
+                                      const hsize_t *log_chk_coord /*in*/,
+                                      H5SC_chunk_key_t *chunk_key /*out*/)
 {
-    herr_t ret_value = SUCCEED;
-
-    FUNC_ENTER_PACKAGE
+    uint64_t addr;
+    uint64_t addr_high;
+    uint64_t addr_low;
+    uint64_t log_chk;
+    uint64_t log_chk_high;
+    uint64_t log_chk_low;
 
     assert(dset_object_header_addr);
     assert(log_chk_coord);
     assert(chunk_key);
 
-    /* Normalize inputs to 64-bit values for bit interleaving. */
-    uint64_t addr    = (uint64_t)(*dset_object_header_addr);
-    uint64_t log_chk = (uint64_t)(*log_chk_coord);
+    /* Normalize the inputs to 64-bit values. */
+    addr    = (uint64_t)*dset_object_header_addr;
+    log_chk = (uint64_t)*log_chk_coord;
 
-    /* Clear the destination key before populating it. */
-    chunk_key->high_half = (uint64_t)0;
-    chunk_key->low_half  = (uint64_t)0;
+    /*
+     * Separate the lower and upper 32-bit portions of each input.
+     *
+     * The lower portions are expanded into chunk_key->low_half, while
+     * the upper portions are expanded into chunk_key->high_half.
+     */
+    addr_low     = addr & UINT64_C(0x00000000FFFFFFFF);
+    log_chk_low  = log_chk & UINT64_C(0x00000000FFFFFFFF);
+    addr_high    = addr >> 32;
+    log_chk_high = log_chk >> 32;
 
-    /* Interleave dataset address bits and logical chunk index bits. */
-    for (unsigned i = 0; i < (unsigned)64; ++i) {
-        if (((addr >> i) & (uint64_t)1) != 0)
-            H5SC__set_interleave_bit(chunk_key, (unsigned)2 * i);
+    /*
+     * Spread the lower 32 address bits into the even-numbered bit
+     * positions of a 64-bit value.
+     */
+    addr_low = (addr_low | (addr_low << 16)) & UINT64_C(0x0000FFFF0000FFFF);
+    addr_low = (addr_low | (addr_low << 8)) & UINT64_C(0x00FF00FF00FF00FF);
+    addr_low = (addr_low | (addr_low << 4)) & UINT64_C(0x0F0F0F0F0F0F0F0F);
+    addr_low = (addr_low | (addr_low << 2)) & UINT64_C(0x3333333333333333);
+    addr_low = (addr_low | (addr_low << 1)) & UINT64_C(0x5555555555555555);
 
-        if (((log_chk >> i) & (uint64_t)1) != 0)
-            H5SC__set_interleave_bit(chunk_key, (unsigned)2 * i + (unsigned)1);
-    }
+    /*
+     * Spread the lower 32 logical-coordinate bits into the
+     * even-numbered bit positions of a 64-bit value.
+     */
+    log_chk_low = (log_chk_low | (log_chk_low << 16)) & UINT64_C(0x0000FFFF0000FFFF);
+    log_chk_low = (log_chk_low | (log_chk_low << 8)) & UINT64_C(0x00FF00FF00FF00FF);
+    log_chk_low = (log_chk_low | (log_chk_low << 4)) & UINT64_C(0x0F0F0F0F0F0F0F0F);
+    log_chk_low = (log_chk_low | (log_chk_low << 2)) & UINT64_C(0x3333333333333333);
+    log_chk_low = (log_chk_low | (log_chk_low << 1)) & UINT64_C(0x5555555555555555);
 
-done:
-    FUNC_LEAVE_NOAPI(ret_value)
+    /*
+     * Spread the upper 32 address bits into the even-numbered bit
+     * positions of a 64-bit value.
+     */
+    addr_high = (addr_high | (addr_high << 16)) & UINT64_C(0x0000FFFF0000FFFF);
+    addr_high = (addr_high | (addr_high << 8)) & UINT64_C(0x00FF00FF00FF00FF);
+    addr_high = (addr_high | (addr_high << 4)) & UINT64_C(0x0F0F0F0F0F0F0F0F);
+    addr_high = (addr_high | (addr_high << 2)) & UINT64_C(0x3333333333333333);
+    addr_high = (addr_high | (addr_high << 1)) & UINT64_C(0x5555555555555555);
+
+    /*
+     * Spread the upper 32 logical-coordinate bits into the
+     * even-numbered bit positions of a 64-bit value.
+     */
+    log_chk_high = (log_chk_high | (log_chk_high << 16)) & UINT64_C(0x0000FFFF0000FFFF);
+    log_chk_high = (log_chk_high | (log_chk_high << 8)) & UINT64_C(0x00FF00FF00FF00FF);
+    log_chk_high = (log_chk_high | (log_chk_high << 4)) & UINT64_C(0x0F0F0F0F0F0F0F0F);
+    log_chk_high = (log_chk_high | (log_chk_high << 2)) & UINT64_C(0x3333333333333333);
+    log_chk_high = (log_chk_high | (log_chk_high << 1)) & UINT64_C(0x5555555555555555);
+
+    /*
+     * Address bits occupy the even-numbered positions. Shifting the
+     * expanded logical-coordinate values by one places their bits in
+     * the odd-numbered positions.
+     */
+    chunk_key->low_half  = addr_low | (log_chk_low << 1);
+    chunk_key->high_half = addr_high | (log_chk_high << 1);
+
+    return SUCCEED;
 } /* end H5SC__compute_chunk_key() */
 
 /*-------------------------------------------------------------------------
@@ -6669,13 +8177,13 @@ done:
  *   FAIL on failure.
  *-------------------------------------------------------------------------
  */
-static herr_t
-H5SC__compute_logical_chunk_index(unsigned ndims, const hsize_t *dset_dims, hsize_t *chunk_dims,
-                                  const hsize_t *elem_coord, hsize_t *log_chk_idx)
+static herr_t H5SC__compute_logical_chunk_index(unsigned ndims, const hsize_t *dset_dims,
+                                                const hsize_t *chunk_dims, const hsize_t *elem_coord,
+                                                hsize_t *log_chk_idx)
 {
-    herr_t   ret_value = SUCCEED;
-    hsize_t  nchunks[H5S_MAX_RANK];
-    hsize_t  down[H5S_MAX_RANK];
+    herr_t ret_value = SUCCEED;
+    hsize_t nchunks[H5S_MAX_RANK];
+    hsize_t down[H5S_MAX_RANK];
     uint32_t chunk_dims32[H5S_MAX_RANK];
 
     FUNC_ENTER_PACKAGE
@@ -6753,17 +8261,19 @@ done:
  *   - No hash-table maintenance is performed here.
  */
 
-herr_t
-H5SC__dset_lru_prepend(H5SC_t *cache, H5SC_dset_header_t *dset_hdr)
+herr_t H5SC__dset_lru_prepend(H5SC_t *cache, H5SC_dset_header_t *dset_hdr)
 {
-    herr_t              ret_value = SUCCEED;
+    herr_t ret_value       = SUCCEED;
     H5SC_dset_header_t *it = NULL, *pr = NULL;
 
     FUNC_ENTER_PACKAGE
 
+    assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
+
     assert(dset_hdr->magic == H5SC_DSET_HDR_MAGIC);
 
-#ifdef H5SC_DO_SANITY_CHECKS
+#if H5SC_DO_SANITY_CHECKS
     /* Membership: must not already be linked */
     if (dset_hdr->next_dset_ptr || dset_hdr->prev_dset_ptr || cache->dset_lru_head_ptr == dset_hdr)
         HGOTO_ERROR(H5E_SCC, H5E_ALREADY_LINKED, FAIL, "header already linked in global LRU");
@@ -6781,7 +8291,7 @@ H5SC__dset_lru_prepend(H5SC_t *cache, H5SC_dset_header_t *dset_hdr)
     /* Set the struct tag */
     dset_hdr->last_op = H5SC_TAG_LRU_TOUCH;
 
-#ifdef H5SC_DO_SANITY_CHECKS
+#if H5SC_DO_SANITY_CHECKS
     H5SC_DLL_CHECK_LINKS(it, pr, cache->dset_lru_head_ptr, cache->dset_lru_tail_ptr, next_dset_ptr,
                          prev_dset_ptr,
                          HGOTO_ERROR(H5E_SCC, H5E_DLL_INVARIANT, FAIL, "bad header LRU linkage"));
@@ -6810,14 +8320,16 @@ done:
  *   - Invariants are checked when H5SC_DO_SANITY_CHECKS is enabled.
  */
 
-herr_t
-H5SC__dset_lru_remove(H5SC_t *cache, H5SC_dset_header_t *dset_hdr)
+herr_t H5SC__dset_lru_remove(H5SC_t *cache, H5SC_dset_header_t *dset_hdr)
 {
-    herr_t              ret_value = SUCCEED;
+    herr_t ret_value       = SUCCEED;
     H5SC_dset_header_t *it = NULL, *pr = NULL;
     FUNC_ENTER_PACKAGE
 
-#ifdef H5SC_DO_SANITY_CHECKS
+    assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
+
+#if H5SC_DO_SANITY_CHECKS
     /* Must be a member */
     if (!(dset_hdr->next_dset_ptr || dset_hdr->prev_dset_ptr || cache->dset_lru_head_ptr == dset_hdr))
         HGOTO_ERROR(H5E_SCC, H5E_NOT_A_MEMBER, FAIL, "header not in global LRU");
@@ -6833,7 +8345,7 @@ H5SC__dset_lru_remove(H5SC_t *cache, H5SC_dset_header_t *dset_hdr)
     cache->dset_lru_len--;
     cache->SCC_quiescent_size -= dset_hdr->curr_dset_size;
 
-#ifdef H5SC_DO_SANITY_CHECKS
+#if H5SC_DO_SANITY_CHECKS
     H5SC_DLL_CHECK_LINKS(it, pr, cache->dset_lru_head_ptr, cache->dset_lru_tail_ptr, next_dset_ptr,
                          prev_dset_ptr,
                          HGOTO_ERROR(H5E_SCC, H5E_DLL_INVARIANT, FAIL, "bad header LRU linkage"));
@@ -6870,14 +8382,14 @@ done:
  *   FAIL on failure.
  *-------------------------------------------------------------------------
  */
-herr_t
-H5SC__dset_lru_promote(H5SC_t *cache, H5SC_dset_header_t *dset_hdr)
+herr_t H5SC__dset_lru_promote(H5SC_t *cache, H5SC_dset_header_t *dset_hdr)
 {
     herr_t ret_value = SUCCEED;
 
     FUNC_ENTER_PACKAGE
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset_hdr);
     assert(dset_hdr->magic == H5SC_DSET_HDR_MAGIC);
 
@@ -6900,201 +8412,6 @@ done:
 
 /******************************************************************************
  *
- * Function:    H5SC__dset_lru_append
- *
- * Purpose:
- *   Insert a dataset header as LRU (at the tail) of the global dataset-header
- *   LRU maintained in H5SC_t.{dset_lru_head_ptr,dset_lru_tail_ptr}. Pointer
- *   splicing is performed by H5SC_DLL_APPEND; counters are updated explicitly.
- *
- * Inputs:
- *   H5SC_t             *cache     - SCC instance holding global header LRU
- *   H5SC_dset_header_t *dset_hdr  - Header to insert (must not already be linked)
- *
- * Returns:
- *   SUCCEED on success; FAIL on already-linked, splice, or invariant error.
- */
-herr_t
-H5SC__dset_lru_append(H5SC_t *cache, H5SC_dset_header_t *dset_hdr)
-{
-    herr_t              ret_value = SUCCEED;
-    H5SC_dset_header_t *it        = NULL;
-    H5SC_dset_header_t *pr        = NULL;
-
-    FUNC_ENTER_PACKAGE
-
-    assert(cache);
-    assert(dset_hdr);
-    assert(dset_hdr->magic == H5SC_DSET_HDR_MAGIC);
-
-#ifdef H5SC_DO_SANITY_CHECKS
-    if (dset_hdr->next_dset_ptr || dset_hdr->prev_dset_ptr || cache->dset_lru_head_ptr == dset_hdr)
-        HGOTO_ERROR(H5E_SCC, H5E_ALREADY_LINKED, FAIL, "header already linked in global LRU");
-#endif
-
-    H5SC_DLL_APPEND(dset_hdr, next_dset_ptr, prev_dset_ptr, cache->dset_lru_head_ptr,
-                    cache->dset_lru_tail_ptr,
-                    HGOTO_ERROR(H5E_SCC, H5E_SPLICE_FAILED, FAIL, "header append failed"));
-
-    cache->dset_lru_len++;
-    cache->SCC_quiescent_size += dset_hdr->curr_dset_size;
-
-    dset_hdr->last_op = H5SC_TAG_LRU_TOUCH;
-
-#ifdef H5SC_DO_SANITY_CHECKS
-    H5SC_DLL_CHECK_LINKS(it, pr, cache->dset_lru_head_ptr, cache->dset_lru_tail_ptr, next_dset_ptr,
-                         prev_dset_ptr,
-                         HGOTO_ERROR(H5E_SCC, H5E_DLL_INVARIANT, FAIL, "bad header LRU linkage"));
-#endif
-
-done:
-    FUNC_LEAVE_NOAPI(ret_value)
-} /* end H5SC__dset_lru_append() */
-
-/******************************************************************************
- *
- * Function:    H5SC__dset_exhausted_lru_prepend
- *
- * Purpose:
- *   Insert a dataset header into the optional exhausted
- * list (caller-maintained head/tail) as MRU. Uses
- * next_exhausted_ptr/prev_exhausted_ptr links.
- *
- * Inputs:
- *   H5SC_exhausted_list_t *exh – Exhausted list endpoints &
- * counters H5SC_dset_header_t    *dset_hdr – Header to
- * insert (must not already be linked)
- *
- * Returns
- *   SUCCEED on success; FAIL on already-linked, splice, or
- * invariant error.
- */
-
-static herr_t
-H5SC__dset_exhausted_lru_prepend(H5SC_exhausted_list_t *exh, H5SC_dset_header_t *dset_hdr)
-{
-    herr_t              ret_value = SUCCEED;
-    H5SC_dset_header_t *it = NULL, *pr = NULL;
-    FUNC_ENTER_PACKAGE
-
-#ifdef H5SC_DO_SANITY_CHECKS
-    if (dset_hdr->next_exhausted_ptr || dset_hdr->prev_exhausted_ptr || exh->head == dset_hdr)
-        HGOTO_ERROR(H5E_SCC, H5E_ALREADY_LINKED, FAIL,
-                    "header already linked in "
-                    "exhausted list");
-#endif
-
-    H5SC_DLL_PREPEND(dset_hdr, next_exhausted_ptr, prev_exhausted_ptr, exh->head, exh->tail,
-                     HGOTO_ERROR(H5E_SCC, H5E_SPLICE_FAILED, FAIL, "exhausted prepend failed"));
-
-    exh->len++;
-    exh->bytes += dset_hdr->curr_dset_size;
-
-#ifdef H5SC_DO_SANITY_CHECKS
-    H5SC_DLL_CHECK_LINKS(it, pr, exh->head, exh->tail, next_exhausted_ptr, prev_exhausted_ptr,
-                         HGOTO_ERROR(H5E_SCC, H5E_DLL_INVARIANT, FAIL, "bad exhausted linkage"));
-#endif
-
-done:
-    FUNC_LEAVE_NOAPI(ret_value)
-}
-
-/******************************************************************************
- *
- * Function:    H5SC__dset_exhausted_remove
- *
- * Purpose:
- *   Remove a dataset header from the optional exhausted
- * list and decrement the list counters by
- * dset_hdr->curr_dset_size.
- *
- * Inputs:
- *   H5SC_exhausted_list_t *exh – Exhausted list endpoints &
- * counters H5SC_dset_header_t    *dset_hdr – Header to
- * remove (must be linked)
- *
- * Returns
- *   SUCCEED on success; FAIL if the header is not a member
- * or splice fails.
- */
-
-static herr_t
-H5SC__dset_exhausted_remove(H5SC_exhausted_list_t *exh, H5SC_dset_header_t *dset_hdr)
-{
-    herr_t              ret_value = SUCCEED;
-    H5SC_dset_header_t *it = NULL, *pr = NULL;
-    FUNC_ENTER_PACKAGE
-
-#ifdef H5SC_DO_SANITY_CHECKS
-    if (!(dset_hdr->next_exhausted_ptr || dset_hdr->prev_exhausted_ptr || exh->head == dset_hdr))
-        HGOTO_ERROR(H5E_SCC, H5E_NOT_A_MEMBER, FAIL, "header not in exhausted list");
-#endif
-
-    H5SC_DLL_REMOVE(dset_hdr, next_exhausted_ptr, prev_exhausted_ptr, exh->head, exh->tail,
-                    HGOTO_ERROR(H5E_SCC, H5E_SPLICE_FAILED, FAIL, "exhausted remove failed"));
-
-    exh->len--;
-    exh->bytes -= dset_hdr->curr_dset_size;
-
-#ifdef H5SC_DO_SANITY_CHECKS
-    H5SC_DLL_CHECK_LINKS(it, pr, exh->head, exh->tail, next_exhausted_ptr, prev_exhausted_ptr,
-                         HGOTO_ERROR(H5E_SCC, H5E_DLL_INVARIANT, FAIL, "bad exhausted linkage"));
-#endif
-
-done:
-    FUNC_LEAVE_NOAPI(ret_value)
-}
-
-/*-------------------------------------------------------------------------
- * Function: H5SC__dset_exhausted_restore_to_global_lru
- *
- * Purpose:
- *   Function that restores dataset headers from the exhausted-dataset list
- *     back to the global dataset LRU. Headers are removed from the
- *     exhausted list one at a time from head to tail and appended to the
- *     tail of the global dataset LRU so that their original old-to-new
- *     traversal order is preserved for subsequent eviction passes.
- *
- * Inputs:
- *   H5SC_t *cache               - Pointer to the SCC cache state whose
- *      global dataset LRU is to be repopulated.
- *
- *   H5SC_exhausted_list_t *exh -  Pointer to the exhausted-dataset list
- *      containing headers that were fully processed during the current eviction pass.
- *
- * Return:
- *   SUCCEED on success;
- *   FAIL on failure.
- *-------------------------------------------------------------------------
- */
-
-static herr_t
-H5SC__dset_exhausted_restore_to_global_lru(H5SC_t *cache, H5SC_exhausted_list_t *exh)
-{
-    herr_t ret_value = SUCCEED;
-
-    FUNC_ENTER_PACKAGE
-
-    assert(cache);
-    assert(exh);
-
-    /* Restore in exhausted head->tail order so original global order is preserved at the tail. */
-    while (exh->head) {
-        H5SC_dset_header_t *dset_hdr = exh->head;
-
-        if (H5SC__dset_exhausted_remove(exh, dset_hdr) < 0)
-            HGOTO_ERROR(H5E_SCC, H5E_CANNOTREMOVE, FAIL, "failed to remove dataset from exhausted list");
-
-        if (H5SC__dset_lru_append(cache, dset_hdr) < 0)
-            HGOTO_ERROR(H5E_SCC, H5E_CANTINSERT, FAIL, "failed to append dataset back to global LRU");
-    }
-
-done:
-    FUNC_LEAVE_NOAPI(ret_value)
-}
-
-/******************************************************************************
- *
  * Function: H5SC__chunk_lru_prepend
  *
  * Purpose:  Insert a chunk as MRU (head) of its dataset’s chunk LRU and update
@@ -7108,21 +8425,25 @@ done:
  *   SUCCEED on success; FAIL on already-linked, splice, or invariant error.
  */
 
-herr_t
-H5SC__chunk_lru_prepend(H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk)
+herr_t H5SC__chunk_lru_prepend(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk)
 {
-    herr_t        ret_value = SUCCEED;
+    H5SC_reclaim_contrib_t before;
+    H5SC_reclaim_contrib_t after;
+    herr_t ret_value = SUCCEED;
     H5SC_chunk_t *it = NULL, *pr = NULL;
 
     FUNC_ENTER_PACKAGE
 
+    assert(cache);
     assert(dset_hdr->magic == H5SC_DSET_HDR_MAGIC);
     assert(chunk->magic == H5SC_CHUNK_MAGIC);
 
-#ifdef H5SC_DO_SANITY_CHECKS
+#if H5SC_DO_SANITY_CHECKS
     if (chunk->next_ptr || chunk->prev_ptr || dset_hdr->lru_head_ptr == chunk)
         HGOTO_ERROR(H5E_SCC, H5E_ALREADY_LINKED, FAIL, "chunk already linked in per-dataset LRU");
 #endif
+
+    before = H5SC__chunk_reclaim_contribution(dset_hdr, chunk);
 
     /* Splice first; if it fails, nothing changes. */
     H5SC_DLL_PREPEND(chunk, next_ptr, prev_ptr, dset_hdr->lru_head_ptr, dset_hdr->lru_tail_ptr,
@@ -7132,7 +8453,7 @@ H5SC__chunk_lru_prepend(H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk)
     dset_hdr->chunk_lru_len++;
     dset_hdr->curr_dset_size += chunk->cached_chunk_size;
 
-#ifdef H5SC_DO_SANITY_CHECKS
+#if H5SC_DO_SANITY_CHECKS
     assert(dset_hdr->curr_dset_size >= chunk->cached_chunk_size);
 #endif
 
@@ -7140,7 +8461,13 @@ H5SC__chunk_lru_prepend(H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk)
     dset_hdr->last_op = H5SC_TAG_LRU_TOUCH;
     chunk->last_op    = H5SC_TAG_LRU_PROMOTE;
 
-#ifdef H5SC_DO_SANITY_CHECKS
+    after = H5SC__chunk_reclaim_contribution(dset_hdr, chunk);
+
+    if (H5SC__apply_reclaim_transition(cache, dset_hdr, before, after) < 0)
+        HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL,
+                    "unable to account reclaimability after chunk LRU insertion");
+
+#if H5SC_DO_SANITY_CHECKS
     H5SC_DLL_CHECK_LINKS(it, pr, dset_hdr->lru_head_ptr, dset_hdr->lru_tail_ptr, next_ptr, prev_ptr,
                          HGOTO_ERROR(H5E_SCC, H5E_DLL_INVARIANT, FAIL, "bad chunk LRU linkage"));
 #endif
@@ -7165,19 +8492,24 @@ done:
  *   SUCCEED on success; FAIL if the chunk is not a member or splice fails.
  */
 
-herr_t
-H5SC__chunk_lru_remove(H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk)
+herr_t H5SC__chunk_lru_remove(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk)
 {
-    herr_t        ret_value = SUCCEED;
+    H5SC_reclaim_contrib_t before;
+    H5SC_reclaim_contrib_t after;
+    herr_t ret_value = SUCCEED;
     H5SC_chunk_t *it = NULL, *pr = NULL;
 
     FUNC_ENTER_PACKAGE
+
+    assert(cache);
 
     if (!(chunk->next_ptr || chunk->prev_ptr || dset_hdr->lru_head_ptr == chunk))
         HGOTO_ERROR(H5E_SCC, H5E_NOT_A_MEMBER, FAIL, "chunk not in per-dataset LRU");
 
     assert(dset_hdr->magic == H5SC_DSET_HDR_MAGIC);
     assert(chunk->magic == H5SC_CHUNK_MAGIC);
+
+    before = H5SC__chunk_reclaim_contribution(dset_hdr, chunk);
 
     /* Splice out first; if it fails, leave counters untouched. */
     H5SC_DLL_REMOVE(chunk, next_ptr, prev_ptr, dset_hdr->lru_head_ptr, dset_hdr->lru_tail_ptr,
@@ -7189,14 +8521,20 @@ H5SC__chunk_lru_remove(H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk)
     /* Embedded counters */
     dset_hdr->chunk_lru_len--;
 
-#ifdef H5SC_DO_SANITY_CHECKS
+#if H5SC_DO_SANITY_CHECKS
     if (chunk->cached_chunk_size > dset_hdr->curr_dset_size)
         HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "chunk bytes underflow");
 #endif
 
     dset_hdr->curr_dset_size -= chunk->cached_chunk_size;
 
-#ifdef H5SC_DO_SANITY_CHECKS
+    after = H5SC__chunk_reclaim_contribution(dset_hdr, chunk);
+
+    if (H5SC__apply_reclaim_transition(cache, dset_hdr, before, after) < 0)
+        HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL,
+                    "unable to account reclaimability after chunk LRU removal");
+
+#if H5SC_DO_SANITY_CHECKS
     H5SC_DLL_CHECK_LINKS(it, pr, dset_hdr->lru_head_ptr, dset_hdr->lru_tail_ptr, next_ptr, prev_ptr,
                          HGOTO_ERROR(H5E_SCC, H5E_DLL_INVARIANT, FAIL, "bad chunk LRU linkage"));
 #endif
@@ -7210,10 +8548,11 @@ done:
  * Function:    H5SC__chunk_update_cached_size
  *
  * Purpose:
- *   Adjust counters to reflect a change in chunk->cached_chunk_size (no relink)
- * and commit the new size into the chunk object.
+ *   Adjust counters to reflect a change in chunk->cached_chunk_size and commit
+ *   the new size into the chunk object.
  *
  * Inputs:
+ *   H5SC_t cache                - Pointer to the cache
  *   H5SC_dset_header_t dset_hdr – Dataset containing the target chunk
  *   H5SC_chunk_t *chunk         – Target chunk (must already exist in the cache)
  *   size_t new_size             – New cached size in bytes
@@ -7221,43 +8560,70 @@ done:
  * Returns
  *   SUCCEED on success; FAIL if size math would violate invariants.
  */
-
-herr_t
-H5SC__chunk_update_cached_size(H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk, size_t new_size)
+herr_t H5SC__chunk_update_cached_size(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk,
+                                      size_t new_size)
 {
+    H5SC_reclaim_contrib_t before;
+    H5SC_reclaim_contrib_t after;
+    size_t old_size;
+    size_t old_dset_size;
+    bool linked;
     herr_t ret_value = SUCCEED;
-
-    size_t old = chunk->cached_chunk_size;
 
     FUNC_ENTER_PACKAGE
 
+    assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset_hdr);
+    assert(dset_hdr->magic == H5SC_DSET_HDR_MAGIC);
     assert(chunk);
+    assert(chunk->magic == H5SC_CHUNK_MAGIC);
 
-    if (new_size == old) {
-        HGOTO_DONE(SUCCEED); /* no-op */
-    }
+    old_size      = chunk->cached_chunk_size;
+    old_dset_size = dset_hdr->curr_dset_size;
 
-    bool linked = (chunk->next_ptr || chunk->prev_ptr || dset_hdr->lru_head_ptr == chunk);
+    if (new_size == old_size)
+        HGOTO_DONE(SUCCEED);
+
+    linked = chunk->next_ptr || chunk->prev_ptr || dset_hdr->lru_head_ptr == chunk;
+
+    before = H5SC__chunk_reclaim_contribution(dset_hdr, chunk);
 
     if (linked) {
+        if (new_size > old_size) {
+            size_t delta = new_size - old_size;
 
-        if (new_size > old) {
-            size_t delta = new_size - old;
+            if (delta > SIZE_MAX - dset_hdr->curr_dset_size)
+                HGOTO_ERROR(H5E_SCC, H5E_OVERFLOW, FAIL, "dataset cached-size accounting overflow");
+
             dset_hdr->curr_dset_size += delta;
         }
         else {
-            size_t delta = old - new_size;
-#ifdef H5SC_DO_SANITY_CHECKS
+            size_t delta = old_size - new_size;
+
             if (delta > dset_hdr->curr_dset_size)
-                HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "chunk bytes underflow");
-#endif
+                HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL, "dataset cached-size accounting underflow");
 
             dset_hdr->curr_dset_size -= delta;
         }
     }
 
     chunk->cached_chunk_size = new_size;
+
+    after = H5SC__chunk_reclaim_contribution(dset_hdr, chunk);
+
+    if (H5SC__apply_reclaim_transition(cache, dset_hdr, before, after) < 0) {
+        /*
+         * Restore both chunk and dataset accounting before reporting failure.
+         */
+        chunk->cached_chunk_size = old_size;
+
+        if (linked)
+            dset_hdr->curr_dset_size = old_dset_size;
+
+        HGOTO_ERROR(H5E_SCC, H5E_SIZE_MISMATCH, FAIL,
+                    "unable to update cached reclaimability after chunk resize");
+    }
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
@@ -7267,12 +8633,8 @@ done:
  * Debug helpers
  * -------------------------------------------------------------
  */
-#if defined(H5SC_ENABLE_DUMPS) && (H5SC_ENABLE_DUMPS + 0)
-static FILE *
-cache_dbg_stream(FILE *s)
-{
-    return s ? s : stderr;
-}
+#if defined(H5SC_ENABLE_STAT_DUMPS) && (H5SC_ENABLE_STAT_DUMPS + 0)
+static FILE *cache_dbg_stream(FILE *s) { return s ? s : stderr; }
 
 /******************************************************************************
  *
@@ -7292,8 +8654,7 @@ cache_dbg_stream(FILE *s)
  *   void
  */
 
-void
-H5SC_dset_lru_dump(const char *tag, const H5SC_t *cache, FILE *stream)
+void H5SC_dset_lru_dump(const char *tag, const H5SC_t *cache, FILE *stream)
 {
     FILE *out = cache_dbg_stream(stream);
     if (!out)
@@ -7324,8 +8685,7 @@ done:;
  *   void
  */
 
-void
-H5SC_chunk_lru_dump(const char *tag, const H5SC_dset_header_t *dset_hdr, FILE *stream)
+void H5SC_chunk_lru_dump(const char *tag, const H5SC_dset_header_t *dset_hdr, FILE *stream)
 {
     FILE *out = cache_dbg_stream(stream);
     if (!out)
@@ -7337,7 +8697,7 @@ H5SC_chunk_lru_dump(const char *tag, const H5SC_dset_header_t *dset_hdr, FILE *s
     fputc('\n', out);
 done:;
 }
-#endif /* H5SC_ENABLE_DUMPS */
+#endif /* H5SC_ENABLE_STAT_DUMPS */
 
 /*
  * UTHash Functions
@@ -7358,10 +8718,10 @@ done:;
  *   (void)
  */
 
-void
-H5SC__hash_init(H5SC_t *cache)
+void H5SC__hash_init(H5SC_t *cache)
 {
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     cache->chunk_hash_table_head_ptr = NULL;
     cache->dset_hash_table_head_ptr  = NULL;
@@ -7383,13 +8743,13 @@ H5SC__hash_init(H5SC_t *cache)
  *   (void)
  */
 
-void
-H5SC__reset_hash_tables(H5SC_t *cache)
+void H5SC__reset_hash_tables(H5SC_t *cache)
 {
-    H5SC_chunk_t       *chk, *chk_tmp;
+    H5SC_chunk_t *chk, *chk_tmp;
     H5SC_dset_header_t *dset_hdr, *dset_hdr_tmp;
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     H5SC_CHUNK_ITER(cache->chunk_hash_table_head_ptr, chk, chk_tmp)
     {
@@ -7421,15 +8781,15 @@ H5SC__reset_hash_tables(H5SC_t *cache)
  *   SUCCEED on success; FAIL on internal error (e.g., invalid arguments).
  */
 
-herr_t
-H5SC__ht_dset_insert(H5SC_t *cache, H5SC_dset_header_t *dset_hdr)
+herr_t H5SC__ht_dset_insert(H5SC_t *cache, H5SC_dset_header_t *dset_hdr)
 {
-    herr_t              ret_value = SUCCEED;
-    H5SC_dset_header_t *found     = NULL;
+    herr_t ret_value          = SUCCEED;
+    H5SC_dset_header_t *found = NULL;
 
     FUNC_ENTER_PACKAGE
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(dset_hdr);
 
     if (dset_hdr->magic != H5SC_DSET_HDR_MAGIC)
@@ -7467,12 +8827,12 @@ done:
  *   Pointer to the matching H5SC_dset_header_t on success; NULL if not found.
  */
 
-H5SC_dset_header_t *
-H5SC__ht_dset_find(H5SC_t *cache, haddr_t addr)
+H5SC_dset_header_t *H5SC__ht_dset_find(H5SC_t *cache, haddr_t addr)
 {
     H5SC_dset_header_t *found = NULL;
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     H5SC_DSET_FIND(cache->dset_hash_table_head_ptr, &addr, found);
 
     if (found) {
@@ -7499,15 +8859,15 @@ H5SC__ht_dset_find(H5SC_t *cache, haddr_t addr)
  *   SUCCEED on success; FAIL if the key is not present.
  */
 
-herr_t
-H5SC__ht_dset_delete(H5SC_t *cache, haddr_t addr)
+herr_t H5SC__ht_dset_delete(H5SC_t *cache, haddr_t addr)
 {
-    herr_t              ret_value = SUCCEED;
-    H5SC_dset_header_t *found     = NULL;
+    herr_t ret_value          = SUCCEED;
+    H5SC_dset_header_t *found = NULL;
 
     FUNC_ENTER_PACKAGE
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     H5SC_DSET_FIND(cache->dset_hash_table_head_ptr, &addr, found);
     if (!found)
@@ -7538,15 +8898,15 @@ done:
  *   SUCCEED on success; FAIL on internal error (e.g., invalid arguments).
  */
 
-herr_t
-H5SC__ht_chunk_insert(H5SC_t *cache, H5SC_chunk_t *chk)
+herr_t H5SC__ht_chunk_insert(H5SC_t *cache, H5SC_chunk_t *chk)
 {
-    herr_t        ret_value = SUCCEED;
-    H5SC_chunk_t *found     = NULL;
+    herr_t ret_value    = SUCCEED;
+    H5SC_chunk_t *found = NULL;
 
     FUNC_ENTER_PACKAGE
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(chk);
 
     H5SC_CHUNK_FIND(cache->chunk_hash_table_head_ptr, &chk->data_key, found);
@@ -7558,7 +8918,8 @@ H5SC__ht_chunk_insert(H5SC_t *cache, H5SC_chunk_t *chk)
     }
     else {
         assert(found->magic == H5SC_CHUNK_MAGIC);
-        found->last_op = H5SC_TAG_LOOKUP;
+        found->last_op = H5SC_TAG_HT_INSERT;
+        HGOTO_ERROR(H5E_SCC, H5E_CANNOTINSERT, FAIL, "attempted to insert existing chunk");
     }
 
     /* Update struct tag to reflect it has been added to the hash table */
@@ -7583,12 +8944,12 @@ done:
  *   Pointer to the matching H5SC_chunk_t on success; NULL if not found.
  */
 
-H5SC_chunk_t *
-H5SC__ht_chunk_find(H5SC_t *cache, const H5SC_chunk_key_t *chk_key)
+H5SC_chunk_t *H5SC__ht_chunk_find(H5SC_t *cache, const H5SC_chunk_key_t *chk_key)
 {
     H5SC_chunk_t *found = NULL;
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(chk_key);
 
     H5SC_CHUNK_FIND(cache->chunk_hash_table_head_ptr, chk_key, found);
@@ -7619,15 +8980,15 @@ H5SC__ht_chunk_find(H5SC_t *cache, const H5SC_chunk_key_t *chk_key)
  *   SUCCEED on success; FAIL if the key is not present.
  */
 
-herr_t
-H5SC__ht_chunk_delete(H5SC_t *cache, const H5SC_chunk_key_t *chk_key)
+herr_t H5SC__ht_chunk_delete(H5SC_t *cache, const H5SC_chunk_key_t *chk_key)
 {
-    herr_t        ret_value = SUCCEED;
-    H5SC_chunk_t *found     = NULL;
+    herr_t ret_value    = SUCCEED;
+    H5SC_chunk_t *found = NULL;
 
     FUNC_ENTER_PACKAGE
 
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
     assert(chk_key);
 
     H5SC_CHUNK_FIND(cache->chunk_hash_table_head_ptr, chk_key, found);
@@ -7659,8 +9020,7 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-herr_t
-H5SC_validate_config(const H5SC__cache_config_t *config_ptr)
+herr_t H5SC_validate_config(const H5SC__cache_config_t *config_ptr)
 {
     herr_t ret_value = SUCCEED; /* Return value */
 
@@ -7681,9 +9041,195 @@ H5SC_validate_config(const H5SC__cache_config_t *config_ptr)
         HGOTO_ERROR(H5E_SCC, H5E_INVALIDLIMIT, FAIL, "Active limit must be non-zero");
     }
 
+    if (config_ptr->max_q_size > config_ptr->max_a_size) {
+        HGOTO_ERROR(H5E_SCC, H5E_INVALIDLIMIT, FAIL, "Active limit must be greater than the quiescent limit");
+    }
+
 done:
     FUNC_LEAVE_NOAPI(ret_value)
 } /* H5SC_validate_config() */
+
+static bool H5SC__space_exceeded(size_t current, size_t additional, size_t limit)
+{
+    if (additional > limit)
+        return true;
+
+    return current > (limit - additional);
+}
+
+static void H5SC__saturating_add_size(size_t *total, size_t amount)
+{
+    assert(total);
+
+    if (amount > SIZE_MAX - *total)
+        *total = SIZE_MAX;
+    else
+        *total += amount;
+}
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__cached_active_reclaimable
+ *
+ * Purpose:
+ *   Return the cache-wide number of resident bytes reclaimable under the
+ *   active-pressure policy. The result combines cached clean-eviction bytes
+ *   and cached dirty flush-and-evict bytes, saturating at SIZE_MAX.
+ *
+ *   Dataset-local min_dset_size targets are intentionally not applied.
+ *-------------------------------------------------------------------------
+ */
+static inline size_t H5SC__cached_active_reclaimable(const H5SC_t *cache)
+{
+    size_t reclaimable;
+
+    assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
+
+    reclaimable = cache->reclaimable_clean_bytes;
+
+    if (cache->reclaimable_dirty_bytes > SIZE_MAX - reclaimable)
+        return SIZE_MAX;
+
+    return reclaimable + cache->reclaimable_dirty_bytes;
+}
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__effective_budget
+ *
+ * Purpose:
+ *   Return the additional resident bytes that may be admitted under the
+ *   active-pressure policy. The budget consists of unused active-limit
+ *   headroom plus resident bytes currently reclaimable by clean eviction or
+ *   dirty flush-and-evict. Arithmetic saturates at SIZE_MAX.
+ *
+ *   Pinned chunks are excluded through the cached reclaimability counters.
+ *   Dataset-local min_dset_size targets are ignored because they apply only
+ *   to quiescent retention.
+ *-------------------------------------------------------------------------
+ */
+static inline size_t H5SC__effective_budget(const H5SC_t *cache)
+{
+    size_t budget      = 0;
+    size_t reclaimable = 0;
+
+    assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
+
+    if (cache->SCC_quiescent_size < cache->SCC_active_limit)
+        budget = cache->SCC_active_limit - cache->SCC_quiescent_size;
+
+    reclaimable = H5SC__cached_active_reclaimable(cache);
+
+    if (reclaimable > SIZE_MAX - budget)
+        return SIZE_MAX;
+
+    return budget + reclaimable;
+}
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__chunk_pin
+ *
+ * Purpose:
+ *   Acquire one request pin and remove the chunk's contribution from cached
+ *   active-pressure reclaimability when the pin count changes from zero to
+ *   one. Additional nested pins do not change reclaimability.
+ *-------------------------------------------------------------------------
+ */
+static inline herr_t H5SC__chunk_pin(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk)
+{
+    H5SC_reclaim_contrib_t before;
+    H5SC_reclaim_contrib_t after;
+
+    assert(cache);
+    assert(dset_hdr);
+    assert(chunk);
+
+    if (chunk->chunk_counter == SIZE_MAX)
+        return FAIL;
+
+    before = H5SC__chunk_reclaim_contribution(dset_hdr, chunk);
+
+    chunk->chunk_counter++;
+
+    after = H5SC__chunk_reclaim_contribution(dset_hdr, chunk);
+
+    if (H5SC__apply_reclaim_transition(cache, dset_hdr, before, after) < 0) {
+        chunk->chunk_counter--;
+        return FAIL;
+    }
+
+    return SUCCEED;
+} /* end H5SC__chunk_pin() */
+
+/*-------------------------------------------------------------------------
+ * Function: H5SC__chunk_unpin
+ *
+ * Purpose:
+ *   Release one request pin and add the chunk's current clean or dirty
+ *   resident-byte contribution when the final pin is released.
+ *-------------------------------------------------------------------------
+ */
+static inline herr_t H5SC__chunk_unpin(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk)
+{
+    H5SC_reclaim_contrib_t before;
+    H5SC_reclaim_contrib_t after;
+
+    assert(cache);
+    assert(dset_hdr);
+    assert(chunk);
+
+    if (chunk->chunk_counter == 0)
+        return FAIL;
+
+    before = H5SC__chunk_reclaim_contribution(dset_hdr, chunk);
+
+    chunk->chunk_counter--;
+
+    after = H5SC__chunk_reclaim_contribution(dset_hdr, chunk);
+
+    if (H5SC__apply_reclaim_transition(cache, dset_hdr, before, after) < 0) {
+        chunk->chunk_counter++;
+        return FAIL;
+    }
+
+    return SUCCEED;
+} /* end H5SC__chunk_unpin() */
+
+#if H5SC_DO_SANITY_CHECKS
+/* Test-only entry points for exercising centralized chunk state transitions. */
+herr_t H5SC__test_chunk_pin(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk)
+{
+    return H5SC__chunk_pin(cache, dset_hdr, chunk);
+}
+
+herr_t H5SC__test_chunk_unpin(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk)
+{
+    return H5SC__chunk_unpin(cache, dset_hdr, chunk);
+}
+
+herr_t H5SC__test_chunk_set_dirty(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk,
+                                  bool dirty)
+{
+    return H5SC__chunk_set_dirty(cache, dset_hdr, chunk, dirty);
+}
+
+herr_t H5SC__test_ensure_space(H5SC_t *cache, size_t bytes_needed)
+{
+    return H5SC__ensure_space(cache, bytes_needed, false);
+}
+
+herr_t H5SC__test_ensure_oversized_single_chunk_space(H5SC_t *cache, size_t bytes_needed)
+{
+    return H5SC__ensure_space(cache, bytes_needed, true);
+}
+
+herr_t H5SC__test_trim_to_quiescent_limit(H5SC_t *cache) { return H5SC__trim_to_quiescent_limit(cache); }
+
+herr_t H5SC__test_account_chunk_link_change(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, size_t old_dset_size)
+{
+    return H5SC__account_chunk_link_change(cache, dset_hdr, old_dset_size);
+}
+#endif
 
 /*
  *
@@ -7713,10 +9259,10 @@ done:
  *     reinitialization.
  */
 
-void
-H5SC__stats_reset(H5SC_t *cache)
+void H5SC__stats_reset(H5SC_t *cache)
 {
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     memset(&cache->stats, 0, sizeof(cache->stats));
 } /* end H5SC__stats_reset() */
@@ -7745,10 +9291,10 @@ H5SC__stats_reset(H5SC_t *cache)
  *   - A miss indicates that the requested chunk was not found in that form.
  */
 
-void
-H5SC__stats_record_lookup(H5SC_t *cache, hbool_t hit)
+void H5SC__stats_record_lookup(H5SC_t *cache, hbool_t hit)
 {
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     cache->stats.scc_lookups++;
 
@@ -7778,10 +9324,10 @@ H5SC__stats_record_lookup(H5SC_t *cache, hbool_t hit)
  *     into the SCC, not when an existing cached chunk is merely updated.
  */
 
-void
-H5SC__stats_record_insert(H5SC_t *cache)
+void H5SC__stats_record_insert(H5SC_t *cache)
 {
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     cache->stats.scc_inserts++;
 } /* end H5SC__stats_record_insert() */
@@ -7806,10 +9352,10 @@ H5SC__stats_record_insert(H5SC_t *cache)
  *     are logically distinct from eviction.
  */
 
-void
-H5SC__stats_record_delete(H5SC_t *cache)
+void H5SC__stats_record_delete(H5SC_t *cache)
 {
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     cache->stats.scc_removes++;
 } /* end H5SC__stats_record_delete() */
@@ -7831,10 +9377,10 @@ H5SC__stats_record_delete(H5SC_t *cache)
  *
  */
 
-void
-H5SC__stats_record_batch_read(H5SC_t *cache)
+void H5SC__stats_record_batch_read(H5SC_t *cache)
 {
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     cache->stats.scc_reads_batch_calls_count++;
 } /* end H5SC__stats_record_batch_read() */
@@ -7856,10 +9402,10 @@ H5SC__stats_record_batch_read(H5SC_t *cache)
  *
  */
 
-void
-H5SC__stats_record_batch_write(H5SC_t *cache)
+void H5SC__stats_record_batch_write(H5SC_t *cache)
 {
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     cache->stats.scc_writes_batch_calls_count++;
 } /* end H5SC__stats_record_batch_write() */
@@ -7882,10 +9428,10 @@ H5SC__stats_record_batch_write(H5SC_t *cache)
  *   No return value.
  *-------------------------------------------------------------------------
  */
-void
-H5SC__stats_record_batch_read_len(H5SC_t *cache, size_t batch_len)
+void H5SC__stats_record_batch_read_len(H5SC_t *cache, size_t batch_len)
 {
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     cache->stats.scc_reads_last_batch_len = batch_len;
 
@@ -7911,10 +9457,10 @@ H5SC__stats_record_batch_read_len(H5SC_t *cache, size_t batch_len)
  *   No return value.
  *-------------------------------------------------------------------------
  */
-void
-H5SC__stats_record_batch_write_len(H5SC_t *cache, size_t batch_len)
+void H5SC__stats_record_batch_write_len(H5SC_t *cache, size_t batch_len)
 {
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     cache->stats.scc_writes_last_batch_len = batch_len;
 
@@ -7941,11 +9487,10 @@ H5SC__stats_record_batch_write_len(H5SC_t *cache, size_t batch_len)
  *     actually flushed, rather than at a higher-level request boundary, to
  *     avoid overcounting.
  */
-
-void
-H5SC__stats_record_chunk_flush(H5SC_t *cache)
+void H5SC__stats_record_chunk_flush(H5SC_t *cache)
 {
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     cache->stats.scc_chunk_flush_count++;
 } /* end H5SC__stats_record_chunk_flush() */
@@ -7969,11 +9514,10 @@ H5SC__stats_record_chunk_flush(H5SC_t *cache)
  *     actually flushed, rather than at a higher-level request boundary, to
  *     avoid overcounting.
  */
-
-void
-H5SC__stats_record_dset_flush(H5SC_t *cache)
+void H5SC__stats_record_dset_flush(H5SC_t *cache)
 {
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     cache->stats.scc_dataset_flush_count++;
 } /* end H5SC__stats_record_dset_flush() */
@@ -7998,15 +9542,242 @@ H5SC__stats_record_dset_flush(H5SC_t *cache)
  *   - Explicit removals that are not policy-driven evictions should be
  *     tracked separately using H5SC__stats_record_delete().
  */
-
-void
-H5SC__stats_record_eviction(H5SC_t *cache)
+void H5SC__stats_record_eviction(H5SC_t *cache)
 {
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     cache->stats.scc_evictions++;
 } /* end H5SC__stats_record_eviction() */
 
+/*-------------------------------------------------------------------------
+ * Function: H5SC__estimate_resident_size
+ *
+ * Purpose:
+ *   Estimate the final resident allocation required to materialize a
+ *   nonresident SCC chunk for admission and batch-budget calculations.
+ *
+ *   The result is an admission heuristic, not a formal allocation upper
+ *   bound. Dataset-local history is preferred after a successful
+ *   materialization because sparse resident allocations may be substantially
+ *   smaller than the dense logical chunk size. The dataset's dense logical
+ *   chunk size is used as the cold-dataset fallback when no history is
+ *   available.
+ *
+ *   The current implementation uses, in priority order:
+ *
+ *     1. the maximum of the dataset-local exponential moving average and
+ *        decaying high-water resident-size observations;
+ *
+ *     2. the dataset's dense logical chunk size when no resident-size
+ *        observations are available.
+ *
+ *   H5SC_io_sel_chunk_t::lookup_size_hint is not currently used as a resident
+ *   estimate. For the structured-chunk layout, that field contains the
+ *   allocation size of the encoded on-disk block used by the raw read/decode
+ *   path. It does not describe the complete decoded resident allocation.
+ *
+ *   lookup_defined_values_size and lookup_defined_values_size_hint are byte
+ *   sizes associated with encoded defined-values selection metadata. Neither
+ *   field is a count of defined elements, and neither is currently used as
+ *   nvalues in a sparse resident-size model.
+ *
+ *   Decoded sparse-selection metadata may cause the final resident allocation
+ *   to exceed the dense logical data size, especially for small or
+ *   higher-rank chunks. After successful materialization, callers must
+ *   reconcile the estimate with the layout-reported resident allocation
+ *   through H5SC__chunk_update_cached_size() and update dataset-local history
+ *   through H5SC__update_resident_estimate_history().
+ *
+ *   The sparse-model and lookup estimate sources remain reserved for future
+ *   use. They must not be selected until their inputs have semantics that
+ *   describe, or can reliably predict, the complete decoded resident
+ *   allocation.
+ *
+ *   WRITE_BYTES is accepted for a possible future conservative write-growth
+ *   allowance. Current callers pass zero, so no write-growth term is included
+ *   in the estimate.
+ *
+ * Inputs:
+ *   const H5SC_dset_header_t *dset_hdr:
+ *     Dataset-local SCC header containing adaptive resident-size history.
+ *
+ *   const H5D_t *dset:
+ *     Dataset whose dense logical chunk size supplies the cold fallback.
+ *
+ *   const H5SC_io_sel_chunk_t *sel:
+ *     Selected-chunk request state. Lookup-related fields are available for
+ *     future estimator development but are not currently used.
+ *
+ *   bool is_write:
+ *     True for write admission and false for read admission.
+ *
+ *   size_t write_bytes:
+ *     Optional future write-growth allowance. Current callers pass zero.
+ *
+ * Outputs:
+ *   H5SC_size_est_source_t *source:
+ *     Receives H5SC_SIZE_EST_DATASET_HISTORY or
+ *     H5SC_SIZE_EST_DENSE_FALLBACK for the current implementation.
+ *
+ *   size_t *estimate:
+ *     Receives the predicted resident allocation in bytes.
+ *
+ * Return:
+ *   SUCCEED when a nonzero estimate is produced;
+ *   FAIL when no usable estimate can be produced.
+ *-------------------------------------------------------------------------
+ */
+static herr_t H5SC__estimate_resident_size(const H5SC_dset_header_t *dset_hdr, const H5D_t *dset,
+                                           const H5SC_io_sel_chunk_t *sel, bool is_write, size_t write_bytes,
+                                           H5SC_size_est_source_t *source, size_t *estimate)
+{
+    size_t result  = 0;
+    size_t history = 0;
+    size_t dense;
+
+    assert(dset_hdr);
+    assert(dset);
+    assert(sel);
+    assert(source);
+    assert(estimate);
+
+    *source   = H5SC_SIZE_EST_NONE;
+    *estimate = 0;
+
+    dense = (size_t)dset->shared->layout.u.struct_chunk.size;
+
+    /*
+     * lookup_size_hint currently describes the encoded on-disk block
+     * allocation for the structured-chunk layout. It is retained for raw
+     * read-buffer allocation but is not used here as a decoded resident-size
+     * estimate.
+     */
+    if (dset_hdr->resident_estimate_samples > 0) {
+        history = MAX(dset_hdr->resident_estimate_ema, dset_hdr->resident_estimate_high);
+
+        if (history > result) {
+            result  = history;
+            *source = H5SC_SIZE_EST_DATASET_HISTORY;
+        }
+    }
+
+    if (result == 0) {
+        result  = dense;
+        *source = H5SC_SIZE_EST_DENSE_FALLBACK;
+    }
+
+    /*
+     * Reserved for future conservative write-growth estimation. Current
+     * callers pass write_bytes == 0.
+     */
+    if (is_write && write_bytes > 0)
+        H5SC__saturating_add_size(&result, write_bytes);
+
+    if (result == 0)
+        return FAIL;
+
+    *estimate = result;
+    return SUCCEED;
+} /* end H5SC__estimate_resident_size() */
+
+static void H5SC__report_oversized_admission(H5SC_t *cache, size_t estimated_bytes)
+{
+    size_t excess;
+
+    assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
+
+    excess = estimated_bytes > cache->SCC_active_limit ? estimated_bytes - cache->SCC_active_limit : 0;
+
+    cache->stats.scc_oversized_admission_count++;
+
+    if (estimated_bytes > cache->stats.scc_oversized_admission_max_bytes)
+        cache->stats.scc_oversized_admission_max_bytes = estimated_bytes;
+
+    if (excess > cache->stats.scc_oversized_admission_max_excess)
+        cache->stats.scc_oversized_admission_max_excess = excess;
+
+    fprintf(stderr,
+            "HDF5 SCC warning: temporarily exceeded the configured active "
+            "cache limit to process an indivisible chunk requiring "
+            "approximately %zu byte(s(); the configured active limit is "
+            "%zu byte(s). Consider increasing the active limit for datasets "
+            "with large chunks.\n",
+            estimated_bytes, cache->SCC_active_limit);
+} /* end H5SC__report_oversized_admission() */
+
+#if defined(H5SC_COLLECT_ESTIMATE_STATS) && (H5SC_COLLECT_ESTIMATE_STATS + 0)
+/*-------------------------------------------------------------------------
+ * Function: H5SC__stats_record_size_estimate
+ *
+ * Purpose:
+ *   Record one completed comparison between a pending admission estimate and
+ *   the successfully observed final resident allocation.
+ *
+ *   The function updates aggregate estimated and actual byte totals,
+ *   over/under counts and byte deltas, maximum observed errors, and the count
+ *   associated with SOURCE. Exact comparisons increase only the total and
+ *   source counts.
+ *-------------------------------------------------------------------------
+ */
+static void H5SC__stats_record_size_estimate(H5SC_t *cache, H5SC_size_est_source_t source, size_t estimate,
+                                             size_t actual)
+{
+    size_t delta;
+
+    assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
+
+    cache->stats.size_estimate_count++;
+
+    H5SC__saturating_add_size(&cache->stats.size_estimated_total, estimate);
+    H5SC__saturating_add_size(&cache->stats.size_actual_total, actual);
+
+    switch (source) {
+    case H5SC_SIZE_EST_LOOKUP:
+        cache->stats.size_estimate_lookup_count++;
+        break;
+
+    case H5SC_SIZE_EST_SPARSE_MODEL:
+        cache->stats.size_estimate_sparse_model_count++;
+        break;
+
+    case H5SC_SIZE_EST_DATASET_HISTORY:
+        cache->stats.size_estimate_dataset_history_count++;
+        break;
+
+    case H5SC_SIZE_EST_DENSE_FALLBACK:
+        cache->stats.size_estimate_dense_fallback_count++;
+        break;
+
+    case H5SC_SIZE_EST_NONE:
+    default:
+        break;
+    }
+
+    if (estimate > actual) {
+        delta = estimate - actual;
+
+        cache->stats.size_estimate_over_count++;
+        H5SC__saturating_add_size(&cache->stats.size_overestimated_bytes, delta);
+
+        if (delta > cache->stats.size_estimate_max_over)
+            cache->stats.size_estimate_max_over = delta;
+    }
+    else if (actual > estimate) {
+        delta = actual - estimate;
+
+        cache->stats.size_estimate_under_count++;
+        H5SC__saturating_add_size(&cache->stats.size_underestimated_bytes, delta);
+
+        if (delta > cache->stats.size_estimate_max_under)
+            cache->stats.size_estimate_max_under = delta;
+    }
+} /* end H5SC__stats_record_size_estimate() */
+#endif
+
+#if defined(H5SC_ENABLE_STAT_DUMPS) && (H5SC_ENABLE_STAT_DUMPS + 0)
 /******************************************************************************
  *
  * Function:    H5SC__stats_get_hit_rate
@@ -8028,10 +9799,10 @@ H5SC__stats_record_eviction(H5SC_t *cache)
  *     non-placeholder chunk already present within the cache.
  */
 
-double
-H5SC__stats_get_hit_rate(const H5SC_t *cache)
+double H5SC__stats_get_hit_rate(const H5SC_t *cache)
 {
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     if (0 == cache->stats.scc_lookups)
         return 0.0;
@@ -8041,7 +9812,7 @@ H5SC__stats_get_hit_rate(const H5SC_t *cache)
 
 /******************************************************************************
  *
- * Function:    H5SC_stats_get_miss_rate
+ * Function:    H5SC__stats_get_miss_rate
  *
  * Purpose
  *   Return the SCC cache miss rate for a cache instance as a floating-point
@@ -8060,16 +9831,16 @@ H5SC__stats_get_hit_rate(const H5SC_t *cache)
  *     resident non-placeholder chunk already present within the cache.
  */
 
-double
-H5SC_stats_get_miss_rate(const H5SC_t *cache)
+double H5SC__stats_get_miss_rate(const H5SC_t *cache)
 {
     assert(cache);
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
 
     if (0 == cache->stats.scc_lookups)
         return 0.0;
 
     return ((double)cache->stats.scc_misses / (double)cache->stats.scc_lookups);
-} /* end H5SC_stats_get_miss_rate() */
+} /* end H5SC__stats_get_miss_rate() */
 
 /******************************************************************************
  *
@@ -8092,9 +9863,7 @@ H5SC_stats_get_miss_rate(const H5SC_t *cache)
  *     rate, inserts, removes, flushes, and evictions.
  *   - Intended primarily for debugging and test instrumentation.
  */
-
-herr_t
-H5SC__stats_dump(const H5SC_t *cache)
+static herr_t H5SC__stats_dump(const H5SC_t *cache)
 {
     herr_t ret_value = SUCCEED;
 
@@ -8103,12 +9872,14 @@ H5SC__stats_dump(const H5SC_t *cache)
     if (!cache)
         HGOTO_ERROR(H5E_ARGS, H5E_BADVALUE, FAIL, "invalid cache pointer");
 
+    assert(cache->SCC_magic == H5SC_MAIN_MAGIC);
+
     fprintf(stdout, "H5SC cache statistics:\n");
     fprintf(stdout, "    lookups:   %" PRIuHSIZE "\n", cache->stats.scc_lookups);
     fprintf(stdout, "    hits:      %" PRIuHSIZE "\n", cache->stats.scc_hits);
     fprintf(stdout, "    misses:    %" PRIuHSIZE "\n", cache->stats.scc_misses);
     fprintf(stdout, "    hit rate:  %.2f%%\n", 100.0 * H5SC__stats_get_hit_rate(cache));
-    fprintf(stdout, "    miss rate: %.2f%%\n", 100.0 * H5SC_stats_get_miss_rate(cache));
+    fprintf(stdout, "    miss rate: %.2f%%\n", 100.0 * H5SC__stats_get_miss_rate(cache));
     fprintf(stdout, "    inserts:   %" PRIuHSIZE "\n", cache->stats.scc_inserts);
     fprintf(stdout, "    removes:   %" PRIuHSIZE "\n\n", cache->stats.scc_removes);
     fprintf(stdout, "    chunk flushes:    %" PRIuHSIZE "\n", cache->stats.scc_chunk_flush_count);
@@ -8122,10 +9893,41 @@ H5SC__stats_dump(const H5SC_t *cache)
             cache->stats.scc_writes_batch_calls_count);
     fprintf(stdout, "    batched writes last len: %" PRIuHSIZE "\n", cache->stats.scc_writes_last_batch_len);
     fprintf(stdout, "    batched writes max len:  %" PRIuHSIZE "\n", cache->stats.scc_writes_max_batch_len);
+    fprintf(stdout, "\n  oversized single-chunk admissions:\n");
+    fprintf(stdout, "    admissions:              %" PRIu64 "\n", cache->stats.scc_oversized_admission_count);
+    fprintf(stdout, "    maximum estimated bytes: %zu\n", cache->stats.scc_oversized_admission_max_bytes);
+    fprintf(stdout, "    maximum excess bytes:    %zu\n", cache->stats.scc_oversized_admission_max_excess);
+
+#if defined(H5SC_COLLECT_ESTIMATE_STATS) && (H5SC_COLLECT_ESTIMATE_STATS + 0)
+    fprintf(stdout, "\n  resident-size estimates:\n");
+    fprintf(stdout, "    comparisons:             %" PRIu64 "\n", cache->stats.size_estimate_count);
+    fprintf(stdout, "    underestimates:          %" PRIu64 "\n", cache->stats.size_estimate_under_count);
+    fprintf(stdout, "    overestimates:           %" PRIu64 "\n", cache->stats.size_estimate_over_count);
+    fprintf(stdout, "    estimated bytes total:   %zu\n", cache->stats.size_estimated_total);
+    fprintf(stdout, "    actual bytes total:      %zu\n", cache->stats.size_actual_total);
+    fprintf(stdout, "    excess estimate bytes:   %zu\n", cache->stats.size_overestimated_bytes);
+    fprintf(stdout, "    missed estimate bytes:   %zu\n", cache->stats.size_underestimated_bytes);
+    fprintf(stdout, "    maximum overestimate:    %zu\n", cache->stats.size_estimate_max_over);
+    fprintf(stdout, "    maximum underestimate:   %zu\n", cache->stats.size_estimate_max_under);
+
+    fprintf(stdout, "    lookup-hint source:      %" PRIu64 "\n", cache->stats.size_estimate_lookup_count);
+    fprintf(stdout, "    sparse-model source:     %" PRIu64 "\n",
+            cache->stats.size_estimate_sparse_model_count);
+    fprintf(stdout, "    dataset-history source:  %" PRIu64 "\n",
+            cache->stats.size_estimate_dataset_history_count);
+    fprintf(stdout, "    dense-fallback source:   %" PRIu64 "\n",
+            cache->stats.size_estimate_dense_fallback_count);
+
+    fprintf(stdout, "\n  resident write growth:\n");
+    fprintf(stdout, "    observations:            %" PRIu64 "\n", cache->stats.write_growth_count);
+    fprintf(stdout, "    total growth bytes:      %zu\n", cache->stats.write_growth_total);
+    fprintf(stdout, "    maximum growth bytes:    %zu\n", cache->stats.write_growth_max);
+#endif
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)
 } /* end H5SC__stats_dump() */
+#endif
 
 /******************************************************************************
  *
@@ -8150,12 +9952,11 @@ done:
  *   FAIL on failure.
  *
  ******************************************************************************/
-herr_t
-H5SC__get_cache_from_file_id(hid_t file_id, H5SC_t **cache)
+herr_t H5SC__get_cache_from_file_id(hid_t file_id, H5SC_t **cache)
 {
-    herr_t         ret_value    = SUCCEED;
+    herr_t ret_value            = SUCCEED;
     H5VL_object_t *file_vol_obj = NULL;
-    void          *tmp_cache    = NULL;
+    void *tmp_cache             = NULL;
 
     FUNC_ENTER_PACKAGE
 
@@ -8173,6 +9974,7 @@ H5SC__get_cache_from_file_id(hid_t file_id, H5SC_t **cache)
         HGOTO_ERROR(H5E_SCC, H5E_CANNOTGET, FAIL, "failed to get pointer to H5SC_t structure");
 
     *cache = (H5SC_t *)tmp_cache;
+    assert((*cache)->SCC_magic == H5SC_MAIN_MAGIC);
 
 done:
     FUNC_LEAVE_NOAPI(ret_value)

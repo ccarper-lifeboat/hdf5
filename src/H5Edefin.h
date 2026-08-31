@@ -253,6 +253,7 @@ hid_t H5E_CANNOTEVICT_g    = H5I_INVALID_HID;      /* Failed to evict chunk */
 hid_t H5E_CANNOTFLUSH_g    = H5I_INVALID_HID;      /* Failed to flush dataset properly */
 hid_t H5E_CANNOTFREE_g     = H5I_INVALID_HID;      /* Failed to free structure */
 hid_t H5E_CANNOTGET_g      = H5I_INVALID_HID;      /* Failed to fetch queried element */
+hid_t H5E_CANNOTGET_SELECTION_g = H5I_INVALID_HID;      /* Failed to get defined falue selection */
 hid_t H5E_CANNOTINSERT_g   = H5I_INVALID_HID;      /* Failed to insert element */
 hid_t H5E_CANNOTPREPEND_g  = H5I_INVALID_HID;      /* Failed to prepend element to DLL */
 hid_t H5E_CANNOTREMOVE_g   = H5I_INVALID_HID;      /* Failed to remove element */
@@ -279,6 +280,6 @@ hid_t H5E_BADSIZE_g        = H5I_INVALID_HID;      /* Bad size for object */
 hid_t H5E_CANTCONVERT_g    = H5I_INVALID_HID;      /* Can't convert datatypes */
 
 /* Number of minor error messages */
-#define H5E_NUM_MIN_ERRORS 165
+#define H5E_NUM_MIN_ERRORS 166
 
 #endif /* H5Edefin_H */

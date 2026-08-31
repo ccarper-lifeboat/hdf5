@@ -33,6 +33,24 @@ typedef struct H5SC_layout_ops_t H5SC_layout_ops_t;
 /**************************/
 /* Library Private Macros */
 /**************************/
+
+/*
+ * Enable SCC invariant checking in assertion-enabled builds. Define this in
+ * the private header because sanity-only private declarations may be consumed
+ * without H5SCpkg.h having been included first.
+ */
+#ifndef H5SC_DO_SANITY_CHECKS
+#ifndef NDEBUG
+#define H5SC_DO_SANITY_CHECKS 1
+#else
+#define H5SC_DO_SANITY_CHECKS 0
+#endif
+#endif
+
+#if !((H5SC_DO_SANITY_CHECKS == 0) || (H5SC_DO_SANITY_CHECKS == 1))
+#error "The value of H5SC_DO_SANITY_CHECKS must be 0 or 1."
+#endif
+
 /* clang-format off */
 #define H5SC__DEFAULT_SCC_CONFIG                  \
 {                                                 \
@@ -62,6 +80,113 @@ typedef struct H5SC_layout_ops_t H5SC_layout_ops_t;
 
 /* Forward declaration for shared chunk cache structs (defined in H5SCpkg.h) */
 
+/******************************************************************************
+ *
+ * Enumeration: H5SC_tag_t
+ *
+ * Info
+ *
+ *      The enumeration defines tags used to identify the most recent internal
+ *      SCC operation performed on an H5SC_chunk_t or H5SC_dset_header_t
+ *      structure. These values are primarily used for debugging, validation,
+ *      and tracking state transitions during hash table, LRU, I/O, flush, and
+ *      eviction operations.
+ *
+ *      An H5SC_tag_t value is stored in the last_op field of both
+ *      H5SC_chunk_t and H5SC_dset_header_t. The structure containing the tag
+ *      provides the context necessary to interpret operations that are common
+ *      to both structure types. For example, H5SC_TAG_LRU_INSERT stored in an
+ *      H5SC_chunk_t refers to insertion into a dataset's chunk LRU list, while
+ *      the same tag stored in an H5SC_dset_header_t refers to insertion into
+ *      the SCC dataset LRU list.
+ *
+ *      Tags are therefore operation-oriented rather than structure-oriented.
+ *      A separate tag is not required for equivalent operations performed on
+ *      chunks and dataset headers. Some tags, particularly those associated
+ *      with pinning and unpinning during I/O, apply only to H5SC_chunk_t
+ *      structures.
+ *
+ * Values
+ *
+ *  H5SC_TAG_NONE – Indicates that no SCC operation has been associated
+ *      with the structure. This value is used as an uninitialized or default
+ *      tag where appropriate.
+ *
+ *  H5SC_TAG_CREATE – Indicates that the H5SC_chunk_t or
+ *      H5SC_dset_header_t structure was created.
+ *
+ *  H5SC_TAG_HT_INSERT – Indicates that the structure was inserted into its
+ *      associated SCC hash table. For H5SC_chunk_t, this refers to the chunk
+ *      hash table. For H5SC_dset_header_t, this refers to the dataset hash
+ *      table.
+ *
+ *  H5SC_TAG_HT_DELETE – Indicates that the structure was removed from its
+ *      associated SCC hash table.
+ *
+ *  H5SC_TAG_LRU_INSERT – Indicates that the structure was inserted into its
+ *      associated LRU list. For H5SC_chunk_t, this refers to the associated
+ *      dataset's chunk LRU list. For H5SC_dset_header_t, this refers to the
+ *      SCC dataset LRU list.
+ *
+ *  H5SC_TAG_LRU_REMOVE – Indicates that the structure was removed from its
+ *      associated LRU list.
+ *
+ *  H5SC_TAG_LRU_PROMOTE – Indicates that the structure was promoted within
+ *      its associated LRU list to reflect recent use.
+ *
+ *  H5SC_TAG_LRU_TOUCH – Indicates that the recency of the structure was
+ *      updated as the result of an access or other operation affecting its
+ *      position within an LRU list.
+ *
+ *  H5SC_TAG_FLUSH_DIRTY – Indicates that the structure was involved in an
+ *      operation responsible for flushing dirty cached chunk data.
+ *
+ *  H5SC_TAG_FLUSH – Indicates that the structure was involved in a general
+ *      SCC flush operation.
+ *
+ *  H5SC_TAG_EVICT – Indicates that the structure was involved in an SCC
+ *      eviction operation.
+ *
+ *  H5SC_TAG_LOOKUP – Indicates that the structure was accessed during an
+ *      SCC lookup operation.
+ *
+ *  H5SC_TAG_PIN_IOINIT – Indicates that a chunk was pinned while
+ *      initializing an I/O request. This tag applies to H5SC_chunk_t
+ *      structures.
+ *
+ *  H5SC_TAG_PIN_IOINIT_CACHED – Indicates that an existing cached chunk
+ *      was pinned while initializing an I/O request. This tag applies to
+ *      H5SC_chunk_t structures.
+ *
+ *  H5SC_TAG_UNPIN_WRITE_DONE – Indicates that a chunk was unpinned after
+ *      successful completion of a write operation. This tag applies to
+ *      H5SC_chunk_t structures.
+ *
+ *  H5SC_TAG_UNPIN_WRITE_DONE_ERROR – Indicates that a chunk was unpinned
+ *      while handling an error during completion of a write operation. This
+ *      tag applies to H5SC_chunk_t structures.
+ *
+ *  H5SC_TAG_UNPIN_READ_DONE – Indicates that a chunk was unpinned after
+ *      successful completion of a read operation. This tag applies to
+ *      H5SC_chunk_t structures.
+ *
+ *  H5SC_TAG_UNPIN_READ_DONE_ERROR – Indicates that a chunk was unpinned
+ *      while handling an error during completion of a read operation. This
+ *      tag applies to H5SC_chunk_t structures.
+ *
+ *  H5SC_TAG_UNPIN_ERASE_DONE – Indicates that a chunk was unpinned after
+ *      successful completion of an erase operation. This tag applies to
+ *      H5SC_chunk_t structures.
+ *
+ *  H5SC_TAG_UNPIN_ERASE_DONE_ERROR – Indicates that a chunk was unpinned
+ *      while handling an error during completion of an erase operation. This
+ *      tag applies to H5SC_chunk_t structures.
+ *
+ *  H5SC_TAG_TEST – Catch-all tag reserved for SCC testing and
+ *      test-specific validation where one of the operational tags above is
+ *      not appropriate.
+ *
+ ******************************************************************************/
 typedef enum H5SC_tag_t {
     H5SC_TAG_NONE = 0,
     H5SC_TAG_CREATE,
@@ -86,25 +211,76 @@ typedef enum H5SC_tag_t {
     H5SC_TAG_TEST /* catch-all for testing */
 } H5SC_tag_t;
 
-typedef enum H5SC_io_op_code_t {
-    H5SC_WRITE_OP = 0,
-    H5SC_READ_OP,
-    H5SC_NOOP, /*catch-all for testing */
-} H5SC_io_op_code_t;
+/******************************************************************************
+ *
+ * Enumeration: H5SC_size_est_source_t
+ *
+ * Info
+ *
+ *      The enumeration identifies the source of a resident-size estimate
+ *      produced for a nonresident chunk before that chunk is admitted for
+ *      materialization by the SCC.
+ *
+ *      Resident-size estimates are used by SCC batching and active-limit
+ *      admission logic to predict the final decoded allocation associated
+ *      with a selected chunk. These estimates are heuristics and are not
+ *      authoritative cache-accounting values. After materialization, the
+ *      actual layout-reported resident allocation replaces the estimate for
+ *      cache accounting and may be used to update dataset-local estimate
+ *      history.
+ *
+ *      The source value is stored with the pending estimate in
+ *      H5SC_io_sel_chunk_t so that estimate accuracy can be attributed to the
+ *      mechanism that produced it.
+ *
+ *      Not every source represented by this enumeration is currently active.
+ *      The present implementation uses dataset history when observations are
+ *      available and otherwise falls back to the dense logical chunk size.
+ *      Lookup-based and sparse-model estimates are reserved for future use.
+ *
+ * Values
+ *
+ *  H5SC_SIZE_EST_NONE – Indicates that no resident-size estimate source
+ *      is currently associated with the selected chunk. This is the default
+ *      value and is restored when a pending estimate is cleared.
+ *
+ *  H5SC_SIZE_EST_LOOKUP – Indicates that the estimate was derived from
+ *      layout lookup information that provides or can reliably predict the
+ *      complete decoded resident allocation. This source is reserved for
+ *      future use by the current structured-chunk implementation.
+ *
+ *  H5SC_SIZE_EST_SPARSE_MODEL – Indicates that the estimate was produced
+ *      by a sparse-representation model derived from information about the
+ *      chunk's defined values or representation. This source is reserved for
+ *      future use by the current implementation.
+ *
+ *  H5SC_SIZE_EST_DATASET_HISTORY – Indicates that the estimate was derived
+ *      from previously observed resident allocation sizes for chunks in the
+ *      same dataset. The current implementation uses the dataset-local
+ *      exponential moving average and decaying high-water observation to
+ *      produce this estimate.
+ *
+ *  H5SC_SIZE_EST_DENSE_FALLBACK – Indicates that the dataset's dense
+ *      logical chunk size was used as the estimate because no usable
+ *      dataset-local resident-size history was available.
+ *
+ ******************************************************************************/
+typedef enum H5SC_size_est_source_t {
+    H5SC_SIZE_EST_NONE = 0,
+    H5SC_SIZE_EST_LOOKUP,
+    H5SC_SIZE_EST_SPARSE_MODEL,
+    H5SC_SIZE_EST_DATASET_HISTORY,
+    H5SC_SIZE_EST_DENSE_FALLBACK
+} H5SC_size_est_source_t;
 
-typedef enum H5SC_evict_mode_t {
-    H5SC_EVICT_CLEAN_ONLY = 0 /* Evict only clean chunks */,
-    H5SC_EVICT_DIRTY_ONLY = 1 /*Evict only dirty chunks */
-} H5SC_evict_mode_t;
-
-typedef struct H5SC_stats_t          H5SC_stats_t;
-typedef struct H5SC_t                H5SC_t;
-typedef struct H5SC_dset_header_t    H5SC_dset_header_t;
-typedef struct H5SC_chunk_t          H5SC_chunk_t;
-typedef struct H5SC_chunk_key_t      H5SC_chunk_key_t;
-typedef struct H5SC_exhausted_list_t H5SC_exhausted_list_t;
-typedef struct H5SC_io_sel_chunk_t   H5SC_io_sel_chunk_t;
-typedef struct H5SC_io_info_t        H5SC_io_info_t;
+typedef struct H5SC_stats_t        H5SC_stats_t;
+typedef struct H5SC_t              H5SC_t;
+typedef struct H5SC_dset_header_t  H5SC_dset_header_t;
+typedef struct H5SC_chunk_t        H5SC_chunk_t;
+typedef struct H5SC_chunk_key_t    H5SC_chunk_key_t;
+typedef struct H5SC_io_sel_chunk_t H5SC_io_sel_chunk_t;
+typedef struct H5SC_io_scratch_t   H5SC_io_scratch_t;
+typedef struct H5SC_io_info_t      H5SC_io_info_t;
 
 /*
  * Layout callbacks
@@ -122,7 +298,7 @@ typedef struct H5SC_io_info_t        H5SC_io_info_t;
 typedef herr_t (*H5SC_chunk_lookup_t)(struct H5D_t *dset, size_t count, const hsize_t *scaled[] /*in*/,
                                       haddr_t *addr[] /*out*/, hsize_t *size[] /*out*/,
                                       hsize_t *defined_values_size[] /*out*/, size_t *size_hint[] /*out*/,
-                                      size_t *defined_values_size_hint[] /*out*/, void **udata[] /*out*/);
+                                      size_t *defined_values_size_hint[] /*out*/, void **udata /*out*/);
 
 /* Decompresses/decodes the chunk from file format to memory cache format if necessary. Reallocs chunk buffer
  * if necessary. On entry, nbytes is the number of bytes used in the chunk buffer. On exit, it shall be set to
@@ -193,16 +369,36 @@ typedef herr_t (*H5SC_chunk_selection_read_t)(H5D_t *dset, const H5S_t *file_spa
                                               bool *select_possible /*out*/, bool *require_values /*out*/,
                                               void *udata);
 
-/* Called when the chunk cache wants to read data directly from the disk to the user buffer via vector I/O. If
- * not possible due to compression, etc, returns vector_possible=false. Otherwise returns the vector of
- * selected elements in offsets (within the file, not the chunk, this is why addr is passed in) and sizes,
- * with the number of vectors returned in vec_count. chunk may be passed as NULL, and may also be an in-cache
- * chunk that only contains information on defined values. If chunk is passed as NULL and the callback
- * requires a chunk to be passed with (at least) the defined values selection, this callback shall return
- * *require_values=true and *file_space_out=NULL. Optional, if not present, chunk I/O is only performed on
- * entire chunks or with selection I/O. The H5SC code checks for type conversion before calling this.
- * partial_bound is true if the on-disk chunk was encoded with partial_bound set to true. If the dataset
- * reported partial_bound_chunks_different_encoding as false, the setting of partial_bound is undefined. */
+/*
+ * Called when the chunk cache wants to describe a direct read from the
+ * on-disk chunk representation as a vector of file offsets and byte sizes.
+ *
+ * file_space_in describes the selected elements in logical chunk coordinates.
+ * addr is the on-disk base address of the chunk. If the requested selection
+ * cannot be represented for direct vector I/O, for example because the
+ * on-disk representation requires decoding or filtering, the callback sets
+ * *vector_possible to false.
+ *
+ * When vector I/O is possible, the callback sets *vector_possible to true,
+ * returns the number of file vectors in *vec_count, and allocates/populates
+ * *offsets and *sizes. Returned offsets are absolute file offsets rather than
+ * offsets relative to the beginning of the chunk.
+ *
+ * chunk may be NULL or may reference a decoded object containing at least
+ * defined-value information. If the callback cannot determine the requested
+ * vectors without defined-value state that is not currently available, it
+ * sets *require_values to true and does not return a usable vector.
+ *
+ * This callback is optional. If it is not provided, the SCC must use another
+ * supported I/O path.
+ *
+ * The SCC must verify that direct vector I/O is compatible with any required
+ * datatype conversion before using the returned vectors.
+ *
+ * partial_bound is true when the on-disk chunk was encoded as a partial-edge
+ * chunk. If the layout reports partial_bound_chunks_different_encoding as
+ * false, the value of partial_bound is not significant.
+ */
 typedef herr_t (*H5SC_chunk_vector_read_t)(H5D_t *dset, haddr_t addr, const H5S_t *file_space_in,
                                            bool partial_bound, void *chunk /*in*/, size_t *vec_count /*out*/,
                                            haddr_t **offsets /*out*/, size_t **sizes /*out*/,
@@ -219,22 +415,45 @@ typedef herr_t (*H5SC_chunk_vector_read_t)(H5D_t *dset, haddr_t addr, const H5S_
  * I/O is only performed on entire chunks or with vector I/O. The H5SC code checks for type conversion before
  * calling this. partial_bound is true if the on-disk chunk was encoded with partial_bound set to true. If the
  * dataset reported partial_bound_chunks_different_encoding as false, the setting of partial_bound is
- * undefined. */
+ * undefined.
+ * NOTE: When implementing this function, consider whether selection_write should be an H5S_t ** in order to
+ *       match the semantics of H5SC_chunk_selection_read_t.
+ */
 typedef herr_t (*H5SC_chunk_selection_write_t)(H5D_t *dset, const H5S_t *file_space_in, bool partial_bound,
                                                void *chunk /*in*/, H5S_t *file_space_out /*out*/,
                                                bool *select_possible /*out*/, bool *require_values /*out*/,
                                                void *udata);
 
-/* Called when the chunk cache wants to write data directly from the user buffer to the cache via vector I/O.
- * If not possible due to compression, etc, returns vector_possible=false. Otherwise returns the vector of
- * selected elements in offsets (within the file, not the chunk, this is why addr is passed in) and sizes,
- * with the number of vectors returned in vec_count. chunk may be passed as NULL, and may also be an in-cache
- * chunk that only contains information on defined values. If chunk is passed as NULL and the callback
- * requires a chunk to be passed with (at least) the defined values selection, this callback shall return
- * *require_values=true and *file_space_out=NULL. Optional, if not present, chunk I/O is only performed on
- * entire chunks or with selection I/O. The H5SC code checks for type conversion before calling this.
- * partial_bound is true if the on-disk chunk was encoded with partial_bound set to true. If the dataset
- * reported partial_bound_chunks_different_encoding as false, the setting of partial_bound is undefined. */
+/*
+ * Called when the chunk cache wants to describe a direct write to the
+ * on-disk chunk representation as a vector of file offsets and byte sizes.
+ *
+ * file_space_in describes the selected elements in logical chunk coordinates.
+ * addr is the on-disk base address of the chunk. If the requested selection
+ * cannot be represented for direct vector I/O, for example because the
+ * on-disk representation requires encoding or filtering, the callback sets
+ * *vector_possible to false.
+ *
+ * When vector I/O is possible, the callback sets *vector_possible to true,
+ * returns the number of file vectors in *vec_count, and allocates/populates
+ * *offsets and *sizes. Returned offsets are absolute file offsets rather than
+ * offsets relative to the beginning of the chunk.
+ *
+ * chunk may be NULL or may reference a decoded object containing at least
+ * defined-value information. If the callback cannot determine the requested
+ * vectors without defined-value state that is not currently available, it
+ * sets *require_values to true and does not return a usable vector.
+ *
+ * This callback is optional. If it is not provided, the SCC must use another
+ * supported I/O path.
+ *
+ * The SCC must verify that direct vector I/O is compatible with any required
+ * datatype conversion before using the returned vectors.
+ *
+ * partial_bound is true when the on-disk chunk was encoded as a partial-edge
+ * chunk. If the layout reports partial_bound_chunks_different_encoding as
+ * false, the value of partial_bound is not significant.
+ */
 typedef herr_t (*H5SC_chunk_vector_write_t)(H5D_t *dset, haddr_t addr, const H5S_t *file_space_in,
                                             bool partial_bound, void *chunk /*in*/, size_t *vec_count /*out*/,
                                             haddr_t **offsets /*out*/, size_t **sizes /*out*/,
@@ -343,29 +562,28 @@ struct H5SC_layout_ops_t {
 /***************************************/
 
 /* Functions that operate on a shared chunk cache */
-H5_DLL H5SC_t *H5SC_create(H5F_t *file, H5P_genplist_t *fa_plist,
-                           H5SC__cache_config_t *config_ptr); /* in docs */
-H5_DLL herr_t  H5SC_destroy(H5SC_t *cache);                   /* in docs */
+H5_DLL H5SC_t *H5SC_create(H5F_t *file, H5P_genplist_t *fa_plist, H5SC__cache_config_t *config_ptr);
+H5_DLL herr_t  H5SC_destroy(H5SC_t *cache);
 
 /* Flush functions */
-H5_DLL herr_t H5SC_flush(H5SC_t *cache);                               /* in docs */
-H5_DLL herr_t H5SC_flush_dset(H5SC_t *cache, H5D_t *dset, bool evict); /* in docs */
+H5_DLL herr_t H5SC_flush(H5SC_t *cache);
+H5_DLL herr_t H5SC_flush_dset(H5SC_t *cache, H5D_t *dset, bool evict_after_flush);
 
 /* I/O functions */
 H5_DLL herr_t H5SC_invoke_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info);
 H5_DLL herr_t H5SC_invoke_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info);
-H5_DLL herr_t H5SC_read(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info);  /* in docs */
-H5_DLL herr_t H5SC_write(H5SC_t *cache, size_t count, H5D_dset_io_info_t *dset_info); /* in docs */
+H5_DLL herr_t H5SC_read(H5SC_t *cache, H5D_dset_io_info_t *dset_info);
+H5_DLL herr_t H5SC_write(H5SC_t *cache, H5D_dset_io_info_t *dset_info);
 H5_DLL herr_t H5SC_direct_chunk_read(H5SC_t *cache, H5D_t *dset, const hsize_t *offset, void *udata,
-                                     void *buf, size_t *buf_size); /* in docs*/
+                                     void *buf, size_t *buf_size);
 H5_DLL herr_t H5SC_direct_chunk_write(H5SC_t *cache, H5D_t *dset, const hsize_t *offset, void *udata,
-                                      const void *buf);                              /* in docs */
-H5_DLL H5S_t *H5SC_get_defined(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space); /* in docs */
-H5_DLL herr_t H5SC_erase(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space);       /* in docs*/
+                                      const void *buf);
+H5_DLL H5S_t *H5SC_get_defined(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space);
+H5_DLL herr_t H5SC_erase(H5SC_t *cache, H5D_t *dset, const H5S_t *file_space);
 
 /* Other functions */
-H5_DLL herr_t H5SC_set_extent_notify(H5SC_t *cache, H5D_t *dset, const hsize_t *old_dims); /* in docs*/
-H5_DLL herr_t H5SC_validate_config(const H5SC__cache_config_t *config_ptr);                /* in docs */
+H5_DLL herr_t H5SC_set_extent_notify(H5SC_t *cache, H5D_t *dset, const hsize_t *old_dims);
+H5_DLL herr_t H5SC_validate_config(const H5SC__cache_config_t *config_ptr);
 
 /* Dataset specific helper functions */
 
@@ -374,6 +592,18 @@ H5_DLL herr_t              H5SC_dset_destroy_header(H5SC_t *cache, H5D_t *dset, 
 
 H5_DLL herr_t  H5SC_dset_is_empty(H5SC_dset_header_t *dset_hdr, bool *is_empty);
 H5_DLL haddr_t H5SC_dset_get_addr(H5SC_dset_header_t *dset_hdr);
+
+#if H5SC_DO_SANITY_CHECKS
+H5_DLL herr_t H5SC__test_chunk_pin(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk);
+H5_DLL herr_t H5SC__test_chunk_unpin(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk);
+H5_DLL herr_t H5SC__test_chunk_set_dirty(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, H5SC_chunk_t *chunk,
+                                         bool dirty);
+H5_DLL herr_t H5SC__test_ensure_space(H5SC_t *cache, size_t bytes_needed);
+H5_DLL herr_t H5SC__test_ensure_oversized_single_chunk_space(H5SC_t *cache, size_t bytes_needed);
+H5_DLL herr_t H5SC__test_trim_to_quiescent_limit(H5SC_t *cache);
+H5_DLL herr_t H5SC__test_account_chunk_link_change(H5SC_t *cache, H5SC_dset_header_t *dset_hdr,
+                                                   size_t old_dset_size);
+#endif
 
 /* Hash Table Functions
  * Heads are stored on H5SC_t; these helpers only link/unlink.
@@ -395,17 +625,17 @@ herr_t              H5SC__ht_dset_delete(H5SC_t *cache, haddr_t addr);
 herr_t H5SC__drop_dset_chunks_for_test(H5SC_t *cache, H5D_t *dset);
 
 /* Dataset specific DLL functions */
-herr_t H5SC__dset_lru_append(H5SC_t *cache, H5SC_dset_header_t *dset_hdr);
 herr_t H5SC__dset_lru_prepend(H5SC_t *cache, struct H5SC_dset_header_t *dset_hdr);
 herr_t H5SC__dset_lru_promote(H5SC_t *cache, H5SC_dset_header_t *dset_hdr);
 herr_t H5SC__dset_lru_remove(H5SC_t *cache, struct H5SC_dset_header_t *dset_hdr);
 
 /* Chunk specific DLL functions */
-herr_t H5SC__chunk_lru_prepend(struct H5SC_dset_header_t *dset_hdr, struct H5SC_chunk_t *chunk);
-herr_t H5SC__chunk_lru_remove(struct H5SC_dset_header_t *dset_hdr, struct H5SC_chunk_t *chunk);
+herr_t H5SC__chunk_lru_prepend(H5SC_t *cache, struct H5SC_dset_header_t *dset_hdr,
+                               struct H5SC_chunk_t *chunk);
+herr_t H5SC__chunk_lru_remove(H5SC_t *cache, struct H5SC_dset_header_t *dset_hdr, struct H5SC_chunk_t *chunk);
 
 /* Internal size operations */
-herr_t H5SC__chunk_update_cached_size(H5SC_dset_header_t *dset_hdr, struct H5SC_chunk_t *chunk,
+herr_t H5SC__chunk_update_cached_size(H5SC_t *cache, H5SC_dset_header_t *dset_hdr, struct H5SC_chunk_t *chunk,
                                       size_t new_size);
 
 H5SC_chunk_t *H5SC__make_chunk(H5SC_chunk_key_t key, size_t cached_sz, size_t counter, bool pio);

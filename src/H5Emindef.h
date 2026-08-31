@@ -210,6 +210,7 @@ static const H5E_msg_t H5E_CANNOTEVICT_msg_s = {false, "Failed to evict chunk", 
 static const H5E_msg_t H5E_CANNOTFLUSH_msg_s = {false, "Failed to flush dataset properly", H5E_MINOR, &H5E_err_cls_s};
 static const H5E_msg_t H5E_CANNOTFREE_msg_s = {false, "Failed to free structure", H5E_MINOR, &H5E_err_cls_s};
 static const H5E_msg_t H5E_CANNOTGET_msg_s = {false, "Failed to fetch queried element", H5E_MINOR, &H5E_err_cls_s};
+static const H5E_msg_t H5E_CANNOTGET_SELECTION_msg_s = {false, "Failed to get defined falue selection", H5E_MINOR, &H5E_err_cls_s};
 static const H5E_msg_t H5E_CANNOTINSERT_msg_s = {false, "Failed to insert element", H5E_MINOR, &H5E_err_cls_s};
 static const H5E_msg_t H5E_CANNOTPREPEND_msg_s = {false, "Failed to prepend element to DLL", H5E_MINOR, &H5E_err_cls_s};
 static const H5E_msg_t H5E_CANNOTREMOVE_msg_s = {false, "Failed to remove element", H5E_MINOR, &H5E_err_cls_s};

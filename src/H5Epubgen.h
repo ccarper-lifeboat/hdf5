@@ -438,6 +438,7 @@ H5_DLLVAR hid_t H5E_OBJOPEN_g;       /* Object is already open */
 #define H5E_CANNOTFLUSH      (H5OPEN H5E_CANNOTFLUSH_g)
 #define H5E_CANNOTFREE       (H5OPEN H5E_CANNOTFREE_g)
 #define H5E_CANNOTGET        (H5OPEN H5E_CANNOTGET_g)
+#define H5E_CANNOTGET_SELECTION (H5OPEN H5E_CANNOTGET_SELECTION_g)
 #define H5E_CANNOTINSERT     (H5OPEN H5E_CANNOTINSERT_g)
 #define H5E_CANNOTPREPEND    (H5OPEN H5E_CANNOTPREPEND_g)
 #define H5E_CANNOTREMOVE     (H5OPEN H5E_CANNOTREMOVE_g)
@@ -463,6 +464,7 @@ H5_DLLVAR hid_t H5E_CANNOTEVICT_g;   /* Failed to evict chunk */
 H5_DLLVAR hid_t H5E_CANNOTFLUSH_g;   /* Failed to flush dataset properly */
 H5_DLLVAR hid_t H5E_CANNOTFREE_g;    /* Failed to free structure */
 H5_DLLVAR hid_t H5E_CANNOTGET_g;     /* Failed to fetch queried element */
+H5_DLLVAR hid_t H5E_CANNOTGET_SELECTION_g; /* Failed to get defined falue selection */
 H5_DLLVAR hid_t H5E_CANNOTINSERT_g;  /* Failed to insert element */
 H5_DLLVAR hid_t H5E_CANNOTPREPEND_g; /* Failed to prepend element to DLL */
 H5_DLLVAR hid_t H5E_CANNOTREMOVE_g;  /* Failed to remove element */
